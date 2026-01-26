@@ -38,11 +38,11 @@ async function seedLocations() {
 
   const dataSource = new DataSource({
     type: 'postgres',
-    host: process.env.CONFIG_POSTGRESQL_HOST || 'localhost',
-    port: parseInt(process.env.CONFIG_POSTGRESQL_PORT || '5432'),
-    username: process.env.CONFIG_POSTGRESQL_USERNAME || 'postgres',
-    password: process.env.CONFIG_POSTGRESQL_PASSWORD || 'postgres',
-    database: process.env.CONFIG_POSTGRESQL_DB_NAME || 'techres_admin',
+    host: process.env.CONFIG_POSTGRESQL_HOST_MASTER || 'localhost',
+    port: parseInt(process.env.CONFIG_POSTGRESQL_PORT_MASTER || '5432'),
+    username: process.env.CONFIG_POSTGRESQL_USERNAME_MASTER || 'postgres',
+    password: process.env.CONFIG_POSTGRESQL_PASSWORD_MASTER || 'postgres',
+    database: process.env.CONFIG_POSTGRESQL_DB_NAME_MASTER || 'techres_master',
     synchronize: false,
     logging: false,
   });

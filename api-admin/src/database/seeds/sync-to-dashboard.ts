@@ -81,11 +81,11 @@ async function syncAllData() {
   // Connect to techres_master database
   const dataSource = new DataSource({
     type: 'postgres',
-    host: process.env.CONFIG_POSTGRESQL_HOST || '172.16.10.146',
-    port: parseInt(process.env.CONFIG_POSTGRESQL_PORT || '5432'),
-    username: process.env.CONFIG_POSTGRESQL_USERNAME || 'techres_master',
-    password: process.env.CONFIG_POSTGRESQL_PASSWORD || 'techres_master',
-    database: process.env.CONFIG_POSTGRESQL_DB_NAME || 'techres_master',
+    host: process.env.CONFIG_POSTGRESQL_HOST_MASTER || '172.16.10.146',
+    port: parseInt(process.env.CONFIG_POSTGRESQL_PORT_MASTER || '5432'),
+    username: process.env.CONFIG_POSTGRESQL_USERNAME_MASTER || 'techres_master',
+    password: process.env.CONFIG_POSTGRESQL_PASSWORD_MASTER || 'techres_master',
+    database: process.env.CONFIG_POSTGRESQL_DB_NAME_MASTER || 'techres_master',
     synchronize: false,
     logging: false,
   });

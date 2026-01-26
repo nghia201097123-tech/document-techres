@@ -51,11 +51,11 @@ import { PublicModule } from './modules/public/public.module';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
-        host: configService.get('CONFIG_POSTGRESQL_HOST', '172.16.10.146'),
-        port: configService.get<number>('CONFIG_POSTGRESQL_PORT', 5432),
-        username: configService.get('CONFIG_POSTGRESQL_USERNAME', 'techres_master'),
-        password: configService.get('CONFIG_POSTGRESQL_PASSWORD', 'techres_master'),
-        database: configService.get('CONFIG_POSTGRESQL_DB_NAME', 'techres_master'),
+        host: configService.get('CONFIG_POSTGRESQL_HOST_MASTER', '172.16.10.146'),
+        port: configService.get<number>('CONFIG_POSTGRESQL_PORT_MASTER', 5432),
+        username: configService.get('CONFIG_POSTGRESQL_USERNAME_MASTER', 'techres_master'),
+        password: configService.get('CONFIG_POSTGRESQL_PASSWORD_MASTER', 'techres_master'),
+        database: configService.get('CONFIG_POSTGRESQL_DB_NAME_MASTER', 'techres_master'),
         entities: [
           Company,
           Brand,

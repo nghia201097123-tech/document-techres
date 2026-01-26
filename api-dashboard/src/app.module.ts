@@ -86,11 +86,11 @@ import { PublicModule } from "./modules/public/public.module";
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: "postgres",
-        host: configService.get("CONFIG_POSTGRESQL_HOST", "172.16.10.146"),
-        port: configService.get("CONFIG_POSTGRESQL_PORT", 5432),
-        username: configService.get("CONFIG_POSTGRESQL_USERNAME", "techres"),
-        password: configService.get("CONFIG_POSTGRESQL_PASSWORD", "techres"),
-        database: configService.get("CONFIG_POSTGRESQL_DB_NAME", "techres"),
+        host: configService.get("CONFIG_POSTGRESQL_HOST_TECHRES", "172.16.10.146"),
+        port: configService.get("CONFIG_POSTGRESQL_PORT_TECHRES", 5432),
+        username: configService.get("CONFIG_POSTGRESQL_USERNAME_TECHRES", "techres"),
+        password: configService.get("CONFIG_POSTGRESQL_PASSWORD_TECHRES", "techres"),
+        database: configService.get("CONFIG_POSTGRESQL_DB_NAME_TECHRES", "techres"),
         entities: [
           Company,
           Brand,

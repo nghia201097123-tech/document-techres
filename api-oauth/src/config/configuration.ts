@@ -3,11 +3,11 @@ export default () => ({
   nodeEnv: process.env.NODE_ENV || 'development',
 
   database: {
-    host: process.env.CONFIG_POSTGRESQL_HOST || 'localhost',
-    port: parseInt(process.env.CONFIG_POSTGRESQL_PORT, 10) || 5432,
-    username: process.env.CONFIG_POSTGRESQL_USERNAME || 'postgres',
-    password: process.env.CONFIG_POSTGRESQL_PASSWORD || 'postgres',
-    database: process.env.CONFIG_POSTGRESQL_DB_NAME || 'fnbpos_oauth',
+    host: process.env.CONFIG_POSTGRESQL_HOST_OAUTH || 'localhost',
+    port: parseInt(process.env.CONFIG_POSTGRESQL_PORT_OAUTH, 10) || 5432,
+    username: process.env.CONFIG_POSTGRESQL_USERNAME_OAUTH || 'postgres',
+    password: process.env.CONFIG_POSTGRESQL_PASSWORD_OAUTH || 'postgres',
+    database: process.env.CONFIG_POSTGRESQL_DB_NAME_OAUTH || 'fnbpos_oauth',
   },
 
   jwt: {
