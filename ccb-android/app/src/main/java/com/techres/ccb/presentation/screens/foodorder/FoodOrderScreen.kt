@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.techres.ccb.domain.model.*
 import com.techres.ccb.presentation.components.PosTopAppBar
 import java.text.SimpleDateFormat
@@ -327,19 +329,93 @@ fun FoodOrderCard(
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
                 )
-                Spacer(modifier = Modifier.width(12.dp))
-                Icon(
-                    Icons.Default.Phone,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.outline
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    order.customerPhone,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                if (order.customerPhone.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Icon(
+                        Icons.Default.Phone,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        order.customerPhone,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            // Driver info (if assigned)
+            if (order.driverName != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Color(0xFF4CAF50).copy(alpha = 0.1f),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Driver avatar
+                    if (order.driverAvatar != null) {
+                        AsyncImage(
+                            model = order.driverAvatar,
+                            contentDescription = "Driver avatar",
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, Color(0xFF4CAF50), CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .background(Color(0xFF4CAF50).copy(alpha = 0.2f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.DeliveryDining,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = Color(0xFF4CAF50)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Tài xế: ${order.driverName}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF2E7D32)
+                        )
+                        // Order content message (e.g., "Driver is nearby")
+                        order.orderContentMessage?.let { message ->
+                            Text(
+                                message,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF4CAF50)
+                            )
+                        }
+                    }
+                    order.driverPhone?.let { phone ->
+                        IconButton(
+                            onClick = { /* TODO: Call driver */ },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Phone,
+                                contentDescription = "Gọi tài xế",
+                                tint = Color(0xFF4CAF50),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
             }
 
             // Items summary
@@ -604,18 +680,73 @@ fun OrderDetailDialog(
                     if (order.driverName != null) {
                         item {
                             DetailSection(title = "Tài xế") {
-                                DetailRow(
-                                    icon = Icons.Default.DeliveryDining,
-                                    label = "Tên",
-                                    value = order.driverName
-                                )
-                                order.driverPhone?.let {
-                                    DetailRow(
-                                        icon = Icons.Default.Phone,
-                                        label = "SĐT",
-                                        value = it,
-                                        isLink = true
-                                    )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Driver avatar
+                                    if (order.driverAvatar != null) {
+                                        AsyncImage(
+                                            model = order.driverAvatar,
+                                            contentDescription = "Driver avatar",
+                                            modifier = Modifier
+                                                .size(56.dp)
+                                                .clip(CircleShape)
+                                                .border(2.dp, Color(0xFF4CAF50), CircleShape),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(56.dp)
+                                                .background(Color(0xFF4CAF50).copy(alpha = 0.2f), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                Icons.Default.DeliveryDining,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(32.dp),
+                                                tint = Color(0xFF4CAF50)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            order.driverName ?: "",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        order.driverPhone?.let { phone ->
+                                            Text(
+                                                phone,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        order.orderContentMessage?.let { message ->
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                message,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = Color(0xFF4CAF50),
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                    order.driverPhone?.let {
+                                        IconButton(
+                                            onClick = { /* TODO: Call driver */ }
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Phone,
+                                                contentDescription = "Gọi tài xế",
+                                                tint = Color(0xFF4CAF50)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
