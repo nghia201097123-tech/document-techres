@@ -3,6 +3,8 @@ package com.techres.ccb.presentation.screens.settings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.techres.ccb.data.local.dao.FoodPlatformAccountDao
+import com.techres.ccb.data.repository.AuthRepository
 import com.techres.ccb.data.repository.FoodPlatformRepository
 import com.techres.ccb.data.repository.SyncRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,7 +45,9 @@ data class ReconnectResult(
 @HiltViewModel
 class FoodPartnerConnectionViewModel @Inject constructor(
     private val syncRepository: SyncRepository,
-    private val foodPlatformRepository: FoodPlatformRepository
+    private val foodPlatformRepository: FoodPlatformRepository,
+    private val foodPlatformAccountDao: FoodPlatformAccountDao,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     companion object {
@@ -56,51 +60,71 @@ class FoodPartnerConnectionViewModel @Inject constructor(
     private val dateFormat = SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault())
 
     /**
-     * Load food platform accounts from local sync data
-     * Data is synced via sync/full endpoint and stored in SharedPreferences
+     * Load food platform accounts from Room database
+     * Data is synced via sync/full endpoint and stored in Room DB
      */
     fun loadAccounts() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             try {
-                // Read food platform data from local storage (synced via sync/full)
-                val foodPlatformData = syncRepository.getFoodPlatformData()
-                Log.d(TAG, "loadAccounts - foodPlatformData: ${foodPlatformData != null}")
+                // Get current branch ID
+                val branchId = authRepository.getBranchId()
+                Log.d(TAG, "loadAccounts - branchId: $branchId")
 
-                if (foodPlatformData == null) {
-                    Log.d(TAG, "loadAccounts - No food platform data found in local storage")
+                if (branchId == null) {
+                    Log.d(TAG, "loadAccounts - No branch ID found")
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             accounts = emptyList(),
                             lastSyncTime = null,
-                            error = "Chưa có dữ liệu cổng liên kết. Vui lòng đồng bộ dữ liệu."
+                            error = "Chưa đăng nhập chi nhánh. Vui lòng đăng nhập lại."
                         )
                     }
                     return@launch
                 }
 
-                // Map accounts from sync data
-                val accounts = foodPlatformData.accounts?.map { accountData ->
-                    FoodPartnerAccount(
-                        id = accountData.account.id,
-                        platform = accountData.account.platform,
-                        displayName = accountData.account.displayName,
-                        username = accountData.account.username,
-                        status = accountData.account.status,
-                        lastError = accountData.account.lastError,
-                        errorCount = accountData.account.errorCount ?: 0
-                    )
-                } ?: emptyList()
+                // Read food platform accounts from Room database
+                val accountEntities = foodPlatformAccountDao.getActiveAccountsList(branchId)
+                Log.d(TAG, "loadAccounts - Found ${accountEntities.size} accounts in Room DB for branch $branchId")
 
-                Log.d(TAG, "loadAccounts - Found ${accounts.size} accounts")
+                if (accountEntities.isEmpty()) {
+                    Log.d(TAG, "loadAccounts - No food platform accounts found in Room DB")
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            accounts = emptyList(),
+                            lastSyncTime = null,
+                            error = "Chưa có cổng liên kết nào. Vui lòng đồng bộ dữ liệu hoặc thêm liên kết mới."
+                        )
+                    }
+                    return@launch
+                }
+
+                // Map entities to UI model
+                val accounts = accountEntities.map { entity ->
+                    FoodPartnerAccount(
+                        id = entity.id,
+                        platform = entity.platform,
+                        displayName = entity.displayName,
+                        username = entity.username,
+                        status = entity.status,
+                        lastError = entity.lastError,
+                        errorCount = entity.errorCount
+                    )
+                }
+
+                // Get last sync time from first account
+                val lastSyncTime = accountEntities.firstOrNull()?.syncedAt
+
+                Log.d(TAG, "loadAccounts - Successfully loaded ${accounts.size} accounts")
 
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         accounts = accounts,
-                        lastSyncTime = foodPlatformData.syncedAt,
+                        lastSyncTime = lastSyncTime,
                         error = null
                     )
                 }
@@ -131,10 +155,15 @@ class FoodPartnerConnectionViewModel @Inject constructor(
                 val message = if (success) "Kết nối lại thành công" else (response.message ?: "Không thể kết nối lại")
 
                 // Update local account status if reconnect was successful
+                if (success) {
+                    // Update in Room DB
+                    foodPlatformAccountDao.updateStatus(accountId, "CONNECTED", null, 0)
+                }
+
                 val updatedAccounts = if (success) {
                     _uiState.value.accounts.map { account ->
                         if (account.id == accountId) {
-                            account.copy(status = "connected", lastError = null, errorCount = 0)
+                            account.copy(status = "CONNECTED", lastError = null, errorCount = 0)
                         } else {
                             account
                         }
@@ -243,10 +272,13 @@ class FoodPartnerConnectionViewModel @Inject constructor(
 
                 result.fold(
                     onSuccess = { disconnectResult ->
+                        // Update in Room DB
+                        foodPlatformAccountDao.updateStatus(accountId, "DISCONNECTED", null, 0)
+
                         // Update the account status in the UI
                         val updatedAccounts = _uiState.value.accounts.map { account ->
                             if (account.id == accountId) {
-                                account.copy(status = "disconnected")
+                                account.copy(status = "DISCONNECTED")
                             } else {
                                 account
                             }
