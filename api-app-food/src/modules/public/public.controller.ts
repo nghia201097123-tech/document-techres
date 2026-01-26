@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Query, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Logger, UnauthorizedException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -414,23 +414,65 @@ export class PublicController {
             ? pageType as 'New' | 'Preparing' | 'Ready' | 'Delivering'
             : 'Preparing';
 
-          const result = await this.grabConnector.fetchOrdersPagination(account, validPageType);
+          let result;
+          let currentAccount = account;
 
-          if (!result.success) {
+          try {
+            result = await this.grabConnector.fetchOrdersPagination(currentAccount, validPageType);
+          } catch (fetchError: any) {
+            // Check if it's a token expiry error (UnauthorizedException)
+            const isUnauthorized = fetchError instanceof UnauthorizedException ||
+              fetchError?.name === 'UnauthorizedException' ||
+              fetchError?.status === 401 ||
+              fetchError?.message?.includes('Token hết hạn') ||
+              fetchError?.message?.includes('401');
+
+            if (isUnauthorized) {
+              this.logger.log(`[pollOrders] Token expired for account ${account.id}, attempting to reconnect...`);
+
+              try {
+                // Try to reconnect using stored credentials
+                currentAccount = await this.accountsService.reconnect(account.id);
+                this.logger.log(`[pollOrders] Reconnect success! Retrying fetch orders...`);
+
+                // Retry once with new token
+                result = await this.grabConnector.fetchOrdersPagination(currentAccount, validPageType);
+              } catch (reconnectError: any) {
+                this.logger.error(`[pollOrders] Reconnect failed for account ${account.id}: ${reconnectError?.message}`);
+
+                // Return reconnect error
+                platformResults.push({
+                  platform: account.platform,
+                  accountId: account.id,
+                  displayName: account.displayName || account.username || account.platform,
+                  success: false,
+                  ordersCount: 0,
+                  newOrdersCount: 0,
+                  error: `Token hết hạn và không thể kết nối lại: ${reconnectError?.message || 'Unknown error'}`,
+                });
+                continue;
+              }
+            } else {
+              // Re-throw non-auth errors
+              throw fetchError;
+            }
+          }
+
+          if (!result || !result.success) {
             // Update account error status
-            await this.accountRepo.update(account.id, {
-              errorCount: account.errorCount + 1,
-              lastError: result.error || 'Lấy đơn hàng thất bại',
+            await this.accountRepo.update(currentAccount.id, {
+              errorCount: currentAccount.errorCount + 1,
+              lastError: result?.error || 'Lấy đơn hàng thất bại',
             });
 
             platformResults.push({
-              platform: account.platform,
-              accountId: account.id,
-              displayName: account.displayName || account.username || account.platform,
+              platform: currentAccount.platform,
+              accountId: currentAccount.id,
+              displayName: currentAccount.displayName || currentAccount.username || currentAccount.platform,
               success: false,
               ordersCount: 0,
               newOrdersCount: 0,
-              error: result.error || 'Lấy đơn hàng thất bại',
+              error: result?.error || 'Lấy đơn hàng thất bại',
             });
             continue;
           }
@@ -479,8 +521,8 @@ export class PublicController {
             } else {
               // Create new order
               const newOrder = new FoodOrder();
-              newOrder.tenantId = account.tenantId;
-              newOrder.branchId = account.branchId;
+              newOrder.tenantId = currentAccount.tenantId;
+              newOrder.branchId = currentAccount.branchId;
               newOrder.externalOrderId = rawOrder.externalOrderId;
               newOrder.orderCode = rawOrder.orderCode;
               newOrder.platform = FoodPlatformType.GRAB;
@@ -506,7 +548,7 @@ export class PublicController {
               if (rawOrder.readyAt) newOrder.preparedAt = rawOrder.readyAt;
               if (rawOrder.completedAt) newOrder.completedAt = rawOrder.completedAt;
               if (rawOrder.cancelledAt) newOrder.cancelledAt = rawOrder.cancelledAt;
-              newOrder.accountId = account.id;
+              newOrder.accountId = currentAccount.id;
               newOrder.rawData = rawOrder.rawData || null;
 
               const saved = await this.orderRepo.save(newOrder);
@@ -516,7 +558,7 @@ export class PublicController {
           }
 
           // Update account last poll time
-          await this.accountRepo.update(account.id, {
+          await this.accountRepo.update(currentAccount.id, {
             lastPollAt: new Date(),
             errorCount: 0,
             lastError: null,
@@ -526,16 +568,16 @@ export class PublicController {
           allNewOrderIds.push(...newOrderIds);
 
           platformResults.push({
-            platform: account.platform,
-            accountId: account.id,
-            displayName: account.displayName || account.username || account.platform,
+            platform: currentAccount.platform,
+            accountId: currentAccount.id,
+            displayName: currentAccount.displayName || currentAccount.username || currentAccount.platform,
             success: true,
             ordersCount: savedOrders.length,
             newOrdersCount: newOrderIds.length,
             orderStats: result.orderStats,
           });
 
-          this.logger.log(`[pollOrders] ${account.platform}: Saved ${savedOrders.length} orders (${newOrderIds.length} new)`);
+          this.logger.log(`[pollOrders] ${currentAccount.platform}: Saved ${savedOrders.length} orders (${newOrderIds.length} new)`);
 
         } catch (accountError: any) {
           this.logger.error(`[pollOrders] Error processing account ${account.id}: ${accountError.message}`);
