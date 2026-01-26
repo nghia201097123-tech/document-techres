@@ -16,6 +16,7 @@ import {
   OrderActionResult,
   GrabPaginationOrder,
   GrabOrdersPaginationResponse,
+  OrdersPaginationResponse,
 } from './interfaces/connector.interface';
 
 /**
@@ -480,6 +481,50 @@ export class GrabConnector extends BasePlatformConnector {
   }
 
   /**
+   * Fetch orders using pagination API - Returns standardized OrdersPaginationResponse
+   * Implements IPlatformConnector.fetchOrdersPagination
+   * This is the method that should be called from PublicController
+   */
+  async fetchOrdersPaginationStandard(
+    account: FoodPlatformAccount,
+    pageType: string = 'Preparing',
+  ): Promise<OrdersPaginationResponse> {
+    const validPageType = ['New', 'Preparing', 'Ready', 'Delivering'].includes(pageType)
+      ? pageType as 'New' | 'Preparing' | 'Ready' | 'Delivering'
+      : 'Preparing';
+
+    const grabResponse = await this.fetchOrdersPagination(account, validPageType);
+
+    if (!grabResponse.success) {
+      return {
+        success: false,
+        orders: [],
+        pollInterval: grabResponse.pollInterval,
+        hasMore: grabResponse.hasMore,
+        error: grabResponse.error,
+      };
+    }
+
+    // Transform Grab orders to standardized RawFoodOrder format
+    const transformedOrders = grabResponse.orders.map((grabOrder) =>
+      this.transformPaginationOrder(grabOrder),
+    );
+
+    return {
+      success: true,
+      orders: transformedOrders,
+      pollInterval: grabResponse.pollInterval,
+      hasMore: grabResponse.hasMore,
+      orderStats: grabResponse.orderStats ? {
+        newCount: grabResponse.orderStats.numberInNew || 0,
+        preparingCount: grabResponse.orderStats.numberInPrepare || 0,
+        readyCount: grabResponse.orderStats.numberInReady || 0,
+        deliveringCount: grabResponse.orderStats.numberInDelivering || 0,
+      } : undefined,
+    };
+  }
+
+  /**
    * Transform Grab pagination order to RawFoodOrder format
    */
   transformPaginationOrder(grabOrder: GrabPaginationOrder): RawFoodOrder {
@@ -547,10 +592,18 @@ export class GrabConnector extends BasePlatformConnector {
   }
 
   /**
-   * Map GrabFood status to standard status
+   * Map GrabFood status to TechRes status
+   * Implements IPlatformConnector.mapStatusToTechRes
+   */
+  mapStatusToTechRes(platformStatus: string): string {
+    return GRAB_STATUS_MAP[platformStatus] || FoodOrderStatus.NEW;
+  }
+
+  /**
+   * Map GrabFood status to standard status (internal use)
    */
   private mapGrabStatus(state: string): string {
-    return GRAB_STATUS_MAP[state] || FoodOrderStatus.NEW;
+    return this.mapStatusToTechRes(state);
   }
 
   /**

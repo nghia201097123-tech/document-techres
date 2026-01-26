@@ -9,7 +9,37 @@ import {
   MerchantStore,
   RawFoodOrder,
   OrderActionResult,
+  OrdersPaginationResponse,
 } from './interfaces/connector.interface';
+
+/**
+ * ShopeeFood Status Mapping - Simplified TechRes Flow
+ * Maps ShopeeFood API states to TechRes statuses:
+ * - Đơn mới (NEW)
+ * - Đã xác nhận (PREPARING) - all in-progress states
+ * - Hoàn tất (COMPLETED)
+ * - Huỷ (CANCELLED)
+ */
+const SHOPEE_STATUS_MAP: Record<string, string> = {
+  // Đơn mới (NEW)
+  '1': FoodOrderStatus.NEW,
+  'PENDING': FoodOrderStatus.NEW,
+  // Đã xác nhận (PREPARING) - all in-progress states
+  '2': FoodOrderStatus.PREPARING,
+  '3': FoodOrderStatus.PREPARING,
+  '4': FoodOrderStatus.PREPARING,
+  '5': FoodOrderStatus.PREPARING,
+  'CONFIRMED': FoodOrderStatus.PREPARING,
+  'PREPARING': FoodOrderStatus.PREPARING,
+  'READY': FoodOrderStatus.PREPARING,
+  'SHIPPING': FoodOrderStatus.PREPARING,
+  // Hoàn tất (COMPLETED)
+  '6': FoodOrderStatus.COMPLETED,
+  'COMPLETED': FoodOrderStatus.COMPLETED,
+  // Huỷ (CANCELLED)
+  '7': FoodOrderStatus.CANCELLED,
+  'CANCELLED': FoodOrderStatus.CANCELLED,
+};
 
 /**
  * ShopeeFood Platform Connector
@@ -241,26 +271,59 @@ export class ShopeeConnector extends BasePlatformConnector {
   }
 
   /**
-   * Map Shopee status to standard status
+   * Map ShopeeFood status to TechRes status
+   * Implements IPlatformConnector.mapStatusToTechRes
+   */
+  mapStatusToTechRes(platformStatus: string): string {
+    return SHOPEE_STATUS_MAP[platformStatus?.toString()] || FoodOrderStatus.NEW;
+  }
+
+  /**
+   * Map Shopee status to standard status (internal use)
    */
   private mapStatus(shopeeStatus: number | string): string {
-    const statusMap: Record<string, string> = {
-      '1': FoodOrderStatus.NEW,
-      '2': FoodOrderStatus.ACCEPTED,
-      '3': FoodOrderStatus.PREPARING,
-      '4': FoodOrderStatus.READY,
-      '5': FoodOrderStatus.DELIVERING,
-      '6': FoodOrderStatus.COMPLETED,
-      '7': FoodOrderStatus.CANCELLED,
-      PENDING: FoodOrderStatus.NEW,
-      CONFIRMED: FoodOrderStatus.ACCEPTED,
-      PREPARING: FoodOrderStatus.PREPARING,
-      READY: FoodOrderStatus.READY,
-      SHIPPING: FoodOrderStatus.DELIVERING,
-      COMPLETED: FoodOrderStatus.COMPLETED,
-      CANCELLED: FoodOrderStatus.CANCELLED,
-    };
-    return statusMap[shopeeStatus?.toString()] || FoodOrderStatus.NEW;
+    return this.mapStatusToTechRes(shopeeStatus?.toString());
+  }
+
+  /**
+   * Fetch orders using pagination API - Returns standardized OrdersPaginationResponse
+   * Implements IPlatformConnector.fetchOrdersPagination
+   */
+  async fetchOrdersPaginationStandard(
+    account: FoodPlatformAccount,
+    _pageType?: string,
+  ): Promise<OrdersPaginationResponse> {
+    try {
+      const params: Record<string, unknown> = {
+        page_size: 50,
+      };
+
+      const response = await this.authenticatedRequest<{ orders: any[] }>(
+        account,
+        'get',
+        '/orders',
+        undefined,
+        params,
+      );
+
+      const orders = response.orders.map((order) => this.transformOrder(order));
+
+      return {
+        success: true,
+        orders,
+        pollInterval: 15,
+        hasMore: false,
+      };
+    } catch (error: any) {
+      this.logger.error('ShopeeFood fetchOrdersPaginationStandard failed', error);
+      return {
+        success: false,
+        orders: [],
+        pollInterval: 60,
+        hasMore: false,
+        error: error?.message || 'Lấy đơn hàng thất bại',
+      };
+    }
   }
 
   /**

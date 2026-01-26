@@ -4,7 +4,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { FoodPlatformAccount, FoodPlatformStoreMapping, FoodPlatformExternalItem, FoodPlatformItemMapping, FoodOrder, FoodOrderStatus, AccountStatus, FoodPlatformType } from '../../database/entities';
 import { AccountsService } from '../accounts/accounts.service';
+import { ConnectorFactory } from '../connectors/connector.factory';
 import { GrabConnector } from '../connectors/grab.connector';
+import { ShopeeConnector } from '../connectors/shopee.connector';
+import { BeFoodConnector } from '../connectors/befood.connector';
+import { RawFoodOrder } from '../connectors/interfaces/connector.interface';
 
 @ApiTags('public')
 @Controller('public')
@@ -23,7 +27,11 @@ export class PublicController {
     @InjectRepository(FoodOrder)
     private readonly orderRepo: Repository<FoodOrder>,
     private readonly accountsService: AccountsService,
+    private readonly connectorFactory: ConnectorFactory,
+    // Platform-specific connectors for direct access when needed
     private readonly grabConnector: GrabConnector,
+    private readonly shopeeConnector: ShopeeConnector,
+    private readonly beFoodConnector: BeFoodConnector,
   ) {}
 
   @Get('health-check')
@@ -378,22 +386,8 @@ export class PublicController {
       const allSavedOrders: FoodOrder[] = [];
       const allNewOrderIds: string[] = [];
 
-      // Process each account
+      // Process each account - supports all platforms (Grab, Shopee, BeFood)
       for (const account of accounts) {
-        // Only process Grab accounts for now
-        if (account.platform !== FoodPlatformType.GRAB) {
-          platformResults.push({
-            platform: account.platform,
-            accountId: account.id,
-            displayName: account.displayName || account.username || account.platform,
-            success: false,
-            ordersCount: 0,
-            newOrdersCount: 0,
-            error: 'Chưa hỗ trợ nền tảng này',
-          });
-          continue;
-        }
-
         // Check access token
         if (!account.accessToken) {
           platformResults.push({
@@ -409,286 +403,36 @@ export class PublicController {
         }
 
         try {
-          // Fetch orders from GrabFood
-          const validPageType = ['New', 'Preparing', 'Ready', 'Delivering'].includes(pageType)
-            ? pageType as 'New' | 'Preparing' | 'Ready' | 'Delivering'
-            : 'Preparing';
+          // Process orders based on platform
+          const result = await this.processAccountOrders(account, pageType);
 
-          let result;
-          let currentAccount = account;
-
-          try {
-            result = await this.grabConnector.fetchOrdersPagination(currentAccount, validPageType);
-          } catch (fetchError: any) {
-            // Check if it's a token expiry error (UnauthorizedException)
-            const isUnauthorized = fetchError instanceof UnauthorizedException ||
-              fetchError?.name === 'UnauthorizedException' ||
-              fetchError?.status === 401 ||
-              fetchError?.message?.includes('Token hết hạn') ||
-              fetchError?.message?.includes('401');
-
-            if (isUnauthorized) {
-              this.logger.log(`[pollOrders] Token expired for account ${account.id}, attempting to reconnect...`);
-
-              try {
-                // Try to reconnect using stored credentials
-                currentAccount = await this.accountsService.reconnect(account.id);
-                this.logger.log(`[pollOrders] Reconnect success! Retrying fetch orders...`);
-
-                // Retry once with new token
-                result = await this.grabConnector.fetchOrdersPagination(currentAccount, validPageType);
-              } catch (reconnectError: any) {
-                this.logger.error(`[pollOrders] Reconnect failed for account ${account.id}: ${reconnectError?.message}`);
-
-                // Return reconnect error
-                platformResults.push({
-                  platform: account.platform,
-                  accountId: account.id,
-                  displayName: account.displayName || account.username || account.platform,
-                  success: false,
-                  ordersCount: 0,
-                  newOrdersCount: 0,
-                  error: `Token hết hạn và không thể kết nối lại: ${reconnectError?.message || 'Unknown error'}`,
-                });
-                continue;
-              }
-            } else {
-              // Re-throw non-auth errors
-              throw fetchError;
-            }
-          }
-
-          if (!result || !result.success) {
-            // Update account error status
-            await this.accountRepo.update(currentAccount.id, {
-              errorCount: currentAccount.errorCount + 1,
-              lastError: result?.error || 'Lấy đơn hàng thất bại',
-            });
-
+          if (!result.success) {
             platformResults.push({
-              platform: currentAccount.platform,
-              accountId: currentAccount.id,
-              displayName: currentAccount.displayName || currentAccount.username || currentAccount.platform,
+              platform: account.platform,
+              accountId: account.id,
+              displayName: account.displayName || account.username || account.platform,
               success: false,
               ordersCount: 0,
               newOrdersCount: 0,
-              error: result?.error || 'Lấy đơn hàng thất bại',
+              error: result.error || 'Lấy đơn hàng thất bại',
             });
             continue;
           }
 
-          // Save orders to database
-          const savedOrders: FoodOrder[] = [];
-          const newOrderIds: string[] = [];
-
-          for (const grabOrder of result.orders) {
-            let rawOrder = this.grabConnector.transformPaginationOrder(grabOrder);
-
-            // Enrich order with detail API to get customer phone, driver phone, etc.
-            const needsEnrichment = !rawOrder.customerPhone || !rawOrder.driverPhone;
-            if (needsEnrichment) {
-              try {
-                this.logger.log(`[pollOrders] [Enrichment] Fetching detail for order ${rawOrder.externalOrderId}`);
-                const detailOrder = await this.grabConnector.fetchOrderDetail(
-                  currentAccount,
-                  rawOrder.externalOrderId,
-                  rawOrder.orderCode,
-                );
-                if (detailOrder) {
-                  this.logger.log(`[pollOrders] [Enrichment] Got detail: customerPhone=${detailOrder.customerPhone}, driverPhone=${detailOrder.driverPhone}`);
-                  // Merge detail data into rawOrder
-                  rawOrder = {
-                    ...rawOrder,
-                    customerPhone: detailOrder.customerPhone || rawOrder.customerPhone,
-                    customerAddress: detailOrder.customerAddress || rawOrder.customerAddress,
-                    customerNote: detailOrder.customerNote || rawOrder.customerNote,
-                    driverPhone: detailOrder.driverPhone || rawOrder.driverPhone,
-                    driverAvatar: detailOrder.driverAvatar || rawOrder.driverAvatar,
-                    driverLicensePlate: detailOrder.driverLicensePlate || rawOrder.driverLicensePlate,
-                  };
-                }
-              } catch (enrichError: any) {
-                this.logger.warn(`[pollOrders] [Enrichment] Failed for order ${rawOrder.externalOrderId}: ${enrichError.message}`);
-              }
-            }
-
-            // Check if order already exists
-            let existingOrder = await this.orderRepo.findOne({
-              where: {
-                externalOrderId: rawOrder.externalOrderId,
-                platform: FoodPlatformType.GRAB,
-              },
-            });
-
-            if (existingOrder) {
-              // Update existing order
-              const newStatus = this.mapGrabStatusToFoodOrderStatus(rawOrder.status);
-              const statusChanged = existingOrder.status !== newStatus;
-
-              existingOrder.status = newStatus;
-              existingOrder.previousStatus = statusChanged ? existingOrder.status : existingOrder.previousStatus;
-              existingOrder.driverName = rawOrder.driverName || existingOrder.driverName;
-              existingOrder.lastSyncAt = new Date();
-              existingOrder.rawData = rawOrder.rawData || null;
-
-              // Update customer info if available from enrichment
-              if (rawOrder.customerPhone && !existingOrder.customerPhone) {
-                existingOrder.customerPhone = rawOrder.customerPhone;
-              }
-              if (rawOrder.customerAddress && !existingOrder.customerAddress) {
-                existingOrder.customerAddress = rawOrder.customerAddress;
-              }
-              if (rawOrder.customerNote && !existingOrder.customerNote) {
-                existingOrder.customerNote = rawOrder.customerNote;
-              }
-
-              // Update driver info if available from enrichment
-              if (rawOrder.driverPhone && !existingOrder.driverPhone) {
-                existingOrder.driverPhone = rawOrder.driverPhone;
-              }
-              if (rawOrder.driverAvatar && !existingOrder.driverAvatar) {
-                existingOrder.driverAvatar = rawOrder.driverAvatar;
-              }
-              if (rawOrder.driverLicensePlate && !existingOrder.driverLicensePlate) {
-                existingOrder.driverLicensePlate = rawOrder.driverLicensePlate;
-              }
-
-              if (rawOrder.acceptedAt && !existingOrder.acceptedAt) {
-                existingOrder.acceptedAt = rawOrder.acceptedAt;
-              }
-              if (rawOrder.readyAt && !existingOrder.preparedAt) {
-                existingOrder.preparedAt = rawOrder.readyAt;
-              }
-              if (rawOrder.completedAt && !existingOrder.completedAt) {
-                existingOrder.completedAt = rawOrder.completedAt;
-              }
-              if (rawOrder.cancelledAt && !existingOrder.cancelledAt) {
-                existingOrder.cancelledAt = rawOrder.cancelledAt;
-              }
-
-              await this.orderRepo.save(existingOrder);
-              savedOrders.push(existingOrder);
-            } else {
-              // Create new order
-              const newOrder = new FoodOrder();
-              newOrder.tenantId = currentAccount.tenantId;
-              newOrder.branchId = currentAccount.branchId;
-              newOrder.externalOrderId = rawOrder.externalOrderId;
-              newOrder.orderCode = rawOrder.orderCode;
-              newOrder.platform = FoodPlatformType.GRAB;
-              newOrder.status = this.mapGrabStatusToFoodOrderStatus(rawOrder.status);
-              newOrder.customerName = rawOrder.customerName;
-              newOrder.customerPhone = rawOrder.customerPhone || '';
-              newOrder.customerAddress = rawOrder.customerAddress || '';
-              newOrder.customerNote = rawOrder.customerNote || '';
-              newOrder.items = rawOrder.items;
-              newOrder.subtotal = rawOrder.subtotal;
-              newOrder.deliveryFee = rawOrder.deliveryFee;
-              newOrder.platformFee = rawOrder.platformFee;
-              newOrder.discount = rawOrder.discount;
-              newOrder.totalAmount = rawOrder.totalAmount;
-              newOrder.isPaid = rawOrder.isPaid;
-              newOrder.paymentMethod = rawOrder.paymentMethod || '';
-              newOrder.driverName = rawOrder.driverName || null;
-              newOrder.driverPhone = rawOrder.driverPhone || null;
-              newOrder.driverAvatar = rawOrder.driverAvatar || null;
-              newOrder.driverLicensePlate = rawOrder.driverLicensePlate || null;
-              newOrder.estimatedDeliveryTime = rawOrder.estimatedDeliveryTime || null;
-              newOrder.platformCreatedAt = rawOrder.createdAt;
-              if (rawOrder.acceptedAt) newOrder.acceptedAt = rawOrder.acceptedAt;
-              if (rawOrder.readyAt) newOrder.preparedAt = rawOrder.readyAt;
-              if (rawOrder.completedAt) newOrder.completedAt = rawOrder.completedAt;
-              if (rawOrder.cancelledAt) newOrder.cancelledAt = rawOrder.cancelledAt;
-              newOrder.accountId = currentAccount.id;
-              newOrder.rawData = rawOrder.rawData || null;
-
-              const saved = await this.orderRepo.save(newOrder);
-              savedOrders.push(saved);
-              newOrderIds.push(saved.externalOrderId);
-            }
-          }
-
-          // Sync status for active orders in DB that are not in pagination response
-          // These orders may have been COMPLETED or CANCELLED
-          // TechRes simplified flow: NEW -> PREPARING -> COMPLETED/CANCELLED
-          const activeStatuses = [
-            FoodOrderStatus.NEW,
-            FoodOrderStatus.PREPARING,
-          ];
-
-          const activeOrdersInDb = await this.orderRepo.find({
-            where: {
-              accountId: currentAccount.id,
-              status: In(activeStatuses),
-            },
-          });
-
-          // Get order IDs from pagination response
-          const paginationOrderIds = new Set(result.orders.map((o: any) => o.orderID));
-
-          // Find orders that are active in DB but not in pagination (may have completed/cancelled)
-          const ordersToSync = activeOrdersInDb.filter(
-            (o) => !paginationOrderIds.has(o.externalOrderId),
-          );
-
-          if (ordersToSync.length > 0) {
-            this.logger.log(`[pollOrders] [StatusSync] Found ${ordersToSync.length} active orders not in pagination, checking status...`);
-
-            for (const order of ordersToSync) {
-              try {
-                const detailOrder = await this.grabConnector.fetchOrderDetail(
-                  currentAccount,
-                  order.externalOrderId,
-                  order.orderCode,
-                );
-
-                if (detailOrder) {
-                  const newStatus = this.mapGrabStatusToFoodOrderStatus(detailOrder.status);
-                  if (newStatus !== order.status) {
-                    this.logger.log(`[pollOrders] [StatusSync] Order ${order.orderCode}: ${order.status} -> ${newStatus}`);
-
-                    order.previousStatus = order.status;
-                    order.status = newStatus;
-                    order.lastSyncAt = new Date();
-
-                    // Update timestamps based on new status
-                    if (newStatus === FoodOrderStatus.COMPLETED && !order.completedAt) {
-                      order.completedAt = new Date();
-                    }
-                    if (newStatus === FoodOrderStatus.CANCELLED && !order.cancelledAt) {
-                      order.cancelledAt = new Date();
-                    }
-
-                    await this.orderRepo.save(order);
-                  }
-                }
-              } catch (syncError: any) {
-                this.logger.warn(`[pollOrders] [StatusSync] Failed for order ${order.orderCode}: ${syncError.message}`);
-              }
-            }
-          }
-
-          // Update account last poll time
-          await this.accountRepo.update(currentAccount.id, {
-            lastPollAt: new Date(),
-            errorCount: 0,
-            lastError: null,
-          });
-
-          allSavedOrders.push(...savedOrders);
-          allNewOrderIds.push(...newOrderIds);
+          allSavedOrders.push(...result.savedOrders);
+          allNewOrderIds.push(...result.newOrderIds);
 
           platformResults.push({
-            platform: currentAccount.platform,
-            accountId: currentAccount.id,
-            displayName: currentAccount.displayName || currentAccount.username || currentAccount.platform,
+            platform: account.platform,
+            accountId: account.id,
+            displayName: account.displayName || account.username || account.platform,
             success: true,
-            ordersCount: savedOrders.length,
-            newOrdersCount: newOrderIds.length,
+            ordersCount: result.savedOrders.length,
+            newOrdersCount: result.newOrderIds.length,
             orderStats: result.orderStats,
           });
 
-          this.logger.log(`[pollOrders] ${currentAccount.platform}: Saved ${savedOrders.length} orders (${newOrderIds.length} new)`);
+          this.logger.log(`[pollOrders] ${account.platform}: Saved ${result.savedOrders.length} orders (${result.newOrderIds.length} new)`);
 
         } catch (accountError: any) {
           this.logger.error(`[pollOrders] Error processing account ${account.id}: ${accountError.message}`);
@@ -780,16 +524,474 @@ export class PublicController {
   }
 
   /**
-   * Map Grab status to FoodOrderStatus - TechRes simplified flow
+   * Map status string to FoodOrderStatus - TechRes simplified flow
    * Đơn mới (NEW) -> Đã xác nhận (PREPARING) -> Hoàn tất (COMPLETED) / Huỷ (CANCELLED)
    */
-  private mapGrabStatusToFoodOrderStatus(status: string): FoodOrderStatus {
+  private mapStatusToFoodOrderStatus(status: string): FoodOrderStatus {
     const statusMap: Record<string, FoodOrderStatus> = {
       'new': FoodOrderStatus.NEW,
       'preparing': FoodOrderStatus.PREPARING,
       'completed': FoodOrderStatus.COMPLETED,
       'cancelled': FoodOrderStatus.CANCELLED,
     };
-    return statusMap[status] || FoodOrderStatus.NEW;
+    return statusMap[status?.toLowerCase()] || FoodOrderStatus.NEW;
+  }
+
+  /**
+   * Process orders for a single account
+   * Supports all platforms: GrabFood, ShopeeFood, BeFood
+   */
+  private async processAccountOrders(
+    account: FoodPlatformAccount,
+    pageType: string,
+  ): Promise<{
+    success: boolean;
+    savedOrders: FoodOrder[];
+    newOrderIds: string[];
+    orderStats?: any;
+    error?: string;
+  }> {
+    let currentAccount = account;
+
+    try {
+      // Fetch orders based on platform
+      let result;
+
+      switch (account.platform) {
+        case FoodPlatformType.GRAB:
+          result = await this.processGrabOrders(currentAccount, pageType);
+          break;
+
+        case FoodPlatformType.SHOPEE_FOOD:
+          result = await this.processShopeeOrders(currentAccount);
+          break;
+
+        case FoodPlatformType.BEFOOD:
+          result = await this.processBeFoodOrders(currentAccount);
+          break;
+
+        default:
+          return {
+            success: false,
+            savedOrders: [],
+            newOrderIds: [],
+            error: `Chưa hỗ trợ nền tảng ${account.platform}`,
+          };
+      }
+
+      return result;
+
+    } catch (error: any) {
+      this.logger.error(`[processAccountOrders] Error for ${account.platform}: ${error.message}`);
+      return {
+        success: false,
+        savedOrders: [],
+        newOrderIds: [],
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Process GrabFood orders
+   * Uses fetchOrdersPagination and fetchOrderDetail for enrichment
+   */
+  private async processGrabOrders(
+    account: FoodPlatformAccount,
+    pageType: string,
+  ): Promise<{
+    success: boolean;
+    savedOrders: FoodOrder[];
+    newOrderIds: string[];
+    orderStats?: any;
+    error?: string;
+  }> {
+    const validPageType = ['New', 'Preparing', 'Ready', 'Delivering'].includes(pageType)
+      ? pageType as 'New' | 'Preparing' | 'Ready' | 'Delivering'
+      : 'Preparing';
+
+    let currentAccount = account;
+    let result;
+
+    try {
+      result = await this.grabConnector.fetchOrdersPagination(currentAccount, validPageType);
+    } catch (fetchError: any) {
+      // Check if it's a token expiry error
+      const isUnauthorized = fetchError instanceof UnauthorizedException ||
+        fetchError?.status === 401 ||
+        fetchError?.message?.includes('Token hết hạn');
+
+      if (isUnauthorized) {
+        this.logger.log(`[processGrabOrders] Token expired, attempting reconnect...`);
+        try {
+          currentAccount = await this.accountsService.reconnect(account.id);
+          result = await this.grabConnector.fetchOrdersPagination(currentAccount, validPageType);
+        } catch (reconnectError: any) {
+          throw new Error(`Token hết hạn và không thể kết nối lại: ${reconnectError?.message}`);
+        }
+      } else {
+        throw fetchError;
+      }
+    }
+
+    if (!result?.success) {
+      await this.accountRepo.update(currentAccount.id, {
+        errorCount: currentAccount.errorCount + 1,
+        lastError: result?.error || 'Lấy đơn hàng thất bại',
+      });
+      return {
+        success: false,
+        savedOrders: [],
+        newOrderIds: [],
+        error: result?.error || 'Lấy đơn hàng thất bại',
+      };
+    }
+
+    // Process and save orders
+    const savedOrders: FoodOrder[] = [];
+    const newOrderIds: string[] = [];
+
+    for (const grabOrder of result.orders) {
+      let rawOrder = this.grabConnector.transformPaginationOrder(grabOrder);
+
+      // Enrich order with detail API
+      const needsEnrichment = !rawOrder.customerPhone || !rawOrder.driverPhone;
+      if (needsEnrichment) {
+        try {
+          const detailOrder = await this.grabConnector.fetchOrderDetail(
+            currentAccount,
+            rawOrder.externalOrderId,
+            rawOrder.orderCode,
+          );
+          if (detailOrder) {
+            rawOrder = {
+              ...rawOrder,
+              customerPhone: detailOrder.customerPhone || rawOrder.customerPhone,
+              customerAddress: detailOrder.customerAddress || rawOrder.customerAddress,
+              customerNote: detailOrder.customerNote || rawOrder.customerNote,
+              driverPhone: detailOrder.driverPhone || rawOrder.driverPhone,
+              driverAvatar: detailOrder.driverAvatar || rawOrder.driverAvatar,
+              driverLicensePlate: detailOrder.driverLicensePlate || rawOrder.driverLicensePlate,
+            };
+          }
+        } catch (enrichError: any) {
+          this.logger.warn(`[processGrabOrders] Enrichment failed for ${rawOrder.externalOrderId}: ${enrichError.message}`);
+        }
+      }
+
+      // Save order
+      const savedOrder = await this.saveOrder(currentAccount, rawOrder, FoodPlatformType.GRAB);
+      savedOrders.push(savedOrder.order);
+      if (savedOrder.isNew) {
+        newOrderIds.push(savedOrder.order.externalOrderId);
+      }
+    }
+
+    // Sync status for active orders not in pagination
+    await this.syncActiveOrdersStatus(currentAccount, result.orders.map((o: any) => o.orderID));
+
+    // Update account last poll time
+    await this.accountRepo.update(currentAccount.id, {
+      lastPollAt: new Date(),
+      errorCount: 0,
+      lastError: null,
+    });
+
+    return {
+      success: true,
+      savedOrders,
+      newOrderIds,
+      orderStats: result.orderStats,
+    };
+  }
+
+  /**
+   * Process ShopeeFood orders
+   */
+  private async processShopeeOrders(
+    account: FoodPlatformAccount,
+  ): Promise<{
+    success: boolean;
+    savedOrders: FoodOrder[];
+    newOrderIds: string[];
+    orderStats?: any;
+    error?: string;
+  }> {
+    try {
+      const result = await this.shopeeConnector.fetchOrdersPaginationStandard(account);
+
+      if (!result.success) {
+        return {
+          success: false,
+          savedOrders: [],
+          newOrderIds: [],
+          error: result.error || 'Lấy đơn hàng thất bại',
+        };
+      }
+
+      const savedOrders: FoodOrder[] = [];
+      const newOrderIds: string[] = [];
+
+      for (const rawOrder of result.orders) {
+        const savedOrder = await this.saveOrder(account, rawOrder, FoodPlatformType.SHOPEE_FOOD);
+        savedOrders.push(savedOrder.order);
+        if (savedOrder.isNew) {
+          newOrderIds.push(savedOrder.order.externalOrderId);
+        }
+      }
+
+      // Update account last poll time
+      await this.accountRepo.update(account.id, {
+        lastPollAt: new Date(),
+        errorCount: 0,
+        lastError: null,
+      });
+
+      return {
+        success: true,
+        savedOrders,
+        newOrderIds,
+        orderStats: result.orderStats,
+      };
+    } catch (error: any) {
+      this.logger.error(`[processShopeeOrders] Error: ${error.message}`);
+      return {
+        success: false,
+        savedOrders: [],
+        newOrderIds: [],
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Process BeFood orders
+   */
+  private async processBeFoodOrders(
+    account: FoodPlatformAccount,
+  ): Promise<{
+    success: boolean;
+    savedOrders: FoodOrder[];
+    newOrderIds: string[];
+    orderStats?: any;
+    error?: string;
+  }> {
+    try {
+      const result = await this.beFoodConnector.fetchOrdersPaginationStandard(account);
+
+      if (!result.success) {
+        return {
+          success: false,
+          savedOrders: [],
+          newOrderIds: [],
+          error: result.error || 'Lấy đơn hàng thất bại',
+        };
+      }
+
+      const savedOrders: FoodOrder[] = [];
+      const newOrderIds: string[] = [];
+
+      for (const rawOrder of result.orders) {
+        const savedOrder = await this.saveOrder(account, rawOrder, FoodPlatformType.BEFOOD);
+        savedOrders.push(savedOrder.order);
+        if (savedOrder.isNew) {
+          newOrderIds.push(savedOrder.order.externalOrderId);
+        }
+      }
+
+      // Update account last poll time
+      await this.accountRepo.update(account.id, {
+        lastPollAt: new Date(),
+        errorCount: 0,
+        lastError: null,
+      });
+
+      return {
+        success: true,
+        savedOrders,
+        newOrderIds,
+        orderStats: result.orderStats,
+      };
+    } catch (error: any) {
+      this.logger.error(`[processBeFoodOrders] Error: ${error.message}`);
+      return {
+        success: false,
+        savedOrders: [],
+        newOrderIds: [],
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Save order to database (create or update)
+   * Generic method for all platforms
+   */
+  private async saveOrder(
+    account: FoodPlatformAccount,
+    rawOrder: any,
+    platform: FoodPlatformType,
+  ): Promise<{ order: FoodOrder; isNew: boolean }> {
+    // Check if order already exists
+    let existingOrder = await this.orderRepo.findOne({
+      where: {
+        externalOrderId: rawOrder.externalOrderId,
+        platform,
+      },
+    });
+
+    if (existingOrder) {
+      // Update existing order
+      const newStatus = this.mapStatusToFoodOrderStatus(rawOrder.status);
+      const statusChanged = existingOrder.status !== newStatus;
+
+      if (statusChanged) {
+        existingOrder.previousStatus = existingOrder.status;
+      }
+      existingOrder.status = newStatus;
+      existingOrder.driverName = rawOrder.driverName || existingOrder.driverName;
+      existingOrder.lastSyncAt = new Date();
+      existingOrder.rawData = rawOrder.rawData || null;
+
+      // Update customer info
+      if (rawOrder.customerPhone && !existingOrder.customerPhone) {
+        existingOrder.customerPhone = rawOrder.customerPhone;
+      }
+      if (rawOrder.customerAddress && !existingOrder.customerAddress) {
+        existingOrder.customerAddress = rawOrder.customerAddress;
+      }
+      if (rawOrder.customerNote && !existingOrder.customerNote) {
+        existingOrder.customerNote = rawOrder.customerNote;
+      }
+
+      // Update driver info
+      if (rawOrder.driverPhone && !existingOrder.driverPhone) {
+        existingOrder.driverPhone = rawOrder.driverPhone;
+      }
+      if (rawOrder.driverAvatar && !existingOrder.driverAvatar) {
+        existingOrder.driverAvatar = rawOrder.driverAvatar;
+      }
+      if (rawOrder.driverLicensePlate && !existingOrder.driverLicensePlate) {
+        existingOrder.driverLicensePlate = rawOrder.driverLicensePlate;
+      }
+
+      // Update timestamps
+      if (rawOrder.acceptedAt && !existingOrder.acceptedAt) {
+        existingOrder.acceptedAt = rawOrder.acceptedAt;
+      }
+      if (rawOrder.readyAt && !existingOrder.preparedAt) {
+        existingOrder.preparedAt = rawOrder.readyAt;
+      }
+      if (rawOrder.completedAt && !existingOrder.completedAt) {
+        existingOrder.completedAt = rawOrder.completedAt;
+      }
+      if (rawOrder.cancelledAt && !existingOrder.cancelledAt) {
+        existingOrder.cancelledAt = rawOrder.cancelledAt;
+      }
+
+      await this.orderRepo.save(existingOrder);
+      return { order: existingOrder, isNew: false };
+    } else {
+      // Create new order
+      const newOrder = new FoodOrder();
+      newOrder.tenantId = account.tenantId;
+      newOrder.branchId = account.branchId;
+      newOrder.externalOrderId = rawOrder.externalOrderId;
+      newOrder.orderCode = rawOrder.orderCode;
+      newOrder.platform = platform;
+      newOrder.status = this.mapStatusToFoodOrderStatus(rawOrder.status);
+      newOrder.customerName = rawOrder.customerName;
+      newOrder.customerPhone = rawOrder.customerPhone || '';
+      newOrder.customerAddress = rawOrder.customerAddress || '';
+      newOrder.customerNote = rawOrder.customerNote || '';
+      newOrder.items = rawOrder.items;
+      newOrder.subtotal = rawOrder.subtotal;
+      newOrder.deliveryFee = rawOrder.deliveryFee;
+      newOrder.platformFee = rawOrder.platformFee;
+      newOrder.discount = rawOrder.discount;
+      newOrder.totalAmount = rawOrder.totalAmount;
+      newOrder.isPaid = rawOrder.isPaid;
+      newOrder.paymentMethod = rawOrder.paymentMethod || '';
+      newOrder.driverName = rawOrder.driverName || null;
+      newOrder.driverPhone = rawOrder.driverPhone || null;
+      newOrder.driverAvatar = rawOrder.driverAvatar || null;
+      newOrder.driverLicensePlate = rawOrder.driverLicensePlate || null;
+      newOrder.estimatedDeliveryTime = rawOrder.estimatedDeliveryTime || null;
+      newOrder.platformCreatedAt = rawOrder.createdAt;
+      if (rawOrder.acceptedAt) newOrder.acceptedAt = rawOrder.acceptedAt;
+      if (rawOrder.readyAt) newOrder.preparedAt = rawOrder.readyAt;
+      if (rawOrder.completedAt) newOrder.completedAt = rawOrder.completedAt;
+      if (rawOrder.cancelledAt) newOrder.cancelledAt = rawOrder.cancelledAt;
+      newOrder.accountId = account.id;
+      newOrder.rawData = rawOrder.rawData || null;
+
+      const saved = await this.orderRepo.save(newOrder);
+      return { order: saved, isNew: true };
+    }
+  }
+
+  /**
+   * Sync status for active orders not in pagination response
+   * For GrabFood: uses fetchOrderDetail to check if COMPLETED/CANCELLED
+   */
+  private async syncActiveOrdersStatus(
+    account: FoodPlatformAccount,
+    paginationOrderIds: string[],
+  ): Promise<void> {
+    const activeStatuses = [
+      FoodOrderStatus.NEW,
+      FoodOrderStatus.PREPARING,
+    ];
+
+    const activeOrdersInDb = await this.orderRepo.find({
+      where: {
+        accountId: account.id,
+        status: In(activeStatuses),
+      },
+    });
+
+    const paginationOrderIdSet = new Set(paginationOrderIds);
+    const ordersToSync = activeOrdersInDb.filter(
+      (o) => !paginationOrderIdSet.has(o.externalOrderId),
+    );
+
+    if (ordersToSync.length === 0) return;
+
+    this.logger.log(`[syncActiveOrdersStatus] Found ${ordersToSync.length} active orders to sync`);
+
+    for (const order of ordersToSync) {
+      try {
+        // Only GrabFood has fetchOrderDetail support currently
+        if (order.platform === FoodPlatformType.GRAB) {
+          const detailOrder = await this.grabConnector.fetchOrderDetail(
+            account,
+            order.externalOrderId,
+            order.orderCode,
+          );
+
+          if (detailOrder) {
+            const newStatus = this.mapStatusToFoodOrderStatus(detailOrder.status);
+            if (newStatus !== order.status) {
+              this.logger.log(`[syncActiveOrdersStatus] Order ${order.orderCode}: ${order.status} -> ${newStatus}`);
+
+              order.previousStatus = order.status;
+              order.status = newStatus;
+              order.lastSyncAt = new Date();
+
+              if (newStatus === FoodOrderStatus.COMPLETED && !order.completedAt) {
+                order.completedAt = new Date();
+              }
+              if (newStatus === FoodOrderStatus.CANCELLED && !order.cancelledAt) {
+                order.cancelledAt = new Date();
+              }
+
+              await this.orderRepo.save(order);
+            }
+          }
+        }
+      } catch (syncError: any) {
+        this.logger.warn(`[syncActiveOrdersStatus] Failed for ${order.orderCode}: ${syncError.message}`);
+      }
+    }
   }
 }

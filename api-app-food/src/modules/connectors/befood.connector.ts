@@ -10,7 +10,35 @@ import {
   MerchantStore,
   RawFoodOrder,
   OrderActionResult,
+  OrdersPaginationResponse,
 } from './interfaces/connector.interface';
+
+/**
+ * BeFood Status Mapping - Simplified TechRes Flow
+ * Maps BeFood API states to TechRes statuses:
+ * - Đơn mới (NEW)
+ * - Đã xác nhận (PREPARING) - all in-progress states
+ * - Hoàn tất (COMPLETED)
+ * - Huỷ (CANCELLED)
+ */
+const BEFOOD_STATUS_MAP: Record<string, string> = {
+  // Đơn mới (NEW)
+  'PENDING': FoodOrderStatus.NEW,
+  'NEW': FoodOrderStatus.NEW,
+  // Đã xác nhận (PREPARING) - all in-progress states
+  'CONFIRMED': FoodOrderStatus.PREPARING,
+  'ACCEPTED': FoodOrderStatus.PREPARING,
+  'PREPARING': FoodOrderStatus.PREPARING,
+  'READY': FoodOrderStatus.PREPARING,
+  'DELIVERING': FoodOrderStatus.PREPARING,
+  'SHIPPING': FoodOrderStatus.PREPARING,
+  // Hoàn tất (COMPLETED)
+  'COMPLETED': FoodOrderStatus.COMPLETED,
+  'DELIVERED': FoodOrderStatus.COMPLETED,
+  // Huỷ (CANCELLED)
+  'CANCELLED': FoodOrderStatus.CANCELLED,
+  'REJECTED': FoodOrderStatus.CANCELLED,
+};
 
 /**
  * BeFood Platform Connector
@@ -460,24 +488,49 @@ export class BeFoodConnector extends BasePlatformConnector {
   }
 
   /**
-   * Map BeFood status to standard status
+   * Map BeFood status to TechRes status
+   * Implements IPlatformConnector.mapStatusToTechRes
+   */
+  mapStatusToTechRes(platformStatus: string): string {
+    return BEFOOD_STATUS_MAP[platformStatus?.toUpperCase()] || FoodOrderStatus.NEW;
+  }
+
+  /**
+   * Map BeFood status to standard status (internal use)
    */
   private mapStatus(beFoodStatus: string): string {
-    const statusMap: Record<string, string> = {
-      PENDING: FoodOrderStatus.NEW,
-      NEW: FoodOrderStatus.NEW,
-      CONFIRMED: FoodOrderStatus.ACCEPTED,
-      ACCEPTED: FoodOrderStatus.ACCEPTED,
-      PREPARING: FoodOrderStatus.PREPARING,
-      READY: FoodOrderStatus.READY,
-      DELIVERING: FoodOrderStatus.DELIVERING,
-      SHIPPING: FoodOrderStatus.DELIVERING,
-      COMPLETED: FoodOrderStatus.COMPLETED,
-      DELIVERED: FoodOrderStatus.COMPLETED,
-      CANCELLED: FoodOrderStatus.CANCELLED,
-      REJECTED: FoodOrderStatus.CANCELLED,
-    };
-    return statusMap[beFoodStatus?.toUpperCase()] || FoodOrderStatus.NEW;
+    return this.mapStatusToTechRes(beFoodStatus);
+  }
+
+  /**
+   * Fetch orders using pagination API - Returns standardized OrdersPaginationResponse
+   * Implements IPlatformConnector.fetchOrdersPagination
+   * TODO: Implement when BeFood orders API is available
+   */
+  async fetchOrdersPaginationStandard(
+    account: FoodPlatformAccount,
+    _pageType?: string,
+  ): Promise<OrdersPaginationResponse> {
+    try {
+      this.logger.debug('[BeFoodConnector] fetchOrdersPaginationStandard - Not yet implemented');
+
+      // TODO: Implement when orders API is available
+      return {
+        success: true,
+        orders: [],
+        pollInterval: 60,
+        hasMore: false,
+      };
+    } catch (error: any) {
+      this.logger.error('[BeFoodConnector] fetchOrdersPaginationStandard failed:', error?.message);
+      return {
+        success: false,
+        orders: [],
+        pollInterval: 60,
+        hasMore: false,
+        error: error?.message || 'Lấy đơn hàng thất bại',
+      };
+    }
   }
 
   /**

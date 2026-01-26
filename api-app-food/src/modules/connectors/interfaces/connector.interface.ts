@@ -309,6 +309,24 @@ export interface GrabOrdersPaginationResponse {
 }
 
 /**
+ * Generic Orders Pagination Response
+ * Used by all platforms for pagination-based order fetching
+ */
+export interface OrdersPaginationResponse {
+  success: boolean;
+  orders: RawFoodOrder[];
+  pollInterval: number;
+  hasMore: boolean;
+  orderStats?: {
+    newCount: number;
+    preparingCount: number;
+    readyCount: number;
+    deliveringCount: number;
+  };
+  error?: string;
+}
+
+/**
  * Platform Connector Interface
  */
 export interface IPlatformConnector {
@@ -340,13 +358,22 @@ export interface IPlatformConnector {
   getStores(account: FoodPlatformAccount): Promise<MerchantStore[]>;
 
   /**
-   * Poll orders from a specific store
+   * Poll orders from a specific store (legacy method)
    */
   pollOrders(
     account: FoodPlatformAccount,
     storeId: string,
     since?: Date,
   ): Promise<RawFoodOrder[]>;
+
+  /**
+   * Poll orders using pagination API (preferred method for CCB polling)
+   * Returns standardized response with orders already mapped to TechRes status
+   */
+  fetchOrdersPagination?(
+    account: FoodPlatformAccount,
+    pageType?: string,
+  ): Promise<OrdersPaginationResponse>;
 
   /**
    * Fetch order detail from platform API
@@ -357,6 +384,12 @@ export interface IPlatformConnector {
     orderId: string,
     displayId?: string,
   ): Promise<RawFoodOrder | null>;
+
+  /**
+   * Map platform-specific status to TechRes FoodOrderStatus
+   * Each platform implements its own status mapping
+   */
+  mapStatusToTechRes?(platformStatus: string): string;
 
   /**
    * Accept/Confirm an order
