@@ -80,21 +80,18 @@ export interface RawFoodOrder {
   customerAddress?: string;
   customerNote?: string;
 
-  items: {
-    productName: string;
-    quantity: number;
-    unitPrice: number;
-    totalPrice: number;
-    note?: string;
-    options?: string;
-    externalProductId?: string;
-  }[];
+  items: RawFoodOrderItem[];
 
   subtotal: number;
   deliveryFee: number;
   platformFee: number;
   discount: number;
   totalAmount: number;
+
+  // Additional fee fields for GrabFood
+  smallOrderFee?: number;
+  itemDiscountAmount?: number;
+  promotionAmount?: number;
 
   isPaid: boolean;
   paymentMethod?: string;
@@ -119,7 +116,74 @@ export interface RawFoodOrder {
   // Order status message
   orderContentMessage?: string;
 
+  // Scheduled order info (đơn đặt trước)
+  isScheduledOrder?: boolean;
+  scheduledDeliveryTime?: string;
+
+  // Combined order info (đơn ghép)
+  isCombinedOrder?: boolean;
+  parentOrderId?: string;
+  subOrders?: RawFoodSubOrder[];
+
   rawData?: Record<string, unknown>;
+}
+
+/**
+ * Raw Order Item with discounts and modifiers
+ */
+export interface RawFoodOrderItem {
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  note?: string;
+  options?: string;
+  externalProductId?: string;
+
+  // Discount info for item
+  discounts?: RawItemDiscount[];
+
+  // Modifiers/Options detailed
+  modifierGroups?: RawModifierGroup[];
+}
+
+/**
+ * Item Discount info
+ */
+export interface RawItemDiscount {
+  discountName: string;
+  discountFunding?: string;
+  discountAmount: number;
+}
+
+/**
+ * Modifier Group (topping, size, etc.)
+ */
+export interface RawModifierGroup {
+  groupId: string;
+  groupName: string;
+  modifiers: RawModifier[];
+}
+
+/**
+ * Single Modifier/Option
+ */
+export interface RawModifier {
+  modifierId: string;
+  modifierName: string;
+  price: number;
+}
+
+/**
+ * Sub Order for combined orders (đơn ghép)
+ */
+export interface RawFoodSubOrder {
+  subOrderId: string;
+  displayId: string;
+  isFirstSubOrder: boolean;
+  driverName?: string;
+  driverPhone?: string;
+  items: RawFoodOrderItem[];
 }
 
 /**

@@ -9,10 +9,66 @@ import {
   OtpRequestResult,
   MerchantStore,
   RawFoodOrder,
+  RawFoodOrderItem,
+  RawFoodSubOrder,
+  RawItemDiscount,
+  RawModifierGroup,
   OrderActionResult,
   GrabPaginationOrder,
   GrabOrdersPaginationResponse,
 } from './interfaces/connector.interface';
+
+/**
+ * GrabFood Status Mapping
+ * Maps GrabFood API states to internal statuses
+ */
+const GRAB_STATUS_MAP: Record<string, string> = {
+  // Active order states
+  'ORDER_NEW': FoodOrderStatus.NEW,
+  'ORDER_IN_PREPARE': FoodOrderStatus.PREPARING,
+  'ORDER_EXECUTING': FoodOrderStatus.DELIVERING,
+  'ORDER_READY': FoodOrderStatus.READY,
+  'ORDER_IN_DELIVERY': FoodOrderStatus.DELIVERING,
+  'ORDER_DELIVERED': FoodOrderStatus.COMPLETED,
+  // Completed state
+  'COMPLETED': FoodOrderStatus.COMPLETED,
+  // Cancelled states
+  'ORDER_CANCELLED': FoodOrderStatus.CANCELLED,
+  'CANCELLED': FoodOrderStatus.CANCELLED,
+  'CANCELLED_MAX': FoodOrderStatus.CANCELLED,
+  'CANCELLED_PASSENGER': FoodOrderStatus.CANCELLED,
+  'CANCELLED_OPERATOR': FoodOrderStatus.CANCELLED,
+  'FAILED': FoodOrderStatus.CANCELLED,
+};
+
+/**
+ * Format Vietnamese phone number
+ * Converts "+84 9362 5425 7" to "0936254257"
+ */
+function formatPhoneNumber(phone: string | null | undefined): string {
+  if (!phone) return '';
+
+  // Remove all spaces and special characters
+  let cleaned = phone.replace(/[\s\-\(\)]/g, '');
+
+  // Handle +84 prefix
+  if (cleaned.startsWith('+84')) {
+    cleaned = '0' + cleaned.substring(3);
+  } else if (cleaned.startsWith('84') && cleaned.length > 10) {
+    cleaned = '0' + cleaned.substring(2);
+  }
+
+  return cleaned;
+}
+
+/**
+ * Parse Vietnamese currency string to number
+ * Converts "246.500" to 246500
+ */
+function parseCurrency(value: string | null | undefined): number {
+  if (!value) return 0;
+  return parseInt(value.replace(/\./g, ''), 10) || 0;
+}
 
 /**
  * GrabFood Platform Connector
@@ -423,20 +479,19 @@ export class GrabConnector extends BasePlatformConnector {
    */
   transformPaginationOrder(grabOrder: GrabPaginationOrder): RawFoodOrder {
     // Parse order value (e.g., "246.500" -> 246500)
-    // Vietnamese format uses dots as thousand separators, so just remove them
-    const orderValue = parseInt((grabOrder.orderValue || '0').replace(/\./g, ''), 10);
+    const orderValue = parseCurrency(grabOrder.orderValue);
 
     return {
       externalOrderId: grabOrder.orderID,
       orderCode: grabOrder.displayID || `#GR${grabOrder.orderID.slice(-6)}`,
       platform: FoodPlatformType.GRAB,
-      status: this.mapPaginationStatus(grabOrder.state, grabOrder.preparationTaskpoolStatus),
+      status: this.mapGrabStatus(grabOrder.state),
 
       // Customer info
       customerId: grabOrder.eater?.ID?.toString() || undefined,
       customerName: grabOrder.eater?.name || 'Khách hàng',
-      customerPhone: '', // Not available in pagination response
-      customerAddress: '', // Not available in pagination response
+      customerPhone: '', // Not available in pagination response - need detail API
+      customerAddress: '', // Not available in pagination response - need detail API
       customerNote: '',
 
       items: (grabOrder.itemInfo?.items || []).map((item) => ({
@@ -464,7 +519,7 @@ export class GrabConnector extends BasePlatformConnector {
       driverAvatar: grabOrder.driver?.avatar || undefined,
       driverPhone: undefined,
       driverLicensePlate: undefined,
-      estimatedDeliveryTime: grabOrder.times?.deliveredAt || undefined,
+      estimatedDeliveryTime: grabOrder.scheduleOrderInfo?.expectedDeliveryTime || grabOrder.times?.deliveredAt || undefined,
 
       createdAt: grabOrder.times?.createdAt ? new Date(grabOrder.times.createdAt) : new Date(),
       updatedAt: new Date(),
@@ -478,48 +533,363 @@ export class GrabConnector extends BasePlatformConnector {
       // Order status message
       orderContentMessage: grabOrder.orderContentMessage || undefined,
 
+      // Scheduled order info (đơn đặt trước)
+      isScheduledOrder: grabOrder.scheduleOrderInfo?.isScheduledOrder || false,
+      scheduledDeliveryTime: grabOrder.scheduleOrderInfo?.expectedDeliveryTime || undefined,
+
       rawData: grabOrder as unknown as Record<string, unknown>,
     };
   }
 
   /**
-   * Map pagination order state to standard status
+   * Map GrabFood status to standard status
    */
-  private mapPaginationStatus(state: string, preparationStatus?: string): string {
-    // First check the main state
-    const stateMap: Record<string, string> = {
-      'ORDER_NEW': FoodOrderStatus.NEW,
-      'ORDER_IN_PREPARE': FoodOrderStatus.PREPARING,
-      'ORDER_READY': FoodOrderStatus.READY,
-      'ORDER_IN_DELIVERY': FoodOrderStatus.DELIVERING,
-      'ORDER_DELIVERED': FoodOrderStatus.COMPLETED,
-      'ORDER_CANCELLED': FoodOrderStatus.CANCELLED,
-    };
-
-    if (stateMap[state]) {
-      return stateMap[state];
-    }
-
-    // Fallback to preparation status
-    if (preparationStatus === 'ACCEPTED') {
-      return FoodOrderStatus.ACCEPTED;
-    }
-
-    return FoodOrderStatus.NEW;
+  private mapGrabStatus(state: string): string {
+    return GRAB_STATUS_MAP[state] || FoodOrderStatus.NEW;
   }
 
   /**
-   * Transform Grab order to standard format
+   * Fetch order detail from GrabFood API
+   * Endpoint: GET https://api.grab.com/food/merchant/v3/order/{orderID}
+   */
+  async fetchOrderDetail(
+    account: FoodPlatformAccount,
+    orderId: string,
+    displayId?: string,
+  ): Promise<RawFoodOrder | null> {
+    const url = `${GrabConnector.GRAB_FOOD_API_URL}/order/${orderId}`;
+
+    this.logger.log(`[GrabFood OrderDetail] Fetching order ${orderId} from ${url}`);
+
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          'Authorization': account.accessToken,
+          'Accept': '*/*',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+        },
+        timeout: 30000,
+      });
+
+      const orderData = response.data?.order || response.data;
+      this.logger.log(`[GrabFood OrderDetail] Got order ${orderData?.orderID}`);
+
+      return this.transformOrderDetail(orderData, displayId);
+    } catch (error: any) {
+      this.logger.error(`[GrabFood OrderDetail] EXCEPTION: ${error?.message}`);
+
+      if (error?.response?.status === 401) {
+        throw new UnauthorizedException('Token hết hạn hoặc không hợp lệ');
+      }
+
+      return null;
+    }
+  }
+
+  /**
+   * Transform detailed order from API response
+   * Handles both normal orders and combined orders (đơn ghép)
+   */
+  private transformOrderDetail(orderData: any, targetDisplayId?: string): RawFoodOrder {
+    const isCombinedOrder = !!orderData.orderBookings && orderData.orderBookings.length > 0;
+
+    // For combined orders, find the matching sub-order by displayId
+    if (isCombinedOrder && targetDisplayId) {
+      const matchingSubOrder = orderData.orderBookings.find(
+        (sub: any) => sub.shortOrderID === targetDisplayId,
+      );
+
+      if (matchingSubOrder) {
+        return this.transformSubOrder(orderData, matchingSubOrder);
+      }
+    }
+
+    // Normal order or combined order without specific target
+    if (isCombinedOrder) {
+      return this.transformCombinedOrder(orderData);
+    }
+
+    return this.transformNormalOrder(orderData);
+  }
+
+  /**
+   * Transform normal (non-combined) order
+   */
+  private transformNormalOrder(order: any): RawFoodOrder {
+    const fare = order.fare || {};
+    const eater = order.eater || {};
+    const driver = order.driver || {};
+
+    // Parse items with modifiers and discounts
+    const items = this.transformOrderItems(order.itemInfo?.items || []);
+
+    return {
+      externalOrderId: order.orderID,
+      orderCode: order.displayID,
+      platform: FoodPlatformType.GRAB,
+      status: this.mapGrabStatus(order.state),
+
+      // Customer info
+      customerId: eater.ID?.toString() || undefined,
+      customerName: eater.name || 'Khách hàng',
+      customerPhone: formatPhoneNumber(eater.mobileNumber),
+      customerAddress: eater.address || undefined,
+      customerNote: eater.comment || undefined,
+
+      items,
+
+      // Pricing
+      subtotal: parseCurrency(fare.reducedPriceDisplay),
+      deliveryFee: parseCurrency(fare.deliveryFeeDisplay),
+      smallOrderFee: parseCurrency(fare.smallOrderFeeDisplay),
+      itemDiscountAmount: parseCurrency(fare.totalDiscountAmountDisplay),
+      promotionAmount: parseCurrency(fare.promotionDisplay),
+      platformFee: 0,
+      discount: parseCurrency(fare.totalDiscountAmountDisplay) + parseCurrency(fare.promotionDisplay),
+      totalAmount: parseCurrency(fare.reducedPriceDisplay),
+
+      isPaid: true,
+      paymentMethod: 'GrabPay',
+
+      // Driver info
+      driverId: driver.ID?.toString() || undefined,
+      driverName: driver.name || undefined,
+      driverPhone: formatPhoneNumber(driver.mobileNumber),
+      driverAvatar: driver.avatar || undefined,
+
+      createdAt: new Date(),
+      updatedAt: new Date(),
+
+      isCombinedOrder: false,
+
+      rawData: order,
+    };
+  }
+
+  /**
+   * Transform combined order (đơn ghép)
+   */
+  private transformCombinedOrder(order: any): RawFoodOrder {
+    const fare = order.fare || {};
+    const eater = order.eater || {};
+
+    // Get all sub-orders
+    const subOrders: RawFoodSubOrder[] = (order.orderBookings || []).map((sub: any) => ({
+      subOrderId: sub.orderID || order.orderID,
+      displayId: sub.shortOrderID,
+      isFirstSubOrder: sub.isFirstSubOrder === 1,
+      driverName: sub.driver?.name,
+      driverPhone: formatPhoneNumber(sub.driver?.mobileNumber),
+      items: this.transformOrderItems(sub.items?.items || []),
+    }));
+
+    // Collect all items from sub-orders
+    const allItems = subOrders.flatMap((sub) => sub.items);
+
+    return {
+      externalOrderId: order.orderID,
+      orderCode: order.displayID,
+      platform: FoodPlatformType.GRAB,
+      status: this.mapGrabStatus(order.state),
+
+      // Customer info (from parent order)
+      customerId: eater.ID?.toString() || undefined,
+      customerName: eater.name || 'Khách hàng',
+      customerPhone: formatPhoneNumber(eater.mobileNumber),
+      customerAddress: eater.address || undefined,
+      customerNote: eater.comment || undefined,
+
+      items: allItems,
+
+      // Pricing
+      subtotal: parseCurrency(fare.reducedPriceDisplay),
+      deliveryFee: parseCurrency(fare.deliveryFeeDisplay),
+      smallOrderFee: parseCurrency(fare.smallOrderFeeDisplay),
+      itemDiscountAmount: parseCurrency(fare.totalDiscountAmountDisplay),
+      promotionAmount: parseCurrency(fare.promotionDisplay),
+      platformFee: 0,
+      discount: parseCurrency(fare.totalDiscountAmountDisplay) + parseCurrency(fare.promotionDisplay),
+      totalAmount: parseCurrency(fare.reducedPriceDisplay),
+
+      isPaid: true,
+      paymentMethod: 'GrabPay',
+
+      createdAt: new Date(),
+      updatedAt: new Date(),
+
+      isCombinedOrder: true,
+      subOrders,
+
+      rawData: order,
+    };
+  }
+
+  /**
+   * Transform a specific sub-order from combined order
+   */
+  private transformSubOrder(parentOrder: any, subOrder: any): RawFoodOrder {
+    const fare = parentOrder.fare || {};
+    const eater = parentOrder.eater || {};
+    const driver = subOrder.driver || {};
+
+    const items = this.transformOrderItems(subOrder.items?.items || []);
+
+    // Only first sub-order gets the item discount
+    const itemDiscount = subOrder.isFirstSubOrder === 1
+      ? parseCurrency(fare.totalDiscountAmountDisplay)
+      : 0;
+
+    return {
+      externalOrderId: parentOrder.orderID,
+      orderCode: subOrder.shortOrderID,
+      platform: FoodPlatformType.GRAB,
+      status: this.mapGrabStatus(parentOrder.state),
+
+      // Customer info
+      customerId: eater.ID?.toString() || undefined,
+      customerName: eater.name || 'Khách hàng',
+      customerPhone: formatPhoneNumber(eater.mobileNumber),
+      customerAddress: eater.address || undefined,
+      customerNote: eater.comment || undefined,
+
+      items,
+
+      // Pricing for sub-order
+      subtotal: items.reduce((sum, item) => sum + item.totalPrice, 0),
+      deliveryFee: parseCurrency(fare.deliveryFeeDisplay),
+      smallOrderFee: parseCurrency(fare.smallOrderFeeDisplay),
+      itemDiscountAmount: itemDiscount,
+      platformFee: 0,
+      discount: itemDiscount,
+      totalAmount: items.reduce((sum, item) => sum + item.totalPrice, 0) - itemDiscount,
+
+      isPaid: true,
+      paymentMethod: 'GrabPay',
+
+      // Driver info for this sub-order
+      driverName: driver.name || undefined,
+      driverPhone: formatPhoneNumber(driver.mobileNumber),
+
+      createdAt: new Date(),
+      updatedAt: new Date(),
+
+      isCombinedOrder: true,
+      parentOrderId: parentOrder.orderID,
+
+      rawData: { parentOrder, subOrder },
+    };
+  }
+
+  /**
+   * Transform order items with modifiers and discounts
+   */
+  private transformOrderItems(items: any[]): RawFoodOrderItem[] {
+    return items.map((item) => {
+      const quantity = item.quantity || 1;
+      const totalPrice = parseCurrency(item.fare?.priceDisplay);
+      // Unit price = total price / quantity (theo yêu cầu)
+      const unitPrice = quantity > 1 ? Math.round(totalPrice / quantity) : totalPrice;
+
+      // Parse discounts
+      const discounts: RawItemDiscount[] = (item.discountInfo || []).map((d: any) => ({
+        discountName: d.discountName,
+        discountFunding: d.discountFunding,
+        discountAmount: parseCurrency(d.itemDiscountPriceDisplay),
+      }));
+
+      // Parse modifier groups
+      const modifierGroups: RawModifierGroup[] = (item.modifierGroups || []).map((group: any) => ({
+        groupId: group.groupID,
+        groupName: group.groupName,
+        modifiers: (group.modifiers || []).map((mod: any) => ({
+          modifierId: mod.modifierID,
+          modifierName: mod.modifierName,
+          price: parseCurrency(mod.priceDisplay),
+        })),
+      }));
+
+      // Build options string from modifiers
+      const optionsString = modifierGroups
+        .flatMap((g) => g.modifiers.map((m) => m.modifierName))
+        .join(', ');
+
+      return {
+        productName: item.name,
+        quantity,
+        unitPrice,
+        totalPrice,
+        note: item.comment || '',
+        options: optionsString,
+        externalProductId: item.itemID,
+        discounts,
+        modifierGroups,
+      };
+    });
+  }
+
+  /**
+   * Fetch order history for status updates
+   * Endpoint: GET https://api.grab.com/food/merchant/v3/statements
+   */
+  async fetchOrderHistory(
+    account: FoodPlatformAccount,
+    pageSize: number = 50,
+    pageIndex: number = 0,
+  ): Promise<{ orders: Array<{ orderId: string; displayId: string; status: string }>; hasMore: boolean }> {
+    const url = `${GrabConnector.GRAB_FOOD_API_URL}/statements`;
+
+    this.logger.log(`[GrabFood History] Fetching history page ${pageIndex}`);
+
+    try {
+      const response = await axios.get(url, {
+        params: {
+          pageSize,
+          pageIndex,
+        },
+        headers: {
+          'Authorization': account.accessToken,
+          'Accept': '*/*',
+        },
+        timeout: 30000,
+      });
+
+      const data = response.data;
+      const statements = data.statements || [];
+
+      const orders = statements.map((stmt: any) => ({
+        orderId: stmt.ID,
+        displayId: stmt.displayID,
+        status: this.mapGrabStatus(stmt.deliveryStatus),
+      }));
+
+      return {
+        orders,
+        hasMore: data.hasMore || false,
+      };
+    } catch (error: any) {
+      this.logger.error(`[GrabFood History] EXCEPTION: ${error?.message}`);
+
+      if (error?.response?.status === 401) {
+        throw new UnauthorizedException('Token hết hạn hoặc không hợp lệ');
+      }
+
+      return { orders: [], hasMore: false };
+    }
+  }
+
+  /**
+   * Transform Grab order to standard format (legacy - for old API)
    */
   private transformOrder(grabOrder: any): RawFoodOrder {
     return {
       externalOrderId: grabOrder.orderID,
       orderCode: `#GR${grabOrder.shortOrderNumber || grabOrder.orderID.slice(-6)}`,
       platform: FoodPlatformType.GRAB,
-      status: this.mapStatus(grabOrder.state),
+      status: this.mapGrabStatus(grabOrder.state),
 
       customerName: grabOrder.receiver?.name || 'Khách hàng',
-      customerPhone: grabOrder.receiver?.phone || '',
+      customerPhone: formatPhoneNumber(grabOrder.receiver?.phone),
       customerAddress: grabOrder.receiver?.address?.fullAddress,
       customerNote: grabOrder.specialInstruction,
 
@@ -543,7 +913,7 @@ export class GrabConnector extends BasePlatformConnector {
       paymentMethod: grabOrder.paymentType,
 
       driverName: grabOrder.driver?.name,
-      driverPhone: grabOrder.driver?.phone,
+      driverPhone: formatPhoneNumber(grabOrder.driver?.phone),
       driverLicensePlate: grabOrder.driver?.licensePlate,
       estimatedDeliveryTime: grabOrder.estimatedPickupTime,
 
@@ -552,24 +922,6 @@ export class GrabConnector extends BasePlatformConnector {
 
       rawData: grabOrder,
     };
-  }
-
-  /**
-   * Map Grab status to standard status
-   */
-  private mapStatus(grabState: string): string {
-    const statusMap: Record<string, string> = {
-      NEW: FoodOrderStatus.NEW,
-      ACCEPTED: FoodOrderStatus.ACCEPTED,
-      PREPARING: FoodOrderStatus.PREPARING,
-      READY_FOR_PICKUP: FoodOrderStatus.READY,
-      DRIVER_ASSIGNED: FoodOrderStatus.DELIVERING,
-      DRIVER_ARRIVED: FoodOrderStatus.DELIVERING,
-      PICKED_UP: FoodOrderStatus.DELIVERING,
-      DELIVERED: FoodOrderStatus.COMPLETED,
-      CANCELLED: FoodOrderStatus.CANCELLED,
-    };
-    return statusMap[grabState] || FoodOrderStatus.NEW;
   }
 
   /**
