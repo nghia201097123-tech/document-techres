@@ -557,7 +557,8 @@ class SunmiPrinterAdapter @Inject constructor(
             }
             if (printOriginalMethod != null) {
                 Timber.d("$TAG: Found printOriginalText, converting data")
-                val text = String(data, Charsets.ISO_8859_1)
+                // Use UTF-8 to properly decode Vietnamese characters
+                val text = String(data, Charsets.UTF_8)
                 when (printOriginalMethod.parameterTypes.size) {
                     1 -> printOriginalMethod.invoke(service, text)
                     2 -> printOriginalMethod.invoke(service, text, null)
@@ -842,7 +843,8 @@ class SunmiPrinterAdapter @Inject constructor(
         val descriptor = serviceDescriptor ?: "woyou.aidlservice.jiuiv5.IWoyouService"
 
         // Convert bytes to string for printOriginalText
-        val text = String(data, Charsets.ISO_8859_1)
+        // Use UTF-8 to properly decode Vietnamese characters
+        val text = String(data, Charsets.UTF_8)
 
         val possibleTransactionCodes = listOf(
             TransactionCodes.TRANSACTION_printOriginalText,
