@@ -487,8 +487,8 @@ export class PublicController {
               newOrder.status = this.mapGrabStatusToFoodOrderStatus(rawOrder.status);
               newOrder.customerName = rawOrder.customerName;
               newOrder.customerPhone = rawOrder.customerPhone || '';
-              newOrder.customerAddress = rawOrder.customerAddress || null;
-              newOrder.customerNote = rawOrder.customerNote || null;
+              newOrder.customerAddress = rawOrder.customerAddress || '';
+              newOrder.customerNote = rawOrder.customerNote || '';
               newOrder.items = rawOrder.items;
               newOrder.subtotal = rawOrder.subtotal;
               newOrder.deliveryFee = rawOrder.deliveryFee;
@@ -496,16 +496,16 @@ export class PublicController {
               newOrder.discount = rawOrder.discount;
               newOrder.totalAmount = rawOrder.totalAmount;
               newOrder.isPaid = rawOrder.isPaid;
-              newOrder.paymentMethod = rawOrder.paymentMethod || null;
+              newOrder.paymentMethod = rawOrder.paymentMethod || '';
               newOrder.driverName = rawOrder.driverName || null;
               newOrder.driverPhone = rawOrder.driverPhone || null;
               newOrder.driverLicensePlate = rawOrder.driverLicensePlate || null;
               newOrder.estimatedDeliveryTime = rawOrder.estimatedDeliveryTime || null;
               newOrder.platformCreatedAt = rawOrder.createdAt;
-              newOrder.acceptedAt = rawOrder.acceptedAt || null;
-              newOrder.preparedAt = rawOrder.readyAt || null;
-              newOrder.completedAt = rawOrder.completedAt || null;
-              newOrder.cancelledAt = rawOrder.cancelledAt || null;
+              if (rawOrder.acceptedAt) newOrder.acceptedAt = rawOrder.acceptedAt;
+              if (rawOrder.readyAt) newOrder.preparedAt = rawOrder.readyAt;
+              if (rawOrder.completedAt) newOrder.completedAt = rawOrder.completedAt;
+              if (rawOrder.cancelledAt) newOrder.cancelledAt = rawOrder.cancelledAt;
               newOrder.accountId = account.id;
               newOrder.rawData = rawOrder.rawData || null;
 
