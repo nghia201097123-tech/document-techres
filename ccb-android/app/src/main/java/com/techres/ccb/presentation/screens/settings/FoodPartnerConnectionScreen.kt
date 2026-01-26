@@ -39,6 +39,9 @@ fun FoodPartnerConnectionScreen(
     var updateDialogUsername by remember { mutableStateOf("") }
     var updateDialogPlatform by remember { mutableStateOf("") }
 
+    // Remember last action result success for snackbar color
+    var lastActionSuccess by remember { mutableStateOf(true) }
+
     // Load accounts when screen first appears
     LaunchedEffect(Unit) {
         viewModel.loadAccounts()
@@ -47,6 +50,7 @@ fun FoodPartnerConnectionScreen(
     // Show snackbar for action result
     LaunchedEffect(uiState.actionResult) {
         uiState.actionResult?.let { result ->
+            lastActionSuccess = result.success
             snackbarHostState.showSnackbar(
                 message = result.message,
                 duration = SnackbarDuration.Short
@@ -92,10 +96,9 @@ fun FoodPartnerConnectionScreen(
         },
         snackbarHost = {
             SnackbarHost(hostState = snackbarHostState) { data ->
-                val isSuccess = uiState.actionResult?.success ?: true
                 Snackbar(
                     snackbarData = data,
-                    containerColor = if (isSuccess) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error,
+                    containerColor = if (lastActionSuccess) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error,
                     contentColor = Color.White
                 )
             }
