@@ -826,6 +826,13 @@ export class PublicController {
   /**
    * Save order to database (create or update)
    * Generic method for all platforms
+   *
+   * TechRes Flow:
+   * - Đơn mới (NEW): Tất cả đơn lấy về đều vào đây
+   * - Đang xử lý (PREPARING): Sau khi TechRes xác nhận
+   * - Hoàn tất (COMPLETED) / Đã huỷ (CANCELLED): Trạng thái cuối
+   *
+   * Chỉ tự động sync COMPLETED/CANCELLED từ platform, không sync các trạng thái khác
    */
   private async saveOrder(
     account: FoodPlatformAccount,
@@ -841,14 +848,22 @@ export class PublicController {
     });
 
     if (existingOrder) {
-      // Update existing order
-      const newStatus = this.mapStatusToFoodOrderStatus(rawOrder.status);
-      const statusChanged = existingOrder.status !== newStatus;
+      // Update existing order - TechRes flow
+      const platformStatus = this.mapStatusToFoodOrderStatus(rawOrder.status);
 
-      if (statusChanged) {
-        existingOrder.previousStatus = existingOrder.status;
+      // Only auto-sync COMPLETED/CANCELLED from platform
+      // Don't change TechRes status based on platform's intermediate states
+      let shouldUpdateStatus = false;
+      if (platformStatus === FoodOrderStatus.COMPLETED || platformStatus === FoodOrderStatus.CANCELLED) {
+        // Auto sync final states from platform
+        if (existingOrder.status !== platformStatus) {
+          shouldUpdateStatus = true;
+          existingOrder.previousStatus = existingOrder.status;
+          existingOrder.status = platformStatus;
+          this.logger.log(`[saveOrder] Auto-sync status for ${existingOrder.orderCode}: ${existingOrder.previousStatus} -> ${platformStatus}`);
+        }
       }
-      existingOrder.status = newStatus;
+      // Keep TechRes status as-is for intermediate states
       existingOrder.driverName = rawOrder.driverName || existingOrder.driverName;
       existingOrder.lastSyncAt = new Date();
       existingOrder.rawData = rawOrder.rawData || null;
@@ -892,14 +907,24 @@ export class PublicController {
       await this.orderRepo.save(existingOrder);
       return { order: existingOrder, isNew: false };
     } else {
-      // Create new order
+      // Create new order - TechRes flow: always start as NEW
+      // Unless platform already says COMPLETED/CANCELLED
+      const platformStatus = this.mapStatusToFoodOrderStatus(rawOrder.status);
+      let initialStatus = FoodOrderStatus.NEW;
+
+      // If platform already marked as final state, use that
+      if (platformStatus === FoodOrderStatus.COMPLETED || platformStatus === FoodOrderStatus.CANCELLED) {
+        initialStatus = platformStatus;
+        this.logger.log(`[saveOrder] New order ${rawOrder.orderCode} already ${platformStatus} on platform`);
+      }
+
       const newOrder = new FoodOrder();
       newOrder.tenantId = account.tenantId;
       newOrder.branchId = account.branchId;
       newOrder.externalOrderId = rawOrder.externalOrderId;
       newOrder.orderCode = rawOrder.orderCode;
       newOrder.platform = platform;
-      newOrder.status = this.mapStatusToFoodOrderStatus(rawOrder.status);
+      newOrder.status = initialStatus;
       newOrder.customerName = rawOrder.customerName;
       newOrder.customerPhone = rawOrder.customerPhone || '';
       newOrder.customerAddress = rawOrder.customerAddress || '';
@@ -970,18 +995,24 @@ export class PublicController {
           );
 
           if (detailOrder) {
-            const newStatus = this.mapStatusToFoodOrderStatus(detailOrder.status);
-            if (newStatus !== order.status) {
-              this.logger.log(`[syncActiveOrdersStatus] Order ${order.orderCode}: ${order.status} -> ${newStatus}`);
+            const platformStatus = this.mapStatusToFoodOrderStatus(detailOrder.status);
+
+            // TechRes flow: Only auto-sync COMPLETED/CANCELLED from platform
+            // Don't change TechRes status based on platform's intermediate states
+            if (
+              (platformStatus === FoodOrderStatus.COMPLETED || platformStatus === FoodOrderStatus.CANCELLED) &&
+              platformStatus !== order.status
+            ) {
+              this.logger.log(`[syncActiveOrdersStatus] Order ${order.orderCode}: ${order.status} -> ${platformStatus} (platform sync)`);
 
               order.previousStatus = order.status;
-              order.status = newStatus;
+              order.status = platformStatus;
               order.lastSyncAt = new Date();
 
-              if (newStatus === FoodOrderStatus.COMPLETED && !order.completedAt) {
+              if (platformStatus === FoodOrderStatus.COMPLETED && !order.completedAt) {
                 order.completedAt = new Date();
               }
-              if (newStatus === FoodOrderStatus.CANCELLED && !order.cancelledAt) {
+              if (platformStatus === FoodOrderStatus.CANCELLED && !order.cancelledAt) {
                 order.cancelledAt = new Date();
               }
 
