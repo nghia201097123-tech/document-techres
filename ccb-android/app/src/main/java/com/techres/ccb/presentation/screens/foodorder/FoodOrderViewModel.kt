@@ -175,17 +175,13 @@ class FoodOrderViewModel @Inject constructor(
                 Log.d(TAG, "Received ${fetchedOrders.size} orders, ${newlyArrivedOrders.size} newly arrived")
 
                 // Update UI state
+                // TechRes simplified flow: NEW -> PREPARING -> COMPLETED/CANCELLED
                 _uiState.update { state ->
                     state.copy(
                         orders = getFilteredOrders(),
                         newOrdersCount = _ordersList.count { it.status == FoodOrderStatus.NEW },
                         processingOrdersCount = _ordersList.count {
-                            it.status in listOf(
-                                FoodOrderStatus.ACCEPTED,
-                                FoodOrderStatus.PREPARING,
-                                FoodOrderStatus.READY,
-                                FoodOrderStatus.DELIVERING
-                            )
+                            it.status == FoodOrderStatus.PREPARING
                         },
                         isLoading = false,
                         errorMessage = null
@@ -274,13 +270,14 @@ class FoodOrderViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Map status string from API to FoodOrderStatus - TechRes simplified flow
+     * Đơn mới (NEW) -> Đã xác nhận (PREPARING) -> Hoàn tất (COMPLETED) / Huỷ (CANCELLED)
+     */
     private fun mapStatusString(status: String): FoodOrderStatus {
         return when (status.uppercase()) {
             "NEW" -> FoodOrderStatus.NEW
-            "ACCEPTED" -> FoodOrderStatus.ACCEPTED
             "PREPARING" -> FoodOrderStatus.PREPARING
-            "READY" -> FoodOrderStatus.READY
-            "DELIVERING" -> FoodOrderStatus.DELIVERING
             "COMPLETED" -> FoodOrderStatus.COMPLETED
             "CANCELLED" -> FoodOrderStatus.CANCELLED
             else -> FoodOrderStatus.NEW
@@ -300,16 +297,12 @@ class FoodOrderViewModel @Inject constructor(
 
     private fun getFilteredOrders(): List<FoodAppOrder> {
         val state = _uiState.value
+        // TechRes simplified flow: NEW -> PREPARING -> COMPLETED/CANCELLED
         var filtered = when (state.selectedFilter) {
             FoodOrderFilter.ALL -> _ordersList.toList()
             FoodOrderFilter.NEW -> _ordersList.filter { it.status == FoodOrderStatus.NEW }
             FoodOrderFilter.PROCESSING -> _ordersList.filter {
-                it.status in listOf(
-                    FoodOrderStatus.ACCEPTED,
-                    FoodOrderStatus.PREPARING,
-                    FoodOrderStatus.READY,
-                    FoodOrderStatus.DELIVERING
-                )
+                it.status == FoodOrderStatus.PREPARING
             }
             FoodOrderFilter.COMPLETED -> _ordersList.filter { it.status == FoodOrderStatus.COMPLETED }
             FoodOrderFilter.CANCELLED -> _ordersList.filter { it.status == FoodOrderStatus.CANCELLED }
@@ -366,30 +359,30 @@ class FoodOrderViewModel @Inject constructor(
     }
 
     // ===== ORDER STATUS ACTIONS =====
+    // TechRes simplified flow: NEW -> PREPARING -> COMPLETED/CANCELLED
 
+    /**
+     * Accept/Confirm order - moves from NEW to PREPARING
+     */
     fun acceptOrder(orderId: String) {
-        updateOrderStatus(orderId, FoodOrderStatus.ACCEPTED)
-        showSuccess("Đã nhận đơn hàng")
-    }
-
-    fun startPreparing(orderId: String) {
         updateOrderStatus(orderId, FoodOrderStatus.PREPARING)
-        showSuccess("Bắt đầu chuẩn bị đơn hàng")
+        showSuccess("Đã xác nhận đơn hàng")
     }
 
-    fun markAsReady(orderId: String) {
-        updateOrderStatus(orderId, FoodOrderStatus.READY)
-        showSuccess("Đơn hàng đã sẵn sàng giao")
-    }
-
+    /**
+     * Complete order - moves from PREPARING to COMPLETED
+     */
     fun completeOrder(orderId: String) {
         updateOrderStatus(orderId, FoodOrderStatus.COMPLETED)
-        showSuccess("Đơn hàng hoàn thành")
+        showSuccess("Đơn hàng hoàn tất")
     }
 
+    /**
+     * Cancel order - moves to CANCELLED
+     */
     fun cancelOrder(orderId: String) {
         updateOrderStatus(orderId, FoodOrderStatus.CANCELLED)
-        showSuccess("Đã hủy đơn hàng")
+        showSuccess("Đã huỷ đơn hàng")
     }
 
     private fun updateOrderStatus(orderId: String, newStatus: FoodOrderStatus) {
@@ -398,8 +391,8 @@ class FoodOrderViewModel @Inject constructor(
             val order = _ordersList[index]
             val updatedOrder = order.copy(
                 status = newStatus,
-                acceptedAt = if (newStatus == FoodOrderStatus.ACCEPTED) System.currentTimeMillis() else order.acceptedAt,
-                preparedAt = if (newStatus == FoodOrderStatus.READY) System.currentTimeMillis() else order.preparedAt,
+                acceptedAt = if (newStatus == FoodOrderStatus.PREPARING) System.currentTimeMillis() else order.acceptedAt,
+                preparedAt = order.preparedAt,
                 completedAt = if (newStatus == FoodOrderStatus.COMPLETED) System.currentTimeMillis() else order.completedAt
             )
             _ordersList[index] = updatedOrder

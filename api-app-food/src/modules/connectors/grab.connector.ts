@@ -19,20 +19,25 @@ import {
 } from './interfaces/connector.interface';
 
 /**
- * GrabFood Status Mapping
- * Maps GrabFood API states to internal statuses
+ * GrabFood Status Mapping - Simplified TechRes Flow
+ * Maps GrabFood API states to TechRes statuses:
+ * - Đơn mới (NEW)
+ * - Đã xác nhận (PREPARING) - all in-progress states
+ * - Hoàn tất (COMPLETED)
+ * - Huỷ (CANCELLED)
  */
 const GRAB_STATUS_MAP: Record<string, string> = {
-  // Active order states
+  // Đơn mới (NEW)
   'ORDER_NEW': FoodOrderStatus.NEW,
+  // Đã xác nhận (PREPARING) - all in-progress states map to PREPARING
   'ORDER_IN_PREPARE': FoodOrderStatus.PREPARING,
-  'ORDER_EXECUTING': FoodOrderStatus.DELIVERING,
-  'ORDER_READY': FoodOrderStatus.READY,
-  'ORDER_IN_DELIVERY': FoodOrderStatus.DELIVERING,
+  'ORDER_EXECUTING': FoodOrderStatus.PREPARING,
+  'ORDER_READY': FoodOrderStatus.PREPARING,
+  'ORDER_IN_DELIVERY': FoodOrderStatus.PREPARING,
+  // Hoàn tất (COMPLETED)
   'ORDER_DELIVERED': FoodOrderStatus.COMPLETED,
-  // Completed state
   'COMPLETED': FoodOrderStatus.COMPLETED,
-  // Cancelled states
+  // Huỷ (CANCELLED)
   'ORDER_CANCELLED': FoodOrderStatus.CANCELLED,
   'CANCELLED': FoodOrderStatus.CANCELLED,
   'CANCELLED_MAX': FoodOrderStatus.CANCELLED,

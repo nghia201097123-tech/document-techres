@@ -183,8 +183,6 @@ fun FoodOrderScreen(
                             order = order,
                             onClick = { viewModel.selectOrder(order) },
                             onAccept = { viewModel.acceptOrder(order.id) },
-                            onStartPreparing = { viewModel.startPreparing(order.id) },
-                            onMarkReady = { viewModel.markAsReady(order.id) },
                             onComplete = { viewModel.completeOrder(order.id) },
                             onCancel = { viewModel.cancelOrder(order.id) },
                             gridColumns = uiState.gridColumns
@@ -200,8 +198,6 @@ fun FoodOrderScreen(
                 order = uiState.selectedOrder!!,
                 onDismiss = { viewModel.hideOrderDetail() },
                 onAccept = { viewModel.acceptOrder(it) },
-                onStartPreparing = { viewModel.startPreparing(it) },
-                onMarkReady = { viewModel.markAsReady(it) },
                 onComplete = { viewModel.completeOrder(it) },
                 onCancel = { viewModel.cancelOrder(it) }
             )
@@ -292,8 +288,6 @@ fun FoodOrderCard(
     order: FoodAppOrder,
     onClick: () -> Unit,
     onAccept: () -> Unit,
-    onStartPreparing: () -> Unit,
-    onMarkReady: () -> Unit,
     onComplete: () -> Unit,
     onCancel: () -> Unit,
     gridColumns: Int = 3
@@ -562,7 +556,7 @@ fun FoodOrderCard(
                 }
             }
 
-            // Action buttons (compact layout)
+            // Action buttons - TechRes simplified flow: NEW -> PREPARING -> COMPLETED/CANCELLED
             Spacer(modifier = Modifier.height(if (isCompact) 8.dp else 12.dp))
             when (order.status) {
                 FoodOrderStatus.NEW -> {
@@ -574,7 +568,7 @@ fun FoodOrderCard(
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                             contentPadding = PaddingValues(vertical = 6.dp)
                         ) {
-                            Text("Nhận", fontSize = 11.sp)
+                            Text("Xác nhận", fontSize = 11.sp)
                         }
                     } else {
                         Row(
@@ -589,7 +583,7 @@ fun FoodOrderCard(
                                 ),
                                 contentPadding = PaddingValues(vertical = 6.dp)
                             ) {
-                                Text("Hủy", fontSize = 11.sp)
+                                Text("Huỷ", fontSize = 11.sp)
                             }
                             Button(
                                 onClick = onAccept,
@@ -597,39 +591,45 @@ fun FoodOrderCard(
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                                 contentPadding = PaddingValues(vertical = 6.dp)
                             ) {
-                                Text("Nhận đơn", fontSize = 11.sp)
+                                Text("Xác nhận", fontSize = 11.sp)
                             }
                         }
                     }
                 }
-                FoodOrderStatus.ACCEPTED -> {
-                    Button(
-                        onClick = onStartPreparing,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9C27B0)),
-                        contentPadding = PaddingValues(vertical = 6.dp)
-                    ) {
-                        Text(if (isCompact) "Làm" else "Bắt đầu làm", fontSize = 11.sp)
-                    }
-                }
                 FoodOrderStatus.PREPARING -> {
-                    Button(
-                        onClick = onMarkReady,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2196F3)),
-                        contentPadding = PaddingValues(vertical = 6.dp)
-                    ) {
-                        Text(if (isCompact) "Xong" else "Sẵn sàng", fontSize = 11.sp)
-                    }
-                }
-                FoodOrderStatus.READY, FoodOrderStatus.DELIVERING -> {
-                    Button(
-                        onClick = onComplete,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                        contentPadding = PaddingValues(vertical = 6.dp)
-                    ) {
-                        Text(if (isCompact) "Xong" else "Hoàn thành", fontSize = 11.sp)
+                    if (isCompact) {
+                        Button(
+                            onClick = onComplete,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                            contentPadding = PaddingValues(vertical = 6.dp)
+                        ) {
+                            Text("Hoàn tất", fontSize = 11.sp)
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = onCancel,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                ),
+                                contentPadding = PaddingValues(vertical = 6.dp)
+                            ) {
+                                Text("Huỷ", fontSize = 11.sp)
+                            }
+                            Button(
+                                onClick = onComplete,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                                contentPadding = PaddingValues(vertical = 6.dp)
+                            ) {
+                                Text("Hoàn tất", fontSize = 11.sp)
+                            }
+                        }
                     }
                 }
                 else -> {}
@@ -693,8 +693,6 @@ fun OrderDetailDialog(
     order: FoodAppOrder,
     onDismiss: () -> Unit,
     onAccept: (String) -> Unit,
-    onStartPreparing: (String) -> Unit,
-    onMarkReady: (String) -> Unit,
     onComplete: (String) -> Unit,
     onCancel: (String) -> Unit
 ) {
@@ -969,6 +967,7 @@ fun OrderDetailDialog(
                         .padding(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // TechRes simplified flow: NEW -> PREPARING -> COMPLETED/CANCELLED
                     when (order.status) {
                         FoodOrderStatus.NEW -> {
                             OutlinedButton(
@@ -980,7 +979,7 @@ fun OrderDetailDialog(
                             ) {
                                 Icon(Icons.Default.Cancel, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Hủy đơn")
+                                Text("Huỷ đơn")
                             }
                             Button(
                                 onClick = { onAccept(order.id); onDismiss() },
@@ -991,10 +990,10 @@ fun OrderDetailDialog(
                             ) {
                                 Icon(Icons.Default.Check, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Nhận đơn")
+                                Text("Xác nhận")
                             }
                         }
-                        FoodOrderStatus.ACCEPTED -> {
+                        FoodOrderStatus.PREPARING -> {
                             OutlinedButton(
                                 onClick = { onCancel(order.id); onDismiss() },
                                 modifier = Modifier.weight(0.4f),
@@ -1002,44 +1001,18 @@ fun OrderDetailDialog(
                                     contentColor = MaterialTheme.colorScheme.error
                                 )
                             ) {
-                                Text("Hủy")
+                                Text("Huỷ")
                             }
-                            Button(
-                                onClick = { onStartPreparing(order.id); onDismiss() },
-                                modifier = Modifier.weight(0.6f),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF9C27B0)
-                                )
-                            ) {
-                                Icon(Icons.Default.Restaurant, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Bắt đầu làm")
-                            }
-                        }
-                        FoodOrderStatus.PREPARING -> {
-                            Button(
-                                onClick = { onMarkReady(order.id); onDismiss() },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF2196F3)
-                                )
-                            ) {
-                                Icon(Icons.Default.DoneAll, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Đã làm xong - Sẵn sàng giao")
-                            }
-                        }
-                        FoodOrderStatus.READY, FoodOrderStatus.DELIVERING -> {
                             Button(
                                 onClick = { onComplete(order.id); onDismiss() },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.weight(0.6f),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = Color(0xFF4CAF50)
                                 )
                             ) {
                                 Icon(Icons.Default.CheckCircle, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Hoàn thành đơn hàng")
+                                Text("Hoàn tất")
                             }
                         }
                         else -> {

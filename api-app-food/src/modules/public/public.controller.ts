@@ -610,11 +610,10 @@ export class PublicController {
 
           // Sync status for active orders in DB that are not in pagination response
           // These orders may have been COMPLETED or CANCELLED
+          // TechRes simplified flow: NEW -> PREPARING -> COMPLETED/CANCELLED
           const activeStatuses = [
-            FoodOrderStatus.ACCEPTED,
+            FoodOrderStatus.NEW,
             FoodOrderStatus.PREPARING,
-            FoodOrderStatus.READY,
-            FoodOrderStatus.DELIVERING,
           ];
 
           const activeOrdersInDb = await this.orderRepo.find({
@@ -781,15 +780,13 @@ export class PublicController {
   }
 
   /**
-   * Map Grab status to FoodOrderStatus
+   * Map Grab status to FoodOrderStatus - TechRes simplified flow
+   * Đơn mới (NEW) -> Đã xác nhận (PREPARING) -> Hoàn tất (COMPLETED) / Huỷ (CANCELLED)
    */
   private mapGrabStatusToFoodOrderStatus(status: string): FoodOrderStatus {
     const statusMap: Record<string, FoodOrderStatus> = {
       'new': FoodOrderStatus.NEW,
-      'accepted': FoodOrderStatus.ACCEPTED,
       'preparing': FoodOrderStatus.PREPARING,
-      'ready': FoodOrderStatus.READY,
-      'delivering': FoodOrderStatus.DELIVERING,
       'completed': FoodOrderStatus.COMPLETED,
       'cancelled': FoodOrderStatus.CANCELLED,
     };

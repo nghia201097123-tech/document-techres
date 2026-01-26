@@ -106,14 +106,13 @@ enum class FoodPlatform(
 }
 
 /**
- * Trạng thái đơn hàng Food App
+ * Trạng thái đơn hàng Food App - TechRes Simplified Flow
+ * Đơn mới (NEW) -> Đã xác nhận (PREPARING) -> Hoàn tất (COMPLETED) / Huỷ (CANCELLED)
  */
 enum class FoodOrderStatus(
     val displayName: String,
     val color: Long,
     val canAccept: Boolean = false,
-    val canPrepare: Boolean = false,
-    val canReady: Boolean = false,
     val canComplete: Boolean = false,
     val canCancel: Boolean = false
 ) {
@@ -123,33 +122,18 @@ enum class FoodOrderStatus(
         canAccept = true,
         canCancel = true
     ),
-    ACCEPTED(
-        displayName = "Đã nhận",
+    PREPARING(
+        displayName = "Đã xác nhận",
         color = 0xFF2196F3,  // Blue
-        canPrepare = true,
+        canComplete = true,
         canCancel = true
     ),
-    PREPARING(
-        displayName = "Đang làm",
-        color = 0xFF9C27B0,  // Purple
-        canReady = true
-    ),
-    READY(
-        displayName = "Sẵn sàng",
-        color = 0xFF4CAF50,  // Green
-        canComplete = true
-    ),
-    DELIVERING(
-        displayName = "Đang giao",
-        color = 0xFF00BCD4,  // Cyan
-        canComplete = true
-    ),
     COMPLETED(
-        displayName = "Hoàn thành",
-        color = 0xFF8BC34A   // Light Green
+        displayName = "Hoàn tất",
+        color = 0xFF4CAF50   // Green
     ),
     CANCELLED(
-        displayName = "Đã hủy",
+        displayName = "Đã huỷ",
         color = 0xFFF44336   // Red
     )
 }
