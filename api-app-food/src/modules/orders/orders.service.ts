@@ -134,23 +134,28 @@ export class OrdersService {
 
     // Enrich ALL orders with detail API to get full customer info, driver phone, etc.
     // Pagination API doesn't return these fields
+    this.logger.log(`[Enrichment] Processing ${orders.length} orders for enrichment`);
+
     const enrichedOrders = await Promise.all(
       orders.map(async (order) => {
         // Always fetch detail to get customer_phone, customer_note, driver_phone, driver_avatar
         // Only skip if we already have full data (customer_phone is the indicator)
         const needsEnrichment = !order.customerPhone || !order.driverPhone;
 
+        this.logger.log(`[Enrichment] Order ${order.orderCode}: customerPhone="${order.customerPhone}", driverPhone="${order.driverPhone}", needsEnrichment=${needsEnrichment}, hasFetchMethod=${!!connector.fetchOrderDetail}`);
+
         if (needsEnrichment && connector.fetchOrderDetail) {
           try {
+            this.logger.log(`[Enrichment] Calling fetchOrderDetail for ${order.orderCode} (${order.externalOrderId})`);
             const detailOrder = await connector.fetchOrderDetail(
               account,
               order.externalOrderId,
               order.orderCode,
             );
             if (detailOrder) {
-              this.logger.log(`Enriched order ${order.orderCode} with detail data`);
+              this.logger.log(`[Enrichment] Got detail for ${order.orderCode}: customerPhone="${detailOrder.customerPhone}", driverPhone="${detailOrder.driverPhone}", driverAvatar="${detailOrder.driverAvatar?.substring(0, 50)}..."`);
               // Merge detail data into order
-              return {
+              const merged = {
                 ...order,
                 customerPhone: detailOrder.customerPhone || order.customerPhone,
                 customerAddress: detailOrder.customerAddress || order.customerAddress,
@@ -160,6 +165,8 @@ export class OrdersService {
                 driverLicensePlate: detailOrder.driverLicensePlate || order.driverLicensePlate,
                 items: detailOrder.items?.length > 0 ? detailOrder.items : order.items,
               };
+              this.logger.log(`[Enrichment] Merged ${order.orderCode}: customerPhone="${merged.customerPhone}", driverPhone="${merged.driverPhone}"`);
+              return merged;
             }
           } catch (error) {
             this.logger.warn(`Failed to fetch order detail for ${order.orderCode}: ${error.message}`);
@@ -169,6 +176,7 @@ export class OrdersService {
       }),
     );
 
+    this.logger.log(`[Enrichment] Completed. Returning ${enrichedOrders.length} orders`);
     return enrichedOrders;
   }
 
@@ -183,7 +191,11 @@ export class OrdersService {
     const newOrders: FoodOrder[] = [];
     const updatedOrders: FoodOrder[] = [];
 
+    this.logger.log(`[SyncToDB] Syncing ${rawOrders.length} orders to database`);
+
     for (const rawOrder of rawOrders) {
+      this.logger.log(`[SyncToDB] Processing ${rawOrder.orderCode}: customerPhone="${rawOrder.customerPhone}", driverPhone="${rawOrder.driverPhone}", driverAvatar="${rawOrder.driverAvatar?.substring(0, 30)}..."`);
+
       // Find mapping for this order's platform
       const mapping = mappings.find(
         (m) => m.account?.platform === rawOrder.platform,
