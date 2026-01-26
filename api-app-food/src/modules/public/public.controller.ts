@@ -594,7 +594,7 @@ export class PublicController {
 
   /**
    * Process GrabFood orders
-   * Uses fetchOrdersPagination and fetchOrderDetail for enrichment
+   * Uses fetchGrabOrdersPagination and fetchOrderDetail for enrichment
    */
   private async processGrabOrders(
     account: FoodPlatformAccount,
@@ -614,7 +614,7 @@ export class PublicController {
     let result;
 
     try {
-      result = await this.grabConnector.fetchOrdersPagination(currentAccount, validPageType);
+      result = await this.grabConnector.fetchGrabOrdersPagination(currentAccount, validPageType);
     } catch (fetchError: any) {
       // Check if it's a token expiry error
       const isUnauthorized = fetchError instanceof UnauthorizedException ||
@@ -625,7 +625,7 @@ export class PublicController {
         this.logger.log(`[processGrabOrders] Token expired, attempting reconnect...`);
         try {
           currentAccount = await this.accountsService.reconnect(account.id);
-          result = await this.grabConnector.fetchOrdersPagination(currentAccount, validPageType);
+          result = await this.grabConnector.fetchGrabOrdersPagination(currentAccount, validPageType);
         } catch (reconnectError: any) {
           throw new Error(`Token hết hạn và không thể kết nối lại: ${reconnectError?.message}`);
         }

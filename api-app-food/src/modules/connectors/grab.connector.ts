@@ -424,8 +424,9 @@ export class GrabConnector extends BasePlatformConnector {
   /**
    * Poll orders using pagination API (new API - called by CCB every 5s)
    * Endpoint: GET https://api.grab.com/food/merchant/v3/orders-pagination
+   * Note: This is a Grab-specific method, not part of IPlatformConnector interface
    */
-  async fetchOrdersPagination(
+  async fetchGrabOrdersPagination(
     account: FoodPlatformAccount,
     pageType: 'New' | 'Preparing' | 'Ready' | 'Delivering' = 'Preparing',
     autoAcceptGroup: number = 3,
@@ -493,7 +494,7 @@ export class GrabConnector extends BasePlatformConnector {
       ? pageType as 'New' | 'Preparing' | 'Ready' | 'Delivering'
       : 'Preparing';
 
-    const grabResponse = await this.fetchOrdersPagination(account, validPageType);
+    const grabResponse = await this.fetchGrabOrdersPagination(account, validPageType);
 
     if (!grabResponse.success) {
       return {
