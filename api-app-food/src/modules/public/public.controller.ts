@@ -482,7 +482,35 @@ export class PublicController {
           const newOrderIds: string[] = [];
 
           for (const grabOrder of result.orders) {
-            const rawOrder = this.grabConnector.transformPaginationOrder(grabOrder);
+            let rawOrder = this.grabConnector.transformPaginationOrder(grabOrder);
+
+            // Enrich order with detail API to get customer phone, driver phone, etc.
+            const needsEnrichment = !rawOrder.customerPhone || !rawOrder.driverPhone;
+            if (needsEnrichment) {
+              try {
+                this.logger.log(`[pollOrders] [Enrichment] Fetching detail for order ${rawOrder.externalOrderId}`);
+                const detailOrder = await this.grabConnector.fetchOrderDetail(
+                  currentAccount,
+                  rawOrder.externalOrderId,
+                  rawOrder.orderCode,
+                );
+                if (detailOrder) {
+                  this.logger.log(`[pollOrders] [Enrichment] Got detail: customerPhone=${detailOrder.customerPhone}, driverPhone=${detailOrder.driverPhone}`);
+                  // Merge detail data into rawOrder
+                  rawOrder = {
+                    ...rawOrder,
+                    customerPhone: detailOrder.customerPhone || rawOrder.customerPhone,
+                    customerAddress: detailOrder.customerAddress || rawOrder.customerAddress,
+                    customerNote: detailOrder.customerNote || rawOrder.customerNote,
+                    driverPhone: detailOrder.driverPhone || rawOrder.driverPhone,
+                    driverAvatar: detailOrder.driverAvatar || rawOrder.driverAvatar,
+                    driverLicensePlate: detailOrder.driverLicensePlate || rawOrder.driverLicensePlate,
+                  };
+                }
+              } catch (enrichError: any) {
+                this.logger.warn(`[pollOrders] [Enrichment] Failed for order ${rawOrder.externalOrderId}: ${enrichError.message}`);
+              }
+            }
 
             // Check if order already exists
             let existingOrder = await this.orderRepo.findOne({
@@ -502,6 +530,28 @@ export class PublicController {
               existingOrder.driverName = rawOrder.driverName || existingOrder.driverName;
               existingOrder.lastSyncAt = new Date();
               existingOrder.rawData = rawOrder.rawData || null;
+
+              // Update customer info if available from enrichment
+              if (rawOrder.customerPhone && !existingOrder.customerPhone) {
+                existingOrder.customerPhone = rawOrder.customerPhone;
+              }
+              if (rawOrder.customerAddress && !existingOrder.customerAddress) {
+                existingOrder.customerAddress = rawOrder.customerAddress;
+              }
+              if (rawOrder.customerNote && !existingOrder.customerNote) {
+                existingOrder.customerNote = rawOrder.customerNote;
+              }
+
+              // Update driver info if available from enrichment
+              if (rawOrder.driverPhone && !existingOrder.driverPhone) {
+                existingOrder.driverPhone = rawOrder.driverPhone;
+              }
+              if (rawOrder.driverAvatar && !existingOrder.driverAvatar) {
+                existingOrder.driverAvatar = rawOrder.driverAvatar;
+              }
+              if (rawOrder.driverLicensePlate && !existingOrder.driverLicensePlate) {
+                existingOrder.driverLicensePlate = rawOrder.driverLicensePlate;
+              }
 
               if (rawOrder.acceptedAt && !existingOrder.acceptedAt) {
                 existingOrder.acceptedAt = rawOrder.acceptedAt;
@@ -541,6 +591,7 @@ export class PublicController {
               newOrder.paymentMethod = rawOrder.paymentMethod || '';
               newOrder.driverName = rawOrder.driverName || null;
               newOrder.driverPhone = rawOrder.driverPhone || null;
+              newOrder.driverAvatar = rawOrder.driverAvatar || null;
               newOrder.driverLicensePlate = rawOrder.driverLicensePlate || null;
               newOrder.estimatedDeliveryTime = rawOrder.estimatedDeliveryTime || null;
               newOrder.platformCreatedAt = rawOrder.createdAt;
