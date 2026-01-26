@@ -46,20 +46,27 @@ export class GrabConnector extends BasePlatformConnector {
       username: credentials.username,
     };
 
+    const fullUrl = `${this.httpClient.defaults.baseURL}${requestUrl}`;
     this.logger.log(`[GrabFood Login] Attempting login for user: ${credentials.username}`);
-    this.logger.log(`[GrabFood Login] URL: ${this.httpClient.defaults.baseURL}${requestUrl}`);
+    this.logger.log(`[GrabFood Login] URL: ${fullUrl}`);
+    this.logger.log(`[GrabFood Login] Request body: ${JSON.stringify(requestBody)}`);
 
     try {
-      const response = await this.httpClient.post(
-        requestUrl,
+      // Use standalone axios to match cURL behavior exactly (avoid base connector interceptors)
+      const response = await axios.post(
+        fullUrl,
         requestBody,
         {
           headers: {
-            'user-agent': 'Grab Merchant/4.126.0 (ios 16.7.10; Build 102734851)',
+            'User-Agent': 'Grab Merchant/4.126.0 (ios 16.7.10; Build 102734851)',
             'mex-country': 'VN',
             'x-currency': 'VND',
             'Content-Type': 'application/json',
+            'Accept': '*/*',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
           },
+          timeout: 30000,
         },
       );
 
