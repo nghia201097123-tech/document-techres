@@ -78,10 +78,13 @@ export class PublicController {
           tenantId: account.tenantId,
           platform: account.platform,
           displayName: account.displayName,
+          username: account.username,
           status: account.status,
           externalMerchantId: account.externalMerchantId,
           externalMerchantName: account.externalMerchantName,
           isActive: account.isActive,
+          lastError: account.lastError,
+          errorCount: account.errorCount,
         },
         storeMappings: [],
       }));
