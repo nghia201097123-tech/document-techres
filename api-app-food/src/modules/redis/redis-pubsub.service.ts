@@ -44,9 +44,25 @@ export class RedisPubSubService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Gửi trigger poll cho api-order-worker
+   * Gửi trigger poll cho api-order-worker (với deduplication)
+   *
+   * Deduplication: Chỉ trigger 1 lần mỗi 10 giây cho mỗi branch
+   * Tránh trường hợp 100 users cùng branch gọi endpoint → 100 triggers trùng lặp
    */
   async triggerPoll(branchId: string, accounts: any[]): Promise<void> {
+    const lockKey = `poll-lock:${branchId}`;
+    const LOCK_TTL_SECONDS = 10; // Chỉ trigger 1 lần mỗi 10 giây
+
+    // Try to acquire lock (NX = only set if not exists)
+    const acquired = await this.publisher.set(lockKey, Date.now().toString(), 'EX', LOCK_TTL_SECONDS, 'NX');
+
+    if (!acquired) {
+      // Lock exists = recently triggered, skip
+      this.logger.log(`[Dedupe] Skip trigger for branch ${branchId} - triggered within last ${LOCK_TTL_SECONDS}s`);
+      return;
+    }
+
+    // Lock acquired, proceed with trigger
     const channel = `trigger-poll:branch:${branchId}`;
     const message = JSON.stringify({
       branchId,
@@ -59,11 +75,26 @@ export class RedisPubSubService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(`   Channel: ${channel}`);
     this.logger.log(`   Accounts: ${accounts.length}`);
     this.logger.log(`   Redis Connected: ${this.isConnected}`);
+    this.logger.log(`   Deduplication: Lock acquired for ${LOCK_TTL_SECONDS}s`);
 
     const result = await this.publisher.publish(channel, message);
 
     this.logger.log(`   Subscribers received: ${result}`);
     this.logger.log('═══════════════════════════════════════════════════════════');
+  }
+
+  /**
+   * Force trigger poll (bỏ qua deduplication)
+   * Dùng khi cần trigger ngay lập tức (vd: sau khi xác nhận đơn)
+   */
+  async forceTriggerPoll(branchId: string, accounts: any[]): Promise<void> {
+    const lockKey = `poll-lock:${branchId}`;
+
+    // Remove lock first
+    await this.publisher.del(lockKey);
+
+    // Then trigger
+    await this.triggerPoll(branchId, accounts);
   }
 
   /**
