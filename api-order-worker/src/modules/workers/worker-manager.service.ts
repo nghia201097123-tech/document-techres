@@ -4,7 +4,7 @@ import * as path from 'path';
 
 export interface AccountData {
   id: string;
-  platform: 'GRAB' | 'SHOPEE_FOOD' | 'BEFOOD';
+  platform: 'grab' | 'shopee_food' | 'befood';
   accessToken: string;
   branchId: string;
   tenantId: string;
@@ -120,7 +120,7 @@ export class WorkerManagerService implements OnModuleInit, OnModuleDestroy {
       return {
         success: false,
         accountId: account.id,
-        platform: 'GRAB',
+        platform: 'grab',
         orders: [],
         error: error.message,
         duration: 0,
@@ -139,7 +139,7 @@ export class WorkerManagerService implements OnModuleInit, OnModuleDestroy {
       return {
         success: false,
         accountId: account.id,
-        platform: 'SHOPEE_FOOD',
+        platform: 'shopee_food',
         orders: [],
         error: error.message,
         duration: 0,
@@ -158,7 +158,7 @@ export class WorkerManagerService implements OnModuleInit, OnModuleDestroy {
       return {
         success: false,
         accountId: account.id,
-        platform: 'BEFOOD',
+        platform: 'befood',
         orders: [],
         error: error.message,
         duration: 0,
@@ -176,11 +176,11 @@ export class WorkerManagerService implements OnModuleInit, OnModuleDestroy {
 
     const promises = accounts.map((account) => {
       switch (account.platform) {
-        case 'GRAB':
+        case 'grab':
           return this.pollGrabOrders(account);
-        case 'SHOPEE_FOOD':
+        case 'shopee_food':
           return this.pollShopeeOrders(account);
-        case 'BEFOOD':
+        case 'befood':
           return this.pollBeFoodOrders(account);
         default:
           return Promise.resolve({

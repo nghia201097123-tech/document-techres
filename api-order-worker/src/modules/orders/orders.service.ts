@@ -106,7 +106,7 @@ export class OrdersService {
       // 3. Prepare account data for workers
       const accountData: AccountData[] = accounts.map((acc) => ({
         id: acc.id,
-        platform: acc.platform as 'GRAB' | 'SHOPEE_FOOD' | 'BEFOOD',
+        platform: acc.platform as 'grab' | 'shopee_food' | 'befood',
         accessToken: acc.accessToken,
         branchId: acc.branchId,
         tenantId: acc.tenantId,

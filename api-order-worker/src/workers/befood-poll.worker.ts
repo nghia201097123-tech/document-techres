@@ -58,7 +58,7 @@ export default async function pollBeFoodOrders(account: AccountData) {
     return {
       success: true,
       accountId: account.id,
-      platform: 'BEFOOD',
+      platform: 'befood',
       orders: [],
       orderStats: null,
       pollInterval: 60,
@@ -69,7 +69,7 @@ export default async function pollBeFoodOrders(account: AccountData) {
     return {
       success: false,
       accountId: account.id,
-      platform: 'BEFOOD',
+      platform: 'befood',
       orders: [],
       error: error?.message || 'Unknown error',
       isUnauthorized: error?.response?.status === 401,
@@ -88,7 +88,7 @@ function transformBeFoodOrder(beFoodOrder: any) {
   return {
     externalOrderId: String(beFoodOrder.order_id || beFoodOrder.id),
     orderCode: beFoodOrder.order_code || `#BE${String(beFoodOrder.id).slice(-6)}`,
-    platform: 'BEFOOD',
+    platform: 'befood',
     status: BEFOOD_STATUS_MAP[status] || 'NEW',
 
     // Customer info

@@ -62,7 +62,7 @@ export default async function pollShopeeOrders(account: AccountData) {
     return {
       success: true,
       accountId: account.id,
-      platform: 'SHOPEE_FOOD',
+      platform: 'shopee_food',
       orders: transformedOrders,
       orderStats: null,
       pollInterval: 60,
@@ -72,7 +72,7 @@ export default async function pollShopeeOrders(account: AccountData) {
     return {
       success: false,
       accountId: account.id,
-      platform: 'SHOPEE_FOOD',
+      platform: 'shopee_food',
       orders: [],
       error: error?.message || 'Unknown error',
       isUnauthorized: error?.response?.status === 401,
@@ -90,7 +90,7 @@ function transformShopeeOrder(shopeeOrder: any) {
   return {
     externalOrderId: String(shopeeOrder.order_id || shopeeOrder.id),
     orderCode: shopeeOrder.order_code || `#SF${String(shopeeOrder.order_id).slice(-6)}`,
-    platform: 'SHOPEE_FOOD',
+    platform: 'shopee_food',
     status: SHOPEE_STATUS_MAP[status] || SHOPEE_STATUS_MAP[status.toUpperCase()] || 'NEW',
 
     // Customer info

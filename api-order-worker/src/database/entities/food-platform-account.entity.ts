@@ -8,47 +8,61 @@ import {
 } from 'typeorm';
 
 export enum AccountStatus {
-  CONNECTED = 'CONNECTED',
-  DISCONNECTED = 'DISCONNECTED',
-  PENDING = 'PENDING',
-  ERROR = 'ERROR',
+  PENDING = 'pending',
+  CONNECTING = 'connecting',
+  CONNECTED = 'connected',
+  DISCONNECTED = 'disconnected',
+  ERROR = 'error',
 }
 
 export enum FoodPlatformType {
-  GRAB = 'GRAB',
-  SHOPEE_FOOD = 'SHOPEE_FOOD',
-  BEFOOD = 'BEFOOD',
+  GRAB = 'grab',
+  SHOPEE_FOOD = 'shopee_food',
+  BEFOOD = 'befood',
+}
+
+export enum AuthType {
+  USERNAME_PASSWORD = 'username_password',
+  PHONE_OTP = 'phone_otp',
 }
 
 @Entity('food_platform_accounts')
-@Index(['tenantId', 'branchId'])
-@Index(['platform', 'status'])
+@Index(['tenantId', 'platform'])
+@Index(['branchId'])
+@Index(['status'])
 export class FoodPlatformAccount {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'tenant_id', type: 'varchar', length: 100 })
+  @Column({ name: 'tenant_id', type: 'varchar', length: 50 })
   tenantId: string;
 
-  @Column({ name: 'branch_id', type: 'varchar', length: 100 })
+  @Column({ name: 'branch_id', type: 'uuid', nullable: true })
   branchId: string;
 
   @Column({ type: 'enum', enum: FoodPlatformType })
   platform: FoodPlatformType;
 
-  @Column({ name: 'display_name', type: 'varchar', length: 255, nullable: true })
+  @Column({ type: 'enum', enum: AuthType, name: 'auth_type' })
+  authType: AuthType;
+
+  @Column({ name: 'display_name', type: 'varchar', length: 100, nullable: true })
   displayName: string;
 
   @Column({ type: 'enum', enum: AccountStatus, default: AccountStatus.PENDING })
   status: AccountStatus;
 
-  // Credentials (encrypted)
+  // Credentials
   @Column({ type: 'varchar', length: 255, nullable: true })
   username: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   password: string;
 
+  @Column({ name: 'phone_number', type: 'varchar', length: 20, nullable: true })
+  phoneNumber: string;
+
+  // Tokens
   @Column({ name: 'access_token', type: 'text', nullable: true })
   accessToken: string;
 
@@ -58,16 +72,26 @@ export class FoodPlatformAccount {
   @Column({ name: 'token_expires_at', type: 'timestamp', nullable: true })
   tokenExpiresAt: Date;
 
-  // External IDs
+  // External merchant info (from platform)
   @Column({ name: 'external_merchant_id', type: 'varchar', length: 100, nullable: true })
   externalMerchantId: string;
 
-  @Column({ name: 'external_store_id', type: 'varchar', length: 100, nullable: true })
-  externalStoreId: string;
+  @Column({ name: 'external_merchant_name', type: 'varchar', length: 255, nullable: true })
+  externalMerchantName: string;
+
+  // Status flags
+  @Column({ name: 'is_active', type: 'boolean', default: false })
+  isActive: boolean;
 
   // Polling metadata
+  @Column({ name: 'poll_interval_seconds', type: 'int', default: 30 })
+  pollIntervalSeconds: number;
+
   @Column({ name: 'last_poll_at', type: 'timestamp', nullable: true })
   lastPollAt: Date;
+
+  @Column({ name: 'next_poll_at', type: 'timestamp', nullable: true })
+  nextPollAt: Date;
 
   @Column({ name: 'error_count', type: 'int', default: 0 })
   errorCount: number;

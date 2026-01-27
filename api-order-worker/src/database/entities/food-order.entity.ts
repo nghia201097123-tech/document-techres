@@ -8,16 +8,19 @@ import {
 } from 'typeorm';
 
 export enum FoodOrderStatus {
-  NEW = 'NEW',
-  PREPARING = 'PREPARING',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
+  NEW = 'new',
+  ACCEPTED = 'accepted',
+  PREPARING = 'preparing',
+  READY = 'ready',
+  DELIVERING = 'delivering',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
 }
 
 export enum FoodPlatformType {
-  GRAB = 'GRAB',
-  SHOPEE_FOOD = 'SHOPEE_FOOD',
-  BEFOOD = 'BEFOOD',
+  GRAB = 'grab',
+  SHOPEE_FOOD = 'shopee_food',
+  BEFOOD = 'befood',
 }
 
 @Entity('food_orders')

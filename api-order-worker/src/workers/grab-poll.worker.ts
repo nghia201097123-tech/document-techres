@@ -113,7 +113,7 @@ export default async function pollGrabOrders(account: AccountData) {
     return {
       success: true,
       accountId: account.id,
-      platform: 'GRAB',
+      platform: 'grab',
       orders: enrichedOrders,
       orderStats: data.orderStats
         ? {
@@ -130,7 +130,7 @@ export default async function pollGrabOrders(account: AccountData) {
     return {
       success: false,
       accountId: account.id,
-      platform: 'GRAB',
+      platform: 'grab',
       orders: [],
       error: error?.message || 'Unknown error',
       isUnauthorized: error?.response?.status === 401,
@@ -148,7 +148,7 @@ function transformGrabOrder(grabOrder: GrabPaginationOrder) {
   return {
     externalOrderId: grabOrder.orderID,
     orderCode: grabOrder.displayID || `#GR${grabOrder.orderID.slice(-6)}`,
-    platform: 'GRAB',
+    platform: 'grab',
     status: GRAB_STATUS_MAP[grabOrder.state] || 'NEW',
 
     // Customer info
