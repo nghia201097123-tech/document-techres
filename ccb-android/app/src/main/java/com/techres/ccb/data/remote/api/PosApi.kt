@@ -19,19 +19,8 @@ interface PosApi {
     @POST("api/auth/verify-pin")
     suspend fun verifyPin(@Body request: VerifyPinRequest): Response<VerifyPinResponse>
 
-    // ============ Staff Branch Permissions Sync ============
-
-    /**
-     * Get brands and branches that staff has permission to access
-     * Only syncs the branches that the logged-in staff member can work with
-     */
-    @GET("api/sync/branches-brands/{staffId}")
-    suspend fun getStaffBranchPermissions(
-        @Header("Authorization") token: String,
-        @Path("staffId") staffId: String
-    ): Response<StaffBranchPermissionsResponse>
-
     // ============ Master Data Sync ============
+    // Note: getStaffBranchPermissions moved to MasterDataApi (api-master-data: 1504)
 
     @GET("api/sync/full")
     suspend fun getFullSyncData(

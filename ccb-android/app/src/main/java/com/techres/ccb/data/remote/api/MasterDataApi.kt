@@ -11,6 +11,7 @@ import com.techres.ccb.data.remote.dto.AreaDto
 import com.techres.ccb.data.remote.dto.TableDto
 import com.techres.ccb.data.remote.dto.StaffDto
 import com.techres.ccb.data.remote.dto.ShiftUploadDto
+import com.techres.ccb.data.remote.dto.StaffBranchPermissionsResponse
 import com.techres.ccb.data.remote.dto.SyncResponse
 import com.techres.ccb.data.remote.dto.UploadResponse
 import retrofit2.Response
@@ -27,6 +28,21 @@ import retrofit2.http.Query
  * All endpoints use /api/v1/ prefix (api-master-data global prefix)
  */
 interface MasterDataApi {
+
+    // ============ Staff Branch Permissions Sync ============
+
+    /**
+     * Get brands and branches that staff has permission to access
+     * Only syncs the branches that the logged-in staff member can work with
+     */
+    @GET("api/v1/sync/branches-brands/{staffId}")
+    suspend fun getStaffBranchPermissions(
+        @Header("Authorization") token: String,
+        @Path("staffId") staffId: String
+    ): Response<StaffBranchPermissionsResponse>
+
+    // ============ Master Data Sync ============
+
     // Full sync endpoint - returns all master data including kitchenIds for products
     @GET("api/v1/sync/full")
     suspend fun getFullSyncData(

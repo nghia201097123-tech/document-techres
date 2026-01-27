@@ -219,8 +219,8 @@ class BranchRepository @Inject constructor(
                 return Result.failure(Exception("Chưa có thông tin nhân viên"))
             }
 
-            Log.d(TAG, "syncStaffBranchPermissions - Calling POS API: sync/branches-brands/$staffId")
-            val response = posApi.getStaffBranchPermissions("Bearer $token", staffId)
+            Log.d(TAG, "syncStaffBranchPermissions - Calling MasterData API: api/v1/sync/branches-brands/$staffId")
+            val response = api.getStaffBranchPermissions("Bearer $token", staffId)
             Log.d(TAG, "syncStaffBranchPermissions - Response code: ${response.code()}, message: ${response.message()}")
 
             if (response.isSuccessful && response.body() != null) {
