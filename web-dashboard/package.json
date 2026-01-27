@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p ${SERVICE_PORT:-3001}",
+    "dev": "node scripts/start.js dev",
     "build": "next build",
-    "start": "next start -p ${SERVICE_PORT:-3001}",
+    "start": "node scripts/start.js start",
     "lint": "eslint"
   },
   "dependencies": {
