@@ -51,7 +51,7 @@ export interface FilterParams {
 export const permissionService = {
   // Permission endpoints
   async getAllPermissions(params?: FilterParams): Promise<PaginatedResponse<Permission>> {
-    const response = await api.get<PaginatedResponse<Permission>>("/permissions", { params });
+    const response = await api.get<PaginatedResponse<Permission>>("/api/permissions", { params });
     return response.data;
   },
 
@@ -67,7 +67,7 @@ export const permissionService = {
 
   // Permission Group endpoints
   async getAllGroups(params?: FilterParams): Promise<PaginatedResponse<PermissionGroup>> {
-    const response = await api.get<PaginatedResponse<PermissionGroup>>("/permission-groups", { params });
+    const response = await api.get<PaginatedResponse<PermissionGroup>>("/api/permission-groups", { params });
     return response.data;
   },
 
@@ -77,7 +77,7 @@ export const permissionService = {
   },
 
   async createGroup(data: CreatePermissionGroupDto): Promise<PermissionGroup> {
-    const response = await api.post<PermissionGroup>("/permission-groups", data);
+    const response = await api.post<PermissionGroup>("/api/permission-groups", data);
     return response.data;
   },
 

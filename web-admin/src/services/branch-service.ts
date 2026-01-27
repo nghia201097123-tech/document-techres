@@ -59,7 +59,7 @@ export const branchService = {
           )
         )
       : undefined;
-    const response = await api.get<BranchListResponse>("/branches", {
+    const response = await api.get<BranchListResponse>("/api/branches", {
       params: cleanParams,
     });
     return response.data;
@@ -72,7 +72,7 @@ export const branchService = {
 
   async create(data: CreateBranchData): Promise<Branch> {
     const cleanedData = cleanBranchData(data);
-    const response = await api.post<Branch>("/branches", cleanedData);
+    const response = await api.post<Branch>("/api/branches", cleanedData);
     return response.data;
   },
 
@@ -92,7 +92,7 @@ export const branchService = {
   },
 
   async getByBrand(brandId: string): Promise<Branch[]> {
-    const response = await api.get<BranchListResponse>("/branches", {
+    const response = await api.get<BranchListResponse>("/api/branches", {
       params: { brandId, limit: 100 },
     });
     return response.data.data;

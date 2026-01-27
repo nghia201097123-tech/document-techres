@@ -46,7 +46,7 @@ export interface PaginatedResponse<T> {
 
 export const transactionCategoryService = {
   async getAll(params?: FilterParams): Promise<PaginatedResponse<TransactionCategory>> {
-    const response = await api.get<PaginatedResponse<TransactionCategory>>("/transaction-categories", { params });
+    const response = await api.get<PaginatedResponse<TransactionCategory>>("/api/transaction-categories", { params });
     return response.data;
   },
 
@@ -56,7 +56,7 @@ export const transactionCategoryService = {
   },
 
   async create(data: CreateTransactionCategoryDto): Promise<TransactionCategory> {
-    const response = await api.post<TransactionCategory>("/transaction-categories", data);
+    const response = await api.post<TransactionCategory>("/api/transaction-categories", data);
     return response.data;
   },
 
@@ -75,6 +75,6 @@ export const transactionCategoryService = {
   },
 
   async seedDefaults(): Promise<void> {
-    await api.post("/transaction-categories/seed");
+    await api.post("/api/transaction-categories/seed");
   },
 };

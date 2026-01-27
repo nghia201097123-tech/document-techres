@@ -138,7 +138,7 @@ export const foodPlatformService = {
    */
   async getAll(tenantId?: string): Promise<FoodPlatformAccount[]> {
     const params = tenantId ? { tenantId } : {};
-    const response = await api.get<FoodPlatformAccount[]>("/food-platforms", {
+    const response = await api.get<FoodPlatformAccount[]>("/api/food-platforms", {
       params,
     });
     return response.data;
@@ -176,7 +176,7 @@ export const foodPlatformService = {
    * Create food platform account
    */
   async create(data: CreateFoodPlatformDto): Promise<FoodPlatformAccount> {
-    const response = await api.post<FoodPlatformAccount>("/food-platforms", data);
+    const response = await api.post<FoodPlatformAccount>("/api/food-platforms", data);
     return response.data;
   },
 

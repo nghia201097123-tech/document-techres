@@ -142,7 +142,7 @@ export const companyService = {
           )
         )
       : undefined;
-    const response = await api.get<CompanyListResponse>("/companies", {
+    const response = await api.get<CompanyListResponse>("/api/companies", {
       params: cleanParams,
     });
     return response.data;
@@ -154,7 +154,7 @@ export const companyService = {
   },
 
   async create(data: CreateCompanyData): Promise<Company> {
-    const response = await api.post<Company>("/companies", data);
+    const response = await api.post<Company>("/api/companies", data);
     return response.data;
   },
 
@@ -173,12 +173,12 @@ export const companyService = {
   },
 
   async createWithWizard(data: CreateCompanyWizardData): Promise<WizardResponse> {
-    const response = await api.post<WizardResponse>("/companies/wizard", data);
+    const response = await api.post<WizardResponse>("/api/companies/wizard", data);
     return response.data;
   },
 
   async getAll(): Promise<Company[]> {
-    const response = await api.get<CompanyListResponse>("/companies", {
+    const response = await api.get<CompanyListResponse>("/api/companies", {
       params: { limit: 100 },
     });
     return response.data.data;
@@ -192,19 +192,19 @@ export const companyService = {
 
   // Quick Create - tạo nhanh công ty với tên và tiên định danh
   async quickCreate(data: QuickCreateData): Promise<WizardResponse> {
-    const response = await api.post<WizardResponse>("/companies/quick-create", data);
+    const response = await api.post<WizardResponse>("/api/companies/quick-create", data);
     return response.data;
   },
 
   // Create with multiple branches
   async createWithBranches(data: CreateCompanyWithBranchesData): Promise<WizardResponse & { additionalBranches?: Array<{ id: string; name: string; code: string }> }> {
-    const response = await api.post<WizardResponse & { additionalBranches?: Array<{ id: string; name: string; code: string }> }>("/companies/wizard-bulk", data);
+    const response = await api.post<WizardResponse & { additionalBranches?: Array<{ id: string; name: string; code: string }> }>("/api/companies/wizard-bulk", data);
     return response.data;
   },
 
   // Clone company
   async clone(data: CloneCompanyData): Promise<WizardResponse> {
-    const response = await api.post<WizardResponse>("/companies/clone", data);
+    const response = await api.post<WizardResponse>("/api/companies/clone", data);
     return response.data;
   },
 

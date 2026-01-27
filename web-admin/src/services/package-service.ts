@@ -56,7 +56,7 @@ export interface FilterParams {
 
 export const packageService = {
   async getAll(params?: FilterParams): Promise<PaginatedResponse<Package>> {
-    const response = await api.get<PaginatedResponse<Package>>("/packages", { params });
+    const response = await api.get<PaginatedResponse<Package>>("/api/packages", { params });
     return response.data;
   },
 
@@ -66,7 +66,7 @@ export const packageService = {
   },
 
   async create(data: CreatePackageDto): Promise<Package> {
-    const response = await api.post<Package>("/packages", data);
+    const response = await api.post<Package>("/api/packages", data);
     return response.data;
   },
 
