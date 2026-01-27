@@ -133,12 +133,19 @@ export class OrdersService {
    * Gọi async, không đợi kết quả
    */
   private async triggerWorkerPoll(branchId: string): Promise<void> {
+    this.logger.log(`[TriggerWorker] ══════════════════════════════════════════════`);
+    this.logger.log(`[TriggerWorker] Starting trigger for branch: ${branchId}`);
+
     try {
       // Get all active accounts for this branch
       const mappings = await this.storesService.getActiveMappingsForBranch(branchId);
 
+      this.logger.log(`[TriggerWorker] Found ${mappings.length} active mappings`);
+
       if (mappings.length === 0) {
-        this.logger.log(`[TriggerWorker] No active accounts for branch ${branchId}`);
+        this.logger.warn(`[TriggerWorker] ⚠️ No active accounts for branch ${branchId}`);
+        this.logger.warn(`[TriggerWorker] Skipping Redis publish - no accounts to poll`);
+        this.logger.log(`[TriggerWorker] ══════════════════════════════════════════════`);
         return;
       }
 
@@ -152,12 +159,18 @@ export class OrdersService {
         externalMerchantId: mapping.account?.externalMerchantId,
       }));
 
+      this.logger.log(`[TriggerWorker] Accounts to poll:`);
+      accounts.forEach((acc, idx) => {
+        this.logger.log(`[TriggerWorker]   [${idx}] ${acc.platform} - ${acc.accountId}`);
+      });
+
       // Send trigger message to api-order-worker via Redis Pub/Sub
       await this.redisPubSub.triggerPoll(branchId, accounts);
 
-      this.logger.log(`[TriggerWorker] Sent signal for branch ${branchId} with ${accounts.length} accounts`);
+      this.logger.log(`[TriggerWorker] ✅ Signal sent successfully`);
+      this.logger.log(`[TriggerWorker] ══════════════════════════════════════════════`);
     } catch (error: any) {
-      this.logger.error(`[TriggerWorker] Error: ${error.message}`);
+      this.logger.error(`[TriggerWorker] ❌ Error: ${error.message}`);
     }
   }
 

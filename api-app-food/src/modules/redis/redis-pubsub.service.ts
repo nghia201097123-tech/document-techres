@@ -54,8 +54,16 @@ export class RedisPubSubService implements OnModuleInit, OnModuleDestroy {
       timestamp: Date.now(),
     });
 
-    await this.publisher.publish(channel, message);
-    this.logger.log(`📤 Published trigger-poll for branch ${branchId} with ${accounts.length} accounts`);
+    this.logger.log('═══════════════════════════════════════════════════════════');
+    this.logger.log(`📤 PUBLISHING to Redis Pub/Sub`);
+    this.logger.log(`   Channel: ${channel}`);
+    this.logger.log(`   Accounts: ${accounts.length}`);
+    this.logger.log(`   Redis Connected: ${this.isConnected}`);
+
+    const result = await this.publisher.publish(channel, message);
+
+    this.logger.log(`   Subscribers received: ${result}`);
+    this.logger.log('═══════════════════════════════════════════════════════════');
   }
 
   /**
