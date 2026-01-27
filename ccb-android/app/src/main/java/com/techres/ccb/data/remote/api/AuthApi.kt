@@ -10,9 +10,11 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 
 interface AuthApi {
-    @POST("auth/login")
+    // api-oauth endpoint: /api/auth/login
+    @POST("api/auth/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
-    @POST("auth/verify-pin")
+    // api-oauth endpoint: /api/auth/verify-pin
+    @POST("api/auth/verify-pin")
     suspend fun verifyPin(@Body request: VerifyPinRequest): Response<VerifyPinResponse>
 }

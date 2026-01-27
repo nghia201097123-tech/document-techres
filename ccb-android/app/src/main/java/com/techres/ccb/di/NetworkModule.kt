@@ -32,22 +32,22 @@ import javax.net.ssl.SSLSocketFactory
 import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 
-// Qualifiers for different Retrofit instances
+// Qualifiers for different Retrofit instances (APISIX Gateway routing via x-svc-id)
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
-annotation class TenantRetrofit
+annotation class OAuthRetrofit      // api-oauth: 1506
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
-annotation class PosRetrofit
+annotation class DashboardRetrofit  // api-dashboard: 1503
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
-annotation class GatewayRetrofit
+annotation class MasterDataRetrofit // api-master-data: 1504
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
-annotation class FoodRetrofit
+annotation class FoodRetrofit       // api-app-food (direct, không qua gateway)
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -55,9 +55,69 @@ object NetworkModule {
 
     private const val TAG = "NetworkModule"
 
-    @Provides
-    @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
+    // APISIX Gateway URL
+    private val GATEWAY_URL: String by lazy { BuildConfig.API_BASE_URL }
+
+    /**
+     * Create OkHttpClient with x-svc-id header for APISIX Gateway routing
+     */
+    private fun createGatewayOkHttpClient(serviceId: String): OkHttpClient {
+        val loggingInterceptor = HttpLoggingInterceptor().apply {
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BODY
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
+        }
+
+        val builder = OkHttpClient.Builder()
+            .addInterceptor(loggingInterceptor)
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Accept", "application/json")
+                    .addHeader("x-svc-id", serviceId) // APISIX Gateway routing header
+                    .build()
+                Log.d(TAG, "Request: ${request.url} | x-svc-id: $serviceId")
+                chain.proceed(request)
+            }
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+
+        // Enable TLS 1.2 for Android 6-7 (API 23-25)
+        if (Build.VERSION.SDK_INT in 19..25) {
+            try {
+                val trustManager = getTrustManager()
+                val sslContext = SSLContext.getInstance("TLSv1.2")
+                sslContext.init(null, arrayOf(trustManager), null)
+
+                builder.sslSocketFactory(
+                    Tls12SocketFactory(sslContext.socketFactory),
+                    trustManager
+                )
+
+                val specs = listOf(
+                    ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+                        .tlsVersions(TlsVersion.TLS_1_2)
+                        .build(),
+                    ConnectionSpec.CLEARTEXT
+                )
+                builder.connectionSpecs(specs)
+
+                Log.d(TAG, "TLS 1.2 enabled for Android ${Build.VERSION.SDK_INT}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error enabling TLS 1.2", e)
+            }
+        }
+
+        return builder.build()
+    }
+
+    /**
+     * Create basic OkHttpClient without x-svc-id (for direct API calls)
+     */
+    private fun createBasicOkHttpClient(): OkHttpClient {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
                 HttpLoggingInterceptor.Level.BODY
@@ -79,8 +139,7 @@ object NetworkModule {
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
 
-        // Enable TLS 1.2 for Android 6-7 (API 23-25)
-        // Android 6 doesn't enable TLS 1.2 by default
+        // Enable TLS 1.2 for Android 6-7
         if (Build.VERSION.SDK_INT in 19..25) {
             try {
                 val trustManager = getTrustManager()
@@ -92,7 +151,6 @@ object NetworkModule {
                     trustManager
                 )
 
-                // Enable TLS 1.2 protocols
                 val specs = listOf(
                     ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
                         .tlsVersions(TlsVersion.TLS_1_2)
@@ -100,8 +158,6 @@ object NetworkModule {
                     ConnectionSpec.CLEARTEXT
                 )
                 builder.connectionSpecs(specs)
-
-                Log.d(TAG, "TLS 1.2 enabled for Android ${Build.VERSION.SDK_INT}")
             } catch (e: Exception) {
                 Log.e(TAG, "Error enabling TLS 1.2", e)
             }
@@ -119,91 +175,99 @@ object NetworkModule {
         return trustManagers[0] as X509TrustManager
     }
 
+    // ==================== OAuth Retrofit (api-oauth: 1506) ====================
+
     @Provides
     @Singleton
-    @TenantRetrofit
-    fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
-        Log.d(TAG, "API Base URL: ${BuildConfig.API_BASE_URL}")
+    @OAuthRetrofit
+    fun provideOAuthRetrofit(): Retrofit {
+        val serviceId = BuildConfig.SVC_ID_OAUTH
+        Log.d(TAG, "Creating OAuth Retrofit | Gateway: $GATEWAY_URL | x-svc-id: $serviceId")
         return Retrofit.Builder()
-            .baseUrl(BuildConfig.API_BASE_URL)
-            .client(okHttpClient)
+            .baseUrl(GATEWAY_URL)
+            .client(createGatewayOkHttpClient(serviceId))
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
 
     @Provides
     @Singleton
-    @PosRetrofit
-    fun providePosRetrofit(okHttpClient: OkHttpClient): Retrofit {
-        Log.d(TAG, "API POS Base URL: ${BuildConfig.API_POS_BASE_URL}")
-        return Retrofit.Builder()
-            .baseUrl(BuildConfig.API_POS_BASE_URL)
-            .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    @GatewayRetrofit
-    fun provideGatewayRetrofit(okHttpClient: OkHttpClient): Retrofit {
-        Log.d(TAG, "API Gateway URL: ${BuildConfig.API_GATEWAY_URL}")
-        return Retrofit.Builder()
-            .baseUrl(BuildConfig.API_GATEWAY_URL)
-            .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideAuthApi(@TenantRetrofit retrofit: Retrofit): AuthApi {
+    fun provideAuthApi(@OAuthRetrofit retrofit: Retrofit): AuthApi {
         return retrofit.create(AuthApi::class.java)
     }
 
+    // ==================== Dashboard Retrofit (api-dashboard: 1503) ====================
+
     @Provides
     @Singleton
-    fun provideMasterDataApi(@PosRetrofit retrofit: Retrofit): MasterDataApi {
-        return retrofit.create(MasterDataApi::class.java)
+    @DashboardRetrofit
+    fun provideDashboardRetrofit(): Retrofit {
+        val serviceId = BuildConfig.SVC_ID_DASHBOARD
+        Log.d(TAG, "Creating Dashboard Retrofit | Gateway: $GATEWAY_URL | x-svc-id: $serviceId")
+        return Retrofit.Builder()
+            .baseUrl(GATEWAY_URL)
+            .client(createGatewayOkHttpClient(serviceId))
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
     }
 
     @Provides
     @Singleton
-    fun provideSyncApi(@PosRetrofit retrofit: Retrofit): SyncApi {
+    fun provideSyncApi(@DashboardRetrofit retrofit: Retrofit): SyncApi {
         return retrofit.create(SyncApi::class.java)
     }
 
     @Provides
     @Singleton
-    fun providePosApi(@PosRetrofit retrofit: Retrofit): PosApi {
+    fun providePosApi(@DashboardRetrofit retrofit: Retrofit): PosApi {
         return retrofit.create(PosApi::class.java)
     }
 
     @Provides
     @Singleton
-    fun providePayOSApi(@PosRetrofit retrofit: Retrofit): PayOSApi {
-        // PayOS is now in api-dashboard (same as POS API)
+    fun providePayOSApi(@DashboardRetrofit retrofit: Retrofit): PayOSApi {
         return retrofit.create(PayOSApi::class.java)
+    }
+
+    // ==================== Master Data Retrofit (api-master-data: 1504) ====================
+
+    @Provides
+    @Singleton
+    @MasterDataRetrofit
+    fun provideMasterDataRetrofit(): Retrofit {
+        val serviceId = BuildConfig.SVC_ID_MASTER_DATA
+        Log.d(TAG, "Creating MasterData Retrofit | Gateway: $GATEWAY_URL | x-svc-id: $serviceId")
+        return Retrofit.Builder()
+            .baseUrl(GATEWAY_URL)
+            .client(createGatewayOkHttpClient(serviceId))
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
     }
 
     @Provides
     @Singleton
+    fun provideMasterDataApi(@MasterDataRetrofit retrofit: Retrofit): MasterDataApi {
+        return retrofit.create(MasterDataApi::class.java)
+    }
+
+    // ==================== Food Platform Retrofit (api-app-food - direct, không qua gateway) ====================
+
+    @Provides
+    @Singleton
     @FoodRetrofit
-    fun provideFoodRetrofit(okHttpClient: OkHttpClient): Retrofit {
-        // api-app-food service URL - use reflection to safely access the field
-        // This handles the case where BuildConfig hasn't been regenerated yet
+    fun provideFoodRetrofit(): Retrofit {
         val foodApiUrl = try {
             val field = BuildConfig::class.java.getField("API_FOOD_BASE_URL")
             val url = field.get(null) as? String
-            if (url.isNullOrEmpty()) BuildConfig.API_POS_BASE_URL else url
+            if (url.isNullOrEmpty()) GATEWAY_URL else url
         } catch (e: Exception) {
-            Log.w(TAG, "API_FOOD_BASE_URL not found, using POS URL as fallback")
-            BuildConfig.API_POS_BASE_URL
+            Log.w(TAG, "API_FOOD_BASE_URL not found, using Gateway URL as fallback")
+            GATEWAY_URL
         }
-        Log.d(TAG, "API Food Base URL: $foodApiUrl")
+        Log.d(TAG, "Creating Food Retrofit | URL: $foodApiUrl")
         return Retrofit.Builder()
             .baseUrl(foodApiUrl)
-            .client(okHttpClient)
+            .client(createBasicOkHttpClient())
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }

@@ -26,17 +26,35 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
-            buildConfigField("String", "API_BASE_URL", "\"http://172.16.5.103:4000/api/tenant/\"")
-            buildConfigField("String", "API_POS_BASE_URL", "\"http://172.16.5.103:4000/api/pos/\"")
-            buildConfigField("String", "API_GATEWAY_URL", "\"http://172.16.5.103:4000/\"")
-            buildConfigField("String", "API_FOOD_BASE_URL", "\"http://172.16.5.103:3010/\"")
-            // Socket-service runs on port 3007
-            buildConfigField("String", "SOCKET_URL", "\"http://172.16.5.103:3007\"")
+            // APISIX Gateway URL - điều hướng request qua header x-svc-id
+            buildConfigField("String", "APISIX_GATEWAY_URL", "\"http://172.16.10.118:7080/\"")
+            // Service port IDs (dùng làm x-svc-id header)
+            buildConfigField("String", "SVC_ID_OAUTH", "\"1506\"")
+            buildConfigField("String", "SVC_ID_DASHBOARD", "\"1503\"")
+            buildConfigField("String", "SVC_ID_MASTER_DATA", "\"1504\"")
+            buildConfigField("String", "SVC_ID_UPLOAD", "\"1505\"")
+            buildConfigField("String", "SVC_ID_SOCKET", "\"1507\"")
+            // Legacy URLs (for backwards compatibility)
+            buildConfigField("String", "API_BASE_URL", "\"http://172.16.10.118:7080/\"")
+            buildConfigField("String", "API_POS_BASE_URL", "\"http://172.16.10.118:7080/\"")
+            buildConfigField("String", "API_GATEWAY_URL", "\"http://172.16.10.118:7080/\"")
+            buildConfigField("String", "API_FOOD_BASE_URL", "\"http://172.16.10.201:3010/\"")
+            // Socket-service (port 1507)
+            buildConfigField("String", "SOCKET_URL", "\"http://172.16.10.118:1507\"")
         }
         release {
             isMinifyEnabled = true
-            buildConfigField("String", "API_BASE_URL", "\"https://api.techres.vn/api/tenant/\"")
-            buildConfigField("String", "API_POS_BASE_URL", "\"https://api.techres.vn/api/pos/\"")
+            // APISIX Gateway URL
+            buildConfigField("String", "APISIX_GATEWAY_URL", "\"https://api.techres.vn/\"")
+            // Service port IDs
+            buildConfigField("String", "SVC_ID_OAUTH", "\"1506\"")
+            buildConfigField("String", "SVC_ID_DASHBOARD", "\"1503\"")
+            buildConfigField("String", "SVC_ID_MASTER_DATA", "\"1504\"")
+            buildConfigField("String", "SVC_ID_UPLOAD", "\"1505\"")
+            buildConfigField("String", "SVC_ID_SOCKET", "\"1507\"")
+            // Legacy URLs
+            buildConfigField("String", "API_BASE_URL", "\"https://api.techres.vn/\"")
+            buildConfigField("String", "API_POS_BASE_URL", "\"https://api.techres.vn/\"")
             buildConfigField("String", "API_GATEWAY_URL", "\"https://api.techres.vn/\"")
             buildConfigField("String", "API_FOOD_BASE_URL", "\"https://food.techres.vn/\"")
             // Socket-service production URL
