@@ -160,7 +160,7 @@ export interface StoreMapping {
   externalStoreAddress?: string;
   externalStorePhone?: string;
   externalStoreEmail?: string;
-  branchId?: number;
+  branchId?: string;  // UUID string
   branchName?: string;
   isActive: boolean;
   isStoreActive: boolean;
@@ -178,7 +178,7 @@ export interface CreateStoreMappingDto {
   externalStoreAddress?: string;
   externalStorePhone?: string;
   externalStoreEmail?: string;
-  branchId: number;
+  branchId: string;  // UUID string of TechRes branch
   branchName?: string;
 }
 
@@ -538,7 +538,7 @@ export const foodPartnerService = {
   /**
    * Update a store mapping (e.g., change branch assignment)
    */
-  async updateStoreMapping(mappingId: string, data: { branchId?: number; branchName?: string; isActive?: boolean }): Promise<StoreMapping> {
+  async updateStoreMapping(mappingId: string, data: { branchId?: string; branchName?: string; isActive?: boolean }): Promise<StoreMapping> {
     const response = await foodApi.put<ApiResponse<StoreMapping>>(`/food-platforms/store-mappings/${mappingId}`, data);
     return response.data.data;
   },

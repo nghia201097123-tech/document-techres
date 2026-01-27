@@ -707,7 +707,7 @@ export default function FoodPartnersPage() {
   };
 
   // Save store mapping (link external store to branch)
-  const handleSaveStoreMapping = async (store: ExternalStore, branchId: number, branchName: string) => {
+  const handleSaveStoreMapping = async (store: ExternalStore, branchId: string, branchName: string) => {
     if (!syncingAccount) return;
 
     setSavingMapping(true);
@@ -786,7 +786,7 @@ export default function FoodPartnersPage() {
   };
 
   // Handle change branch for store mapping
-  const handleChangeBranch = async (branchId: number, branchName: string) => {
+  const handleChangeBranch = async (branchId: string, branchName: string) => {
     if (!selectedMappingForChange) return;
 
     setSavingMapping(true);
@@ -2295,7 +2295,7 @@ export default function FoodPartnersPage() {
                                 key={branch.id}
                                 variant={isCurrentLinked ? "default" : "outline"}
                                 size="sm"
-                                onClick={() => handleSaveStoreMapping(store, parseInt(branch.id), branch.name)}
+                                onClick={() => handleSaveStoreMapping(store, branch.id, branch.name)}
                                 disabled={savingMapping || isCurrentLinked}
                                 className={cn(isCurrentLinked && "bg-green-600 hover:bg-green-600")}
                               >
@@ -2375,7 +2375,7 @@ export default function FoodPartnersPage() {
                           key={branch.id}
                           variant={isCurrentBranch ? "default" : "outline"}
                           size="sm"
-                          onClick={() => handleChangeBranch(parseInt(branch.id), branch.name)}
+                          onClick={() => handleChangeBranch(branch.id, branch.name)}
                           disabled={savingMapping || isCurrentBranch}
                           className={cn(
                             "justify-start",
