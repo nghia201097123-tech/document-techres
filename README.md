@@ -2,11 +2,66 @@
 
 Hệ thống quản lý F&B (Food & Beverage) đa chi nhánh, hỗ trợ offline-first.
 
+## APISIX Gateway Architecture
+
+Hệ thống sử dụng APISIX Gateway để điều hướng request đến các microservices.
+
+### Gateway Configuration
+
+**Gateway URL:** `http://172.16.10.118:7080`
+
+Request format:
+```
+ProjectId: <port>       # Header chứa port của service đích
+Method: 0               # HTTP Method (0=GET, 1=POST, etc.)
+Token: Bearer <token>   # Auth token
+Request: <url>          # Full request URL
+Body: <json>            # Request body
+```
+
+### Service Port Mapping
+
+| Service | Port | Description |
+|---------|------|-------------|
+| web-admin | 1500 | Web Admin Dashboard |
+| web-dashboard | 1501 | Web Dashboard (Tenant) |
+| api-admin | 1502 | Admin API |
+| api-dashboard | 1503 | Dashboard API |
+| api-master-data | 1504 | Master Data API |
+| api-upload | 1505 | Upload Service |
+| api-oauth | 1506 | OAuth Service |
+| socket-service | 1507 | Socket/Realtime Service |
+| webhook-service | 1508 | Webhook Handler |
+
+### API Call Example
+
+Web Admin gọi API thông qua Gateway:
+```typescript
+// services/api.ts
+const GATEWAY_URL = "http://172.16.10.118:7080";
+
+const apiClient = axios.create({
+  baseURL: GATEWAY_URL,
+  headers: {
+    "ProjectId": "1502", // api-admin port
+  },
+});
+```
+
 ## Cấu trúc Repository
 
 ```
 ├── document-techres/    # Documentation website (Docusaurus)
-└── web-admin/           # Web Admin dashboard (Next.js)
+├── web-admin/           # Web Admin dashboard (Next.js) - Port 1500
+├── web-dashboard/       # Web Dashboard (Next.js) - Port 1501
+├── api-admin/           # Admin API (NestJS) - Port 1502
+├── api-dashboard/       # Dashboard API (NestJS) - Port 1503
+├── api-master-data/     # Master Data API (NestJS) - Port 1504
+├── api-upload/          # Upload Service (NestJS) - Port 1505
+├── api-oauth/           # OAuth Service (NestJS) - Port 1506
+├── socket-service/      # Socket Service (NestJS) - Port 1507
+├── webhook-service/     # Webhook Service (NestJS) - Port 1508
+└── api-gateway/         # Internal Gateway (legacy)
 ```
 
 ## Services
@@ -26,7 +81,7 @@ npm install
 npm run start
 ```
 
-### 2. Web Admin
+### 2. Web Admin (Port 1500)
 
 Dashboard quản trị hệ thống, bao gồm:
 - Quản lý Công ty
@@ -40,6 +95,22 @@ Dashboard quản trị hệ thống, bao gồm:
 **Khởi chạy:**
 ```bash
 cd web-admin
+npm install
+npm run dev
+```
+
+### 3. Web Dashboard (Port 1501)
+
+Dashboard cho tenant, bao gồm:
+- Quản lý Menu
+- Quản lý Bàn
+- Quản lý Nhân viên
+- Báo cáo
+- Cài đặt
+
+**Khởi chạy:**
+```bash
+cd web-dashboard
 npm install
 npm run dev
 ```
