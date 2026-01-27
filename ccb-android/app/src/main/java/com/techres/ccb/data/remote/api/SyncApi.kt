@@ -13,10 +13,15 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
+/**
+ * Sync API interface for api-dashboard endpoints
+ * Base URL: APISIX Gateway with x-svc-id: 1503
+ * All endpoints use /api/ prefix (api-dashboard global prefix)
+ */
 interface SyncApi {
 
     // Health check for connectivity verification
-    @GET("health")
+    @GET("api/public/health-check")
     suspend fun healthCheck(): Response<Unit>
 
     // ==================== PULL (Cloud → Local) ====================
@@ -25,7 +30,7 @@ interface SyncApi {
      * Delta sync for master data
      * Returns only changes since the given timestamp
      */
-    @GET("sync/master-data/delta")
+    @GET("api/sync/master-data/delta")
     suspend fun pullMasterDataDelta(
         @Query("branchId") branchId: String,
         @Query("since") since: Long?,
@@ -35,7 +40,7 @@ interface SyncApi {
     /**
      * Full sync for initial data load (paginated)
      */
-    @GET("sync/master-data/full")
+    @GET("api/sync/master-data/full")
     suspend fun pullMasterDataFull(
         @Query("branchId") branchId: String,
         @Query("deviceId") deviceId: String,
@@ -48,7 +53,7 @@ interface SyncApi {
     /**
      * Sync a single order bundle (order + items + payments)
      */
-    @POST("sync/orders")
+    @POST("api/sync/orders")
     suspend fun pushOrder(
         @Header("X-Device-Id") deviceId: String,
         @Header("X-Idempotency-Key") idempotencyKey: String,
@@ -58,7 +63,7 @@ interface SyncApi {
     /**
      * Sync multiple orders in batch
      */
-    @POST("sync/orders/batch")
+    @POST("api/sync/orders/batch")
     suspend fun pushOrdersBatch(
         @Header("X-Device-Id") deviceId: String,
         @Body payloads: List<OrderSyncPayload>
@@ -67,7 +72,7 @@ interface SyncApi {
     /**
      * Sync a shift (open/close)
      */
-    @POST("sync/shifts")
+    @POST("api/sync/shifts")
     suspend fun pushShift(
         @Header("X-Device-Id") deviceId: String,
         @Header("X-Idempotency-Key") idempotencyKey: String,
@@ -77,7 +82,7 @@ interface SyncApi {
     /**
      * Update an existing order on server
      */
-    @PUT("sync/orders/{id}")
+    @PUT("api/sync/orders/{id}")
     suspend fun updateOrder(
         @Path("id") serverId: String,
         @Header("X-Device-Id") deviceId: String,

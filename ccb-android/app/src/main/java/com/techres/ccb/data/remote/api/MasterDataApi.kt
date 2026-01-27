@@ -21,15 +21,20 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
+/**
+ * Master Data API interface for api-master-data endpoints
+ * Base URL: APISIX Gateway with x-svc-id: 1504
+ * All endpoints use /api/v1/ prefix (api-master-data global prefix)
+ */
 interface MasterDataApi {
     // Full sync endpoint - returns all master data including kitchenIds for products
-    @GET("sync/full")
+    @GET("api/v1/sync/full")
     suspend fun getFullSyncData(
         @Header("Authorization") token: String,
         @Query("branchId") branchId: String
     ): Response<FullSyncResponse>
 
-    @GET("sync/categories")
+    @GET("api/v1/sync/categories")
     suspend fun getCategories(
         @Header("Authorization") token: String,
         @Query("branchId") branchId: String,
@@ -37,64 +42,64 @@ interface MasterDataApi {
     ): Response<SyncResponse<CategoryDto>>
 
     // Products with kitchenIds for print routing
-    @GET("sync/products")
+    @GET("api/v1/sync/products")
     suspend fun getProducts(
         @Header("Authorization") token: String,
         @Query("branchId") branchId: String,
         @Query("since") since: String? = null
     ): Response<SyncResponse<ProductDto>>
 
-    @GET("sync/areas")
+    @GET("api/v1/sync/areas")
     suspend fun getAreas(
         @Header("Authorization") token: String,
         @Query("branchId") branchId: String,
         @Query("since") since: String? = null
     ): Response<SyncResponse<AreaDto>>
 
-    @GET("sync/tables")
+    @GET("api/v1/sync/tables")
     suspend fun getTables(
         @Header("Authorization") token: String,
         @Query("branchId") branchId: String,
         @Query("since") since: String? = null
     ): Response<SyncResponse<TableDto>>
 
-    @GET("sync/staff")
+    @GET("api/v1/sync/staff")
     suspend fun getStaff(
         @Header("Authorization") token: String,
         @Query("branchId") branchId: String,
         @Query("since") since: String? = null
     ): Response<SyncResponse<StaffDto>>
 
-    @POST("sync/orders")
+    @POST("api/v1/sync/orders")
     suspend fun uploadOrders(
         @Header("Authorization") token: String,
         @Body orders: List<OrderUploadDto>
     ): Response<UploadResponse>
 
-    @POST("sync/shifts")
+    @POST("api/v1/sync/shifts")
     suspend fun uploadShifts(
         @Header("Authorization") token: String,
         @Body shifts: List<ShiftUploadDto>
     ): Response<UploadResponse>
 
-    @GET("branch/{branchId}")
+    @GET("api/v1/branch/{branchId}")
     suspend fun getBranchInfo(
         @Header("Authorization") token: String,
         @Path("branchId") branchId: String
     ): Response<BranchInfoResponse>
 
-    @GET("brands")
+    @GET("api/v1/brands")
     suspend fun getBrands(
         @Header("Authorization") token: String
     ): Response<BrandsResponse>
 
-    @GET("brands/{brandId}/branches")
+    @GET("api/v1/brands/{brandId}/branches")
     suspend fun getBranchesByBrand(
         @Header("Authorization") token: String,
         @Path("brandId") brandId: String
     ): Response<BranchesResponse>
 
-    @GET("branches")
+    @GET("api/v1/branches")
     suspend fun getAllBranches(
         @Header("Authorization") token: String
     ): Response<BranchesResponse>
