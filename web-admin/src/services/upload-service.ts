@@ -1,13 +1,4 @@
-import axios from "axios";
-
-// Upload service base URL - separate microservice
-const UPLOAD_API_URL = process.env.NEXT_PUBLIC_UPLOAD_API_URL || "http://localhost:3003/api";
-
-// Create axios instance for upload service
-const uploadApi = axios.create({
-  baseURL: UPLOAD_API_URL,
-  timeout: 120000, // 2 minutes for large files
-});
+import { apiUpload } from "./api";
 
 export enum FileType {
   IMAGE = "image",
@@ -32,25 +23,24 @@ export interface UploadResult {
 export const uploadService = {
   /**
    * Upload một hình ảnh
-   * @param file File hình ảnh (jpeg, png, gif, webp, svg) - Max 10MB
-   * @param folder Thư mục lưu trữ (tùy chọn)
+   * api-upload endpoint: /api/uploads/image
    */
   uploadImage: async (file: File, folder?: string): Promise<UploadResult> => {
     const formData = new FormData();
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await uploadApi.post<UploadResult>("/uploads/image", formData, {
+    const response = await apiUpload.post<UploadResult>("/api/uploads/image", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
+      timeout: 120000, // 2 minutes for large files
     });
     return response.data;
   },
 
   /**
    * Upload nhiều hình ảnh (tối đa 10 file)
-   * @param files Danh sách file hình ảnh
-   * @param folder Thư mục lưu trữ (tùy chọn)
+   * api-upload endpoint: /api/uploads/images
    */
   uploadImages: async (files: File[], folder?: string): Promise<UploadResult[]> => {
     const formData = new FormData();
@@ -59,33 +49,33 @@ export const uploadService = {
     });
 
     const params = folder ? { folder } : {};
-    const response = await uploadApi.post<UploadResult[]>("/uploads/images", formData, {
+    const response = await apiUpload.post<UploadResult[]>("/api/uploads/images", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
+      timeout: 120000,
     });
     return response.data;
   },
 
   /**
    * Upload file bất kỳ
-   * @param file File cần upload
-   * @param folder Thư mục lưu trữ (tùy chọn)
+   * api-upload endpoint: /api/uploads/file
    */
   uploadFile: async (file: File, folder?: string): Promise<UploadResult> => {
     const formData = new FormData();
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await uploadApi.post<UploadResult>("/uploads/file", formData, {
+    const response = await apiUpload.post<UploadResult>("/api/uploads/file", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
+      timeout: 120000,
     });
     return response.data;
   },
 
   /**
    * Kiểm tra file có phải là hình ảnh không
-   * @param file File cần kiểm tra
    */
   isImage: (file: File): boolean => {
     return file.type.startsWith("image/");
@@ -93,8 +83,6 @@ export const uploadService = {
 
   /**
    * Kiểm tra kích thước file (MB)
-   * @param file File cần kiểm tra
-   * @param maxSizeMB Kích thước tối đa (MB)
    */
   checkFileSize: (file: File, maxSizeMB: number): boolean => {
     return file.size <= maxSizeMB * 1024 * 1024;
@@ -102,7 +90,6 @@ export const uploadService = {
 
   /**
    * Format kích thước file cho hiển thị
-   * @param bytes Kích thước (bytes)
    */
   formatFileSize: (bytes: number): string => {
     if (bytes === 0) return "0 B";

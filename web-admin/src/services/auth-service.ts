@@ -1,41 +1,5 @@
-import axios from "axios";
-import api from "./api";
+import { apiOAuth } from "./api";
 import type { AdminUser } from "@/types";
-
-// API Gateway URL for auth endpoints
-// Gateway routes /api/auth/* -> api-oauth /api/v1/auth/*
-const API_GATEWAY_URL = "http://localhost:4000/api";
-
-// Separate axios instance for auth (via API Gateway)
-const authApi = axios.create({
-  baseURL: API_GATEWAY_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-// Add auth token to authApi for authenticated requests (logout, etc.)
-authApi.interceptors.request.use(
-  (config) => {
-    if (typeof window !== "undefined") {
-      const authStorage = localStorage.getItem("auth-storage");
-      if (authStorage) {
-        try {
-          const { state } = JSON.parse(authStorage);
-          if (state?.token) {
-            config.headers.Authorization = `Bearer ${state.token}`;
-          }
-        } catch (e) {
-          console.error("Error parsing auth storage:", e);
-        }
-      }
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
 
 interface LoginRequest {
   email: string;
@@ -66,8 +30,9 @@ interface OAuthLoginResponse {
 }
 
 export const authService = {
+  // api-oauth endpoint: /api/v1/auth/login
   async login(data: LoginRequest): Promise<LoginResponse> {
-    const response = await authApi.post<OAuthLoginResponse>("/auth/login", data);
+    const response = await apiOAuth.post<OAuthLoginResponse>("/api/v1/auth/login", data);
     const oauthData = response.data;
 
     // Transform OAuth response to expected format
@@ -87,25 +52,40 @@ export const authService = {
     };
   },
 
+  // api-oauth endpoint: /api/v1/auth/logout
   async logout(): Promise<void> {
-    await authApi.post("/auth/logout");
+    await apiOAuth.post("/api/v1/auth/logout");
   },
 
+  // api-oauth endpoint: /api/v1/auth/profile
   async getCurrentUser(): Promise<AdminUser> {
-    const response = await api.get<AdminUser>("/auth/me");
-    return response.data;
+    const response = await apiOAuth.get<{ user: OAuthLoginResponse["user"] }>("/api/v1/auth/profile");
+    const user = response.data.user || response.data;
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role as AdminUser["role"],
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
   },
 
+  // api-oauth endpoint: /api/v1/auth/forgot-password
   async forgotPassword(email: string): Promise<void> {
-    await authApi.post("/auth/forgot-password", { email });
+    await apiOAuth.post("/api/v1/auth/forgot-password", { email });
   },
 
+  // api-oauth endpoint: /api/v1/auth/reset-password
   async resetPassword(token: string, newPassword: string): Promise<void> {
-    await authApi.post("/auth/reset-password", { token, newPassword });
+    await apiOAuth.post("/api/v1/auth/reset-password", { token, newPassword });
   },
 
+  // api-oauth endpoint: /api/v1/auth/change-password
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    await authApi.post("/auth/change-password", {
+    await apiOAuth.post("/api/v1/auth/change-password", {
       currentPassword,
       newPassword,
     });

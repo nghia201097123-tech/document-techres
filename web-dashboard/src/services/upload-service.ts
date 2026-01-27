@@ -1,13 +1,4 @@
-import axios from "axios";
-
-// Upload service base URL - separate microservice
-const UPLOAD_API_URL = process.env.NEXT_PUBLIC_UPLOAD_API_URL || "http://localhost:3003/api";
-
-// Create axios instance for upload service
-const uploadApi = axios.create({
-  baseURL: UPLOAD_API_URL,
-  timeout: 120000, // 2 minutes for large files
-});
+import { apiUpload, GATEWAY_URL } from "./api";
 
 export enum FileType {
   IMAGE = "image",
@@ -44,42 +35,30 @@ export interface PresignedUrlResponse {
 }
 
 /**
- * Upload Service - Dịch vụ upload file riêng biệt (api-upload microservice)
- *
- * Sử dụng:
- * - uploadService.uploadImage(file) - Upload 1 hình ảnh
- * - uploadService.uploadImages(files) - Upload nhiều hình ảnh
- * - uploadService.uploadVideo(file) - Upload video
- * - uploadService.uploadDocument(file) - Upload tài liệu
- * - uploadService.uploadFile(file) - Upload file bất kỳ
- *
- * Response trả về:
- * - url: URL đầy đủ trên MinIO
- * - shortUrl: /api/uploads/s/{shortCode}
- * - shortCode: Mã ngắn để truy cập file
+ * Upload Service - Dịch vụ upload file (api-upload microservice via APISIX Gateway)
+ * Tất cả endpoint đều có prefix /api/uploads/
  */
 export const uploadService = {
   /**
    * Upload một hình ảnh
-   * @param file File hình ảnh (jpeg, png, gif, webp, svg) - Max 10MB
-   * @param folder Thư mục lưu trữ (tùy chọn)
+   * api-upload endpoint: /api/uploads/image
    */
   uploadImage: async (file: File, folder?: string): Promise<UploadResult> => {
     const formData = new FormData();
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await uploadApi.post<UploadResult>("/uploads/image", formData, {
+    const response = await apiUpload.post<UploadResult>("/api/uploads/image", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
+      timeout: 120000,
     });
     return response.data;
   },
 
   /**
    * Upload nhiều hình ảnh (tối đa 10 file)
-   * @param files Danh sách file hình ảnh
-   * @param folder Thư mục lưu trữ (tùy chọn)
+   * api-upload endpoint: /api/uploads/images
    */
   uploadImages: async (files: File[], folder?: string): Promise<UploadResult[]> => {
     const formData = new FormData();
@@ -88,68 +67,68 @@ export const uploadService = {
     });
 
     const params = folder ? { folder } : {};
-    const response = await uploadApi.post<UploadResult[]>("/uploads/images", formData, {
+    const response = await apiUpload.post<UploadResult[]>("/api/uploads/images", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
+      timeout: 120000,
     });
     return response.data;
   },
 
   /**
    * Upload một video
-   * @param file File video (mp4, webm, ogg...) - Max 100MB
-   * @param folder Thư mục lưu trữ (tùy chọn)
+   * api-upload endpoint: /api/uploads/video
    */
   uploadVideo: async (file: File, folder?: string): Promise<UploadResult> => {
     const formData = new FormData();
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await uploadApi.post<UploadResult>("/uploads/video", formData, {
+    const response = await apiUpload.post<UploadResult>("/api/uploads/video", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
+      timeout: 120000,
     });
     return response.data;
   },
 
   /**
    * Upload một tài liệu (PDF, Word, Excel...)
-   * @param file File tài liệu - Max 50MB
-   * @param folder Thư mục lưu trữ (tùy chọn)
+   * api-upload endpoint: /api/uploads/document
    */
   uploadDocument: async (file: File, folder?: string): Promise<UploadResult> => {
     const formData = new FormData();
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await uploadApi.post<UploadResult>("/uploads/document", formData, {
+    const response = await apiUpload.post<UploadResult>("/api/uploads/document", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
+      timeout: 120000,
     });
     return response.data;
   },
 
   /**
    * Upload file bất kỳ
-   * @param file File cần upload
-   * @param folder Thư mục lưu trữ (tùy chọn)
+   * api-upload endpoint: /api/uploads/file
    */
   uploadFile: async (file: File, folder?: string): Promise<UploadResult> => {
     const formData = new FormData();
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await uploadApi.post<UploadResult>("/uploads/file", formData, {
+    const response = await apiUpload.post<UploadResult>("/api/uploads/file", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
+      timeout: 120000,
     });
     return response.data;
   },
 
   /**
    * Upload nhiều file (tối đa 10 file)
-   * @param files Danh sách file
-   * @param folder Thư mục lưu trữ (tùy chọn)
+   * api-upload endpoint: /api/uploads/multiple
    */
   uploadMultiple: async (files: File[], folder?: string): Promise<UploadResult[]> => {
     const formData = new FormData();
@@ -158,56 +137,57 @@ export const uploadService = {
     });
 
     const params = folder ? { folder } : {};
-    const response = await uploadApi.post<UploadResult[]>("/uploads/multiple", formData, {
+    const response = await apiUpload.post<UploadResult[]>("/api/uploads/multiple", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
+      timeout: 120000,
     });
     return response.data;
   },
 
   /**
    * Lấy thông tin file từ short code
-   * @param shortCode Mã ngắn của file
+   * api-upload endpoint: /api/uploads/info/:shortCode
    */
   getFileInfo: async (shortCode: string): Promise<FileInfo> => {
-    const response = await uploadApi.get<FileInfo>(`/uploads/info/${shortCode}`);
+    const response = await apiUpload.get<FileInfo>(`/api/uploads/info/${shortCode}`);
     return response.data;
   },
 
   /**
    * Xóa file theo short code
-   * @param shortCode Mã ngắn của file
+   * api-upload endpoint: /api/uploads/s/:shortCode
    */
   deleteByShortCode: async (shortCode: string): Promise<{ success: boolean; message: string }> => {
-    const response = await uploadApi.delete<{ success: boolean; message: string }>(`/uploads/s/${shortCode}`);
+    const response = await apiUpload.delete<{ success: boolean; message: string }>(`/api/uploads/s/${shortCode}`);
     return response.data;
   },
 
   /**
    * Xóa file theo object name
-   * @param objectName Tên object trên MinIO
+   * api-upload endpoint: /api/uploads/file/:objectName
    */
   deleteByObjectName: async (objectName: string): Promise<{ success: boolean; message: string }> => {
-    const response = await uploadApi.delete<{ success: boolean; message: string }>(`/uploads/file/${encodeURIComponent(objectName)}`);
+    const response = await apiUpload.delete<{ success: boolean; message: string }>(`/api/uploads/file/${encodeURIComponent(objectName)}`);
     return response.data;
   },
 
   /**
    * Lấy URL truy cập có thời hạn (presigned URL)
-   * @param objectName Tên object trên MinIO
-   * @param expiry Thời gian hết hạn (giây), mặc định 3600 (1 giờ)
+   * api-upload endpoint: /api/uploads/presigned/:objectName
    */
   getPresignedUrl: async (objectName: string, expiry?: number): Promise<PresignedUrlResponse> => {
     const params = expiry ? { expiry } : {};
-    const response = await uploadApi.get<PresignedUrlResponse>(`/uploads/presigned/${encodeURIComponent(objectName)}`, { params });
+    const response = await apiUpload.get<PresignedUrlResponse>(`/api/uploads/presigned/${encodeURIComponent(objectName)}`, { params });
     return response.data;
   },
 
   /**
    * Kiểm tra trạng thái service
+   * api-upload endpoint: /api/uploads/health
    */
   healthCheck: async (): Promise<{ status: string; service: string; timestamp: string }> => {
-    const response = await uploadApi.get<{ status: string; service: string; timestamp: string }>("/uploads/health");
+    const response = await apiUpload.get<{ status: string; service: string; timestamp: string }>("/api/uploads/health");
     return response.data;
   },
 
@@ -215,41 +195,15 @@ export const uploadService = {
 
   /**
    * Tạo URL đầy đủ cho short code (để hiển thị)
-   * @param shortCode Mã ngắn của file
    */
   getShortUrl: (shortCode: string): string => {
-    return `${UPLOAD_API_URL}/uploads/s/${shortCode}`;
+    return `${GATEWAY_URL}/api/uploads/s/${shortCode}`;
   },
 
-  /**
-   * Kiểm tra file có phải là hình ảnh không
-   * @param file File cần kiểm tra
-   */
-  isImage: (file: File): boolean => {
-    return file.type.startsWith("image/");
-  },
+  isImage: (file: File): boolean => file.type.startsWith("image/"),
+  isVideo: (file: File): boolean => file.type.startsWith("video/"),
+  checkFileSize: (file: File, maxSizeMB: number): boolean => file.size <= maxSizeMB * 1024 * 1024,
 
-  /**
-   * Kiểm tra file có phải là video không
-   * @param file File cần kiểm tra
-   */
-  isVideo: (file: File): boolean => {
-    return file.type.startsWith("video/");
-  },
-
-  /**
-   * Kiểm tra kích thước file (MB)
-   * @param file File cần kiểm tra
-   * @param maxSizeMB Kích thước tối đa (MB)
-   */
-  checkFileSize: (file: File, maxSizeMB: number): boolean => {
-    return file.size <= maxSizeMB * 1024 * 1024;
-  },
-
-  /**
-   * Format kích thước file cho hiển thị
-   * @param bytes Kích thước (bytes)
-   */
   formatFileSize: (bytes: number): string => {
     if (bytes === 0) return "0 B";
     const k = 1024;
@@ -258,19 +212,10 @@ export const uploadService = {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   },
 
-  /**
-   * Lấy extension từ tên file
-   * @param filename Tên file
-   */
   getExtension: (filename: string): string => {
     return filename.slice(((filename.lastIndexOf(".") - 1) >>> 0) + 2).toLowerCase();
   },
 
-  /**
-   * Kiểm tra extension có được phép không
-   * @param filename Tên file
-   * @param allowedExtensions Danh sách extension được phép
-   */
   isAllowedExtension: (filename: string, allowedExtensions: string[]): boolean => {
     const ext = uploadService.getExtension(filename);
     return allowedExtensions.includes(ext);
