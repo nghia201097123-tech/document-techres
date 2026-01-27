@@ -61,41 +61,41 @@ export interface ValidateCouponResult {
 export const couponService = {
   getAll: async (branchId?: string): Promise<Coupon[]> => {
     const params = branchId ? { branchId } : {};
-    const response = await api.get("/coupons", { params });
+    const response = await api.get("/api/coupons", { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<Coupon> => {
-    const response = await api.get(`/coupons/${id}`);
+    const response = await api.get(`/api/coupons/${id}`);
     return response.data;
   },
 
   getByCode: async (branchId: string, code: string): Promise<Coupon> => {
-    const response = await api.get(`/coupons/code/${code}`, {
+    const response = await api.get(`/api/coupons/code/${code}`, {
       params: { branchId },
     });
     return response.data;
   },
 
   create: async (branchId: string, data: CreateCouponDto): Promise<Coupon> => {
-    const response = await api.post("/coupons", data, {
+    const response = await api.post("/api/coupons", data, {
       params: { branchId },
     });
     return response.data;
   },
 
   update: async (id: string, data: UpdateCouponDto): Promise<Coupon> => {
-    const response = await api.put(`/coupons/${id}`, data);
+    const response = await api.put(`/api/coupons/${id}`, data);
     return response.data;
   },
 
   toggleActive: async (id: string): Promise<Coupon> => {
-    const response = await api.patch(`/coupons/${id}/toggle-active`);
+    const response = await api.patch(`/api/coupons/${id}/toggle-active`);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/coupons/${id}`);
+    await api.delete(`/api/coupons/${id}`);
   },
 
   validate: async (
@@ -104,7 +104,7 @@ export const couponService = {
     orderAmount: number
   ): Promise<ValidateCouponResult> => {
     const response = await api.post(
-      "/coupons/validate",
+      "/api/coupons/validate",
       { code, orderAmount },
       { params: { branchId } }
     );
@@ -112,7 +112,7 @@ export const couponService = {
   },
 
   use: async (id: string): Promise<Coupon> => {
-    const response = await api.post(`/coupons/${id}/use`);
+    const response = await api.post(`/api/coupons/${id}/use`);
     return response.data;
   },
 };

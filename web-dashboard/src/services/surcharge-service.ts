@@ -32,31 +32,31 @@ export const surchargeService = {
   getAll: async (brandId?: string): Promise<Surcharge[]> => {
     const params: Record<string, any> = {};
     if (brandId) params.brandId = brandId;
-    const response = await api.get<Surcharge[]>("/surcharges", { params });
+    const response = await api.get<Surcharge[]>("/api/surcharges", { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<Surcharge> => {
-    const response = await api.get<Surcharge>(`/surcharges/${id}`);
+    const response = await api.get<Surcharge>(`/api/surcharges/${id}`);
     return response.data;
   },
 
   create: async (data: CreateSurchargeDto): Promise<Surcharge> => {
-    const response = await api.post<Surcharge>("/surcharges", data);
+    const response = await api.post<Surcharge>("/api/surcharges", data);
     return response.data;
   },
 
   update: async (id: string, data: UpdateSurchargeDto): Promise<Surcharge> => {
-    const response = await api.put<Surcharge>(`/surcharges/${id}`, data);
+    const response = await api.put<Surcharge>(`/api/surcharges/${id}`, data);
     return response.data;
   },
 
   toggleActive: async (id: string): Promise<Surcharge> => {
-    const response = await api.patch<Surcharge>(`/surcharges/${id}/toggle-active`);
+    const response = await api.patch<Surcharge>(`/api/surcharges/${id}/toggle-active`);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/surcharges/${id}`);
+    await api.delete(`/api/surcharges/${id}`);
   },
 };

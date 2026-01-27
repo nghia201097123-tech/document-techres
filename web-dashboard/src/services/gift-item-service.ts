@@ -39,31 +39,31 @@ export const giftItemService = {
   getAll: async (branchId?: string): Promise<GiftItem[]> => {
     const params: Record<string, any> = {};
     if (branchId) params.branchId = branchId;
-    const response = await api.get<GiftItem[]>("/gift-items", { params });
+    const response = await api.get<GiftItem[]>("/api/gift-items", { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<GiftItem> => {
-    const response = await api.get<GiftItem>(`/gift-items/${id}`);
+    const response = await api.get<GiftItem>(`/api/gift-items/${id}`);
     return response.data;
   },
 
   create: async (data: CreateGiftItemDto): Promise<GiftItem> => {
-    const response = await api.post<GiftItem>("/gift-items", data);
+    const response = await api.post<GiftItem>("/api/gift-items", data);
     return response.data;
   },
 
   update: async (id: string, data: UpdateGiftItemDto): Promise<GiftItem> => {
-    const response = await api.put<GiftItem>(`/gift-items/${id}`, data);
+    const response = await api.put<GiftItem>(`/api/gift-items/${id}`, data);
     return response.data;
   },
 
   toggleActive: async (id: string): Promise<GiftItem> => {
-    const response = await api.patch<GiftItem>(`/gift-items/${id}/toggle-active`);
+    const response = await api.patch<GiftItem>(`/api/gift-items/${id}/toggle-active`);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/gift-items/${id}`);
+    await api.delete(`/api/gift-items/${id}`);
   },
 };

@@ -55,36 +55,36 @@ export const voucherService = {
   getAll: async (brandId?: string): Promise<Voucher[]> => {
     const params: Record<string, any> = {};
     if (brandId) params.brandId = brandId;
-    const response = await api.get<Voucher[]>("/vouchers", { params });
+    const response = await api.get<Voucher[]>("/api/vouchers", { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<Voucher> => {
-    const response = await api.get<Voucher>(`/vouchers/${id}`);
+    const response = await api.get<Voucher>(`/api/vouchers/${id}`);
     return response.data;
   },
 
   getByCode: async (code: string): Promise<Voucher> => {
-    const response = await api.get<Voucher>(`/vouchers/code/${code}`);
+    const response = await api.get<Voucher>(`/api/vouchers/code/${code}`);
     return response.data;
   },
 
   create: async (data: CreateVoucherDto): Promise<Voucher> => {
-    const response = await api.post<Voucher>("/vouchers", data);
+    const response = await api.post<Voucher>("/api/vouchers", data);
     return response.data;
   },
 
   update: async (id: string, data: UpdateVoucherDto): Promise<Voucher> => {
-    const response = await api.put<Voucher>(`/vouchers/${id}`, data);
+    const response = await api.put<Voucher>(`/api/vouchers/${id}`, data);
     return response.data;
   },
 
   toggleActive: async (id: string): Promise<Voucher> => {
-    const response = await api.patch<Voucher>(`/vouchers/${id}/toggle-active`);
+    const response = await api.patch<Voucher>(`/api/vouchers/${id}/toggle-active`);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/vouchers/${id}`);
+    await api.delete(`/api/vouchers/${id}`);
   },
 };

@@ -32,13 +32,13 @@ export interface StaffBranchAssignment {
 export const staffBranchService = {
   // Get all branches assigned to a staff member
   getByStaffId: async (staffId: string): Promise<StaffBranch[]> => {
-    const response = await api.get<StaffBranch[]>(`/staff/${staffId}/branches`);
+    const response = await api.get<StaffBranch[]>(`/api/staff/${staffId}/api/branches`);
     return response.data;
   },
 
   // Assign a branch to a staff member
   assignBranch: async (data: AssignBranchDto): Promise<StaffBranch> => {
-    const response = await api.post<StaffBranch>(`/staff/${data.staffId}/branches`, {
+    const response = await api.post<StaffBranch>(`/api/staff/${data.staffId}/api/branches`, {
       branchId: data.branchId,
       isDefault: data.isDefault || false
     });
@@ -47,17 +47,17 @@ export const staffBranchService = {
 
   // Remove a branch assignment from a staff member
   removeBranch: async (staffId: string, branchId: string): Promise<void> => {
-    await api.delete(`/staff/${staffId}/branches/${branchId}`);
+    await api.delete(`/api/staff/${staffId}/api/branches/${branchId}`);
   },
 
   // Set a branch as default for a staff member
   setDefaultBranch: async (staffId: string, branchId: string): Promise<void> => {
-    await api.patch(`/staff/${staffId}/branches/${branchId}/set-default`);
+    await api.patch(`/api/staff/${staffId}/api/branches/${branchId}/set-default`);
   },
 
   // Bulk assign branches to a staff member (replace all assignments)
   bulkAssign: async (staffId: string, branchIds: string[], defaultBranchId?: string): Promise<StaffBranch[]> => {
-    const response = await api.put<StaffBranch[]>(`/staff/${staffId}/branches`, {
+    const response = await api.put<StaffBranch[]>(`/api/staff/${staffId}/api/branches`, {
       branchIds,
       defaultBranchId
     });
@@ -66,7 +66,7 @@ export const staffBranchService = {
 
   // Get staff members assigned to a specific branch
   getStaffByBranchId: async (branchId: string): Promise<StaffBranchAssignment[]> => {
-    const response = await api.get<StaffBranchAssignment[]>(`/branches/${branchId}/staff`);
+    const response = await api.get<StaffBranchAssignment[]>(`/api/branches/${branchId}/api/staff`);
     return response.data;
   },
 
@@ -80,7 +80,7 @@ export const staffBranchService = {
       success: number;
       failed: number;
       results: Array<{ staffId: string; success: boolean; error?: string }>;
-    }>(`/staff/bulk-branch-assign`, {
+    }>(`/api/staff/bulk-branch-assign`, {
       staffIds,
       branchIds,
       defaultBranchId

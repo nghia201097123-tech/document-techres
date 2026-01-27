@@ -38,7 +38,7 @@ export const branchProductService = {
    * Get all products for a branch with availability status
    */
   async getByBranch(branchId: string): Promise<BranchProduct[]> {
-    const response = await api.get(`/branch-products/branch/${branchId}`);
+    const response = await api.get(`/api/branch-products/branch/${branchId}`);
     return response.data;
   },
 
@@ -46,7 +46,7 @@ export const branchProductService = {
    * Get only available products for a branch
    */
   async getAvailableByBranch(branchId: string): Promise<BranchProduct[]> {
-    const response = await api.get(`/branch-products/branch/${branchId}/available`);
+    const response = await api.get(`/api/branch-products/branch/${branchId}/available`);
     return response.data;
   },
 
@@ -54,7 +54,7 @@ export const branchProductService = {
    * Get branch product statistics
    */
   async getStats(branchId: string): Promise<BranchProductStats> {
-    const response = await api.get(`/branch-products/branch/${branchId}/stats`);
+    const response = await api.get(`/api/branch-products/branch/${branchId}/stats`);
     return response.data;
   },
 
@@ -62,7 +62,7 @@ export const branchProductService = {
    * Update a branch product (availability, custom price, sort order)
    */
   async update(branchId: string, productId: string, dto: UpdateBranchProductDto): Promise<BranchProduct> {
-    const response = await api.patch(`/branch-products/branch/${branchId}/product/${productId}`, dto);
+    const response = await api.patch(`/api/branch-products/branch/${branchId}/product/${productId}`, dto);
     return response.data;
   },
 
@@ -70,7 +70,7 @@ export const branchProductService = {
    * Toggle availability for a single product
    */
   async toggleAvailability(branchId: string, productId: string): Promise<BranchProduct> {
-    const response = await api.post(`/branch-products/branch/${branchId}/product/${productId}/toggle`);
+    const response = await api.post(`/api/branch-products/branch/${branchId}/product/${productId}/toggle`);
     return response.data;
   },
 
@@ -78,7 +78,7 @@ export const branchProductService = {
    * Bulk toggle availability for multiple products
    */
   async bulkToggleAvailability(branchId: string, dto: BulkToggleAvailabilityDto): Promise<{ updated: number }> {
-    const response = await api.post(`/branch-products/branch/${branchId}/bulk-toggle`, dto);
+    const response = await api.post(`/api/branch-products/branch/${branchId}/bulk-toggle`, dto);
     return response.data;
   },
 
@@ -110,7 +110,7 @@ export const branchProductService = {
       });
 
       try {
-        const response = await api.post(`/branch-products/branch/${branchId}/bulk-toggle`, {
+        const response = await api.post(`/api/branch-products/branch/${branchId}/bulk-toggle`, {
           productIds: batch,
           isAvailable: dto.isAvailable,
         });
@@ -134,7 +134,7 @@ export const branchProductService = {
    * Sync all products to a branch
    */
   async syncAllProductsToBranch(branchId: string, brandId: string): Promise<{ synced: number }> {
-    const response = await api.post(`/branch-products/branch/${branchId}/sync?brandId=${brandId}`);
+    const response = await api.post(`/api/branch-products/branch/${branchId}/sync?brandId=${brandId}`);
     return response.data;
   },
 };

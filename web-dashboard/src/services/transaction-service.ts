@@ -157,7 +157,7 @@ export const transactionCategoryService = {
         )
       : undefined;
     const response = await api.get<TransactionCategoryListResponse>(
-      "/transaction-categories",
+      "/api/transaction-categories",
       { params: cleanParams }
     );
     return response.data;
@@ -169,7 +169,7 @@ export const transactionCategoryService = {
   async getDropdown(type?: TransactionType): Promise<TransactionCategory[]> {
     const params = type ? { type } : undefined;
     const response = await api.get<TransactionCategory[]>(
-      "/transaction-categories/dropdown",
+      "/api/transaction-categories/dropdown",
       { params }
     );
     return response.data;
@@ -180,7 +180,7 @@ export const transactionCategoryService = {
    */
   async getById(id: string): Promise<TransactionCategory> {
     const response = await api.get<TransactionCategory>(
-      `/transaction-categories/${id}`
+      `/api/transaction-categories/${id}`
     );
     return response.data;
   },
@@ -192,7 +192,7 @@ export const transactionCategoryService = {
     data: CreateTransactionCategoryDto
   ): Promise<TransactionCategory> {
     const response = await api.post<TransactionCategory>(
-      "/transaction-categories",
+      "/api/transaction-categories",
       data
     );
     return response.data;
@@ -206,7 +206,7 @@ export const transactionCategoryService = {
     data: Partial<CreateTransactionCategoryDto>
   ): Promise<TransactionCategory> {
     const response = await api.put<TransactionCategory>(
-      `/transaction-categories/${id}`,
+      `/api/transaction-categories/${id}`,
       data
     );
     return response.data;
@@ -216,7 +216,7 @@ export const transactionCategoryService = {
    * Xóa danh mục
    */
   async delete(id: string): Promise<void> {
-    await api.delete(`/transaction-categories/${id}`);
+    await api.delete(`/api/transaction-categories/${id}`);
   },
 
   /**
@@ -224,7 +224,7 @@ export const transactionCategoryService = {
    */
   async toggleActive(id: string): Promise<TransactionCategory> {
     const response = await api.patch<TransactionCategory>(
-      `/transaction-categories/${id}/toggle-active`
+      `/api/transaction-categories/${id}/toggle-active`
     );
     return response.data;
   },
@@ -234,7 +234,7 @@ export const transactionCategoryService = {
    */
   async seed(): Promise<{ message: string; created: number }> {
     const response = await api.post<{ message: string; created: number }>(
-      "/transaction-categories/seed"
+      "/api/transaction-categories/seed"
     );
     return response.data;
   },
@@ -269,7 +269,7 @@ export const transactionVoucherService = {
         )
       : undefined;
     const response = await api.get<TransactionVoucherListResponse>(
-      "/transaction-vouchers",
+      "/api/transaction-vouchers",
       { params: cleanParams }
     );
     return response.data;
@@ -280,7 +280,7 @@ export const transactionVoucherService = {
    */
   async getById(id: string): Promise<TransactionVoucher> {
     const response = await api.get<TransactionVoucher>(
-      `/transaction-vouchers/${id}`
+      `/api/transaction-vouchers/${id}`
     );
     return response.data;
   },
@@ -290,7 +290,7 @@ export const transactionVoucherService = {
    */
   async create(data: CreateTransactionVoucherDto): Promise<TransactionVoucher> {
     const response = await api.post<TransactionVoucher>(
-      "/transaction-vouchers",
+      "/api/transaction-vouchers",
       data
     );
     return response.data;
@@ -304,7 +304,7 @@ export const transactionVoucherService = {
     data: Partial<CreateTransactionVoucherDto>
   ): Promise<TransactionVoucher> {
     const response = await api.put<TransactionVoucher>(
-      `/transaction-vouchers/${id}`,
+      `/api/transaction-vouchers/${id}`,
       data
     );
     return response.data;
@@ -314,7 +314,7 @@ export const transactionVoucherService = {
    * Xóa phiếu
    */
   async delete(id: string): Promise<void> {
-    await api.delete(`/transaction-vouchers/${id}`);
+    await api.delete(`/api/transaction-vouchers/${id}`);
   },
 
   /**
@@ -322,7 +322,7 @@ export const transactionVoucherService = {
    */
   async submit(id: string): Promise<TransactionVoucher> {
     const response = await api.patch<TransactionVoucher>(
-      `/transaction-vouchers/${id}/submit`
+      `/api/transaction-vouchers/${id}/submit`
     );
     return response.data;
   },
@@ -332,7 +332,7 @@ export const transactionVoucherService = {
    */
   async approve(id: string): Promise<TransactionVoucher> {
     const response = await api.patch<TransactionVoucher>(
-      `/transaction-vouchers/${id}/approve`
+      `/api/transaction-vouchers/${id}/approve`
     );
     return response.data;
   },
@@ -342,7 +342,7 @@ export const transactionVoucherService = {
    */
   async cancel(id: string, reason: string): Promise<TransactionVoucher> {
     const response = await api.patch<TransactionVoucher>(
-      `/transaction-vouchers/${id}/cancel`,
+      `/api/transaction-vouchers/${id}/cancel`,
       { reason }
     );
     return response.data;
@@ -358,7 +358,7 @@ export const transactionVoucherService = {
     toDate: string;
   }): Promise<CashBankReportResponse> {
     const response = await api.get<CashBankReportResponse>(
-      "/transaction-vouchers/cash-book",
+      "/api/transaction-vouchers/cash-book",
       { params }
     );
     return response.data;
@@ -374,7 +374,7 @@ export const transactionVoucherService = {
     toDate: string;
   }): Promise<CashBankReportResponse> {
     const response = await api.get<CashBankReportResponse>(
-      "/transaction-vouchers/bank-book",
+      "/api/transaction-vouchers/bank-book",
       { params }
     );
     return response.data;

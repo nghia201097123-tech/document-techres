@@ -57,31 +57,31 @@ export const seasonalPriceService = {
   getAll: async (branchId?: string): Promise<SeasonalPrice[]> => {
     const params: Record<string, any> = {};
     if (branchId) params.branchId = branchId;
-    const response = await api.get<SeasonalPrice[]>("/seasonal-prices", { params });
+    const response = await api.get<SeasonalPrice[]>("/api/seasonal-prices", { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<SeasonalPrice> => {
-    const response = await api.get<SeasonalPrice>(`/seasonal-prices/${id}`);
+    const response = await api.get<SeasonalPrice>(`/api/seasonal-prices/${id}`);
     return response.data;
   },
 
   create: async (data: CreateSeasonalPriceDto): Promise<SeasonalPrice> => {
-    const response = await api.post<SeasonalPrice>("/seasonal-prices", data);
+    const response = await api.post<SeasonalPrice>("/api/seasonal-prices", data);
     return response.data;
   },
 
   update: async (id: string, data: UpdateSeasonalPriceDto): Promise<SeasonalPrice> => {
-    const response = await api.put<SeasonalPrice>(`/seasonal-prices/${id}`, data);
+    const response = await api.put<SeasonalPrice>(`/api/seasonal-prices/${id}`, data);
     return response.data;
   },
 
   toggleActive: async (id: string): Promise<SeasonalPrice> => {
-    const response = await api.patch<SeasonalPrice>(`/seasonal-prices/${id}/toggle-active`);
+    const response = await api.patch<SeasonalPrice>(`/api/seasonal-prices/${id}/toggle-active`);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/seasonal-prices/${id}`);
+    await api.delete(`/api/seasonal-prices/${id}`);
   },
 };

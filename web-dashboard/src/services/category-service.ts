@@ -41,42 +41,42 @@ export const categoryService = {
     const params: Record<string, any> = {};
     if (brandId) params.brandId = brandId;
     if (productType) params.productType = productType;
-    const response = await api.get<Category[]>("/categories", { params });
+    const response = await api.get<Category[]>("/api/categories", { params });
     return response.data;
   },
 
   getCountByType: async (brandId?: string): Promise<CategoryCount[]> => {
     const params = brandId ? { brandId } : {};
-    const response = await api.get<CategoryCount[]>("/categories/count-by-type", { params });
+    const response = await api.get<CategoryCount[]>("/api/categories/count-by-type", { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<Category> => {
-    const response = await api.get<Category>(`/categories/${id}`);
+    const response = await api.get<Category>(`/api/categories/${id}`);
     return response.data;
   },
 
   create: async (data: CreateCategoryDto): Promise<Category> => {
-    const response = await api.post<Category>("/categories", data);
+    const response = await api.post<Category>("/api/categories", data);
     return response.data;
   },
 
   update: async (id: string, data: UpdateCategoryDto): Promise<Category> => {
-    const response = await api.put<Category>(`/categories/${id}`, data);
+    const response = await api.put<Category>(`/api/categories/${id}`, data);
     return response.data;
   },
 
   toggleActive: async (id: string): Promise<Category> => {
-    const response = await api.patch<Category>(`/categories/${id}/toggle-active`);
+    const response = await api.patch<Category>(`/api/categories/${id}/toggle-active`);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/categories/${id}`);
+    await api.delete(`/api/categories/${id}`);
   },
 
   updateSortOrder: async (sortOrders: SortOrderItem[]): Promise<Category[]> => {
-    const response = await api.patch<Category[]>("/categories/sort-order", { sortOrders });
+    const response = await api.patch<Category[]>("/api/categories/sort-order", { sortOrders });
     return response.data;
   },
 };

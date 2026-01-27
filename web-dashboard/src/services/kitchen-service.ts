@@ -239,62 +239,62 @@ export interface UpdateKitchenDto {
 export const kitchenService = {
   getAll: async (branchId?: string): Promise<Kitchen[]> => {
     const params = branchId ? { branchId } : {};
-    const response = await api.get<Kitchen[]>("/kitchen", { params });
+    const response = await api.get<Kitchen[]>("/api/kitchen", { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<Kitchen> => {
-    const response = await api.get<Kitchen>(`/kitchen/${id}`);
+    const response = await api.get<Kitchen>(`/api/kitchen/${id}`);
     return response.data;
   },
 
   create: async (data: CreateKitchenDto): Promise<Kitchen> => {
-    const response = await api.post<Kitchen>("/kitchen", data);
+    const response = await api.post<Kitchen>("/api/kitchen", data);
     return response.data;
   },
 
   update: async (id: string, data: UpdateKitchenDto): Promise<Kitchen> => {
-    const response = await api.put<Kitchen>(`/kitchen/${id}`, data);
+    const response = await api.put<Kitchen>(`/api/kitchen/${id}`, data);
     return response.data;
   },
 
   toggleActive: async (id: string): Promise<Kitchen> => {
-    const response = await api.patch<Kitchen>(`/kitchen/${id}/toggle-active`);
+    const response = await api.patch<Kitchen>(`/api/kitchen/${id}/toggle-active`);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/kitchen/${id}`);
+    await api.delete(`/api/kitchen/${id}`);
   },
 
   // Product assignment APIs
   getKitchenProducts: async (kitchenId: string): Promise<Product[]> => {
-    const response = await api.get<Product[]>(`/kitchen/${kitchenId}/products`);
+    const response = await api.get<Product[]>(`/api/kitchen/${kitchenId}/products`);
     return response.data;
   },
 
   setKitchenProducts: async (kitchenId: string, productIds: string[]): Promise<Product[]> => {
-    const response = await api.put<Product[]>(`/kitchen/${kitchenId}/products`, { productIds });
+    const response = await api.put<Product[]>(`/api/kitchen/${kitchenId}/products`, { productIds });
     return response.data;
   },
 
   addProductToKitchen: async (kitchenId: string, productId: string): Promise<Product[]> => {
-    const response = await api.post<Product[]>(`/kitchen/${kitchenId}/products/${productId}`);
+    const response = await api.post<Product[]>(`/api/kitchen/${kitchenId}/products/${productId}`);
     return response.data;
   },
 
   removeProductFromKitchen: async (kitchenId: string, productId: string): Promise<Product[]> => {
-    const response = await api.delete<Product[]>(`/kitchen/${kitchenId}/products/${productId}`);
+    const response = await api.delete<Product[]>(`/api/kitchen/${kitchenId}/products/${productId}`);
     return response.data;
   },
 
   getProductKitchens: async (productId: string): Promise<Kitchen[]> => {
-    const response = await api.get<Kitchen[]>(`/kitchen/product/${productId}/kitchens`);
+    const response = await api.get<Kitchen[]>(`/api/kitchen/product/${productId}/api/kitchens`);
     return response.data;
   },
 
   setProductKitchens: async (productId: string, kitchenIds: string[]): Promise<Kitchen[]> => {
-    const response = await api.put<Kitchen[]>(`/kitchen/product/${productId}/kitchens`, { kitchenIds });
+    const response = await api.put<Kitchen[]>(`/api/kitchen/product/${productId}/api/kitchens`, { kitchenIds });
     return response.data;
   },
 
@@ -308,7 +308,7 @@ export const kitchenService = {
     if (branchId) params.branchId = branchId;
     if (categoryId) params.categoryId = categoryId;
     if (search) params.search = search;
-    const response = await api.get<ProductWithKitchens[]>('/kitchen/products/with-assignments', { params });
+    const response = await api.get<ProductWithKitchens[]>('/api/kitchen/products/with-assignments', { params });
     return response.data;
   },
 };

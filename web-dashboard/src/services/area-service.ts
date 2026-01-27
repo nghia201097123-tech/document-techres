@@ -32,31 +32,31 @@ export interface UpdateAreaDto {
 export const areaService = {
   getAll: async (branchId?: string): Promise<Area[]> => {
     const params = branchId ? { branchId } : {};
-    const response = await api.get<Area[]>("/areas", { params });
+    const response = await api.get<Area[]>("/api/areas", { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<Area> => {
-    const response = await api.get<Area>(`/areas/${id}`);
+    const response = await api.get<Area>(`/api/areas/${id}`);
     return response.data;
   },
 
   create: async (data: CreateAreaDto): Promise<Area> => {
-    const response = await api.post<Area>("/areas", data);
+    const response = await api.post<Area>("/api/areas", data);
     return response.data;
   },
 
   update: async (id: string, data: UpdateAreaDto): Promise<Area> => {
-    const response = await api.put<Area>(`/areas/${id}`, data);
+    const response = await api.put<Area>(`/api/areas/${id}`, data);
     return response.data;
   },
 
   toggleActive: async (id: string): Promise<Area> => {
-    const response = await api.patch<Area>(`/areas/${id}/toggle-active`);
+    const response = await api.patch<Area>(`/api/areas/${id}/toggle-active`);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/areas/${id}`);
+    await api.delete(`/api/areas/${id}`);
   },
 };

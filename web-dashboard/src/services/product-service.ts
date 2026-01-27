@@ -222,46 +222,46 @@ export const productService = {
     const params: Record<string, any> = {};
     if (brandId) params.brandId = brandId;
     if (type) params.type = type;
-    const response = await api.get<Product[]>("/products", { params });
+    const response = await api.get<Product[]>("/api/products", { params });
     return response.data;
   },
 
   getAllWithSeasonalPrices: async (brandId: string, branchId: string, type?: ProductType): Promise<Product[]> => {
     const params: Record<string, any> = { brandId, branchId };
     if (type) params.type = type;
-    const response = await api.get<Product[]>("/products/with-seasonal-prices", { params });
+    const response = await api.get<Product[]>("/api/products/with-seasonal-prices", { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<Product> => {
-    const response = await api.get<Product>(`/products/${id}`);
+    const response = await api.get<Product>(`/api/products/${id}`);
     return response.data;
   },
 
   create: async (data: CreateProductDto): Promise<Product> => {
-    const response = await api.post<Product>("/products", data);
+    const response = await api.post<Product>("/api/products", data);
     return response.data;
   },
 
   update: async (id: string, data: UpdateProductDto): Promise<Product> => {
-    const response = await api.put<Product>(`/products/${id}`, data);
+    const response = await api.put<Product>(`/api/products/${id}`, data);
     return response.data;
   },
 
   toggleActive: async (id: string): Promise<Product> => {
-    const response = await api.patch<Product>(`/products/${id}/toggle-active`);
+    const response = await api.patch<Product>(`/api/products/${id}/toggle-active`);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/products/${id}`);
+    await api.delete(`/api/products/${id}`);
   },
 
   // Available Toppings
   getAvailableToppings: async (brandId?: string): Promise<Product[]> => {
     const params: Record<string, any> = {};
     if (brandId) params.brandId = brandId;
-    const response = await api.get<Product[]>("/products/toppings/available", { params });
+    const response = await api.get<Product[]>("/api/products/toppings/available", { params });
     return response.data;
   },
 
@@ -269,75 +269,75 @@ export const productService = {
 
   getAllToppingGroups: async (brandId?: string): Promise<ToppingGroup[]> => {
     const params = brandId ? { brandId } : {};
-    const response = await api.get<ToppingGroup[]>("/products/topping-groups", { params });
+    const response = await api.get<ToppingGroup[]>("/api/products/topping-groups", { params });
     return response.data;
   },
 
   getToppingGroupById: async (groupId: string): Promise<ToppingGroup> => {
-    const response = await api.get<ToppingGroup>(`/products/topping-groups/${groupId}`);
+    const response = await api.get<ToppingGroup>(`/api/products/topping-groups/${groupId}`);
     return response.data;
   },
 
   createToppingGroup: async (data: CreateToppingGroupDto): Promise<ToppingGroup> => {
-    const response = await api.post<ToppingGroup>("/products/topping-groups", data);
+    const response = await api.post<ToppingGroup>("/api/products/topping-groups", data);
     return response.data;
   },
 
   updateToppingGroup: async (groupId: string, data: UpdateToppingGroupDto): Promise<ToppingGroup> => {
-    const response = await api.put<ToppingGroup>(`/products/topping-groups/${groupId}`, data);
+    const response = await api.put<ToppingGroup>(`/api/products/topping-groups/${groupId}`, data);
     return response.data;
   },
 
   deleteToppingGroup: async (groupId: string): Promise<void> => {
-    await api.delete(`/products/topping-groups/${groupId}`);
+    await api.delete(`/api/products/topping-groups/${groupId}`);
   },
 
   toggleToppingGroupActive: async (groupId: string): Promise<ToppingGroup> => {
-    const response = await api.patch<ToppingGroup>(`/products/topping-groups/${groupId}/toggle-active`);
+    const response = await api.patch<ToppingGroup>(`/api/products/topping-groups/${groupId}/toggle-active`);
     return response.data;
   },
 
   // === Topping Group Item Management ===
 
   addToppingItem: async (groupId: string, data: AddToppingItemDto): Promise<ToppingGroup> => {
-    const response = await api.post<ToppingGroup>(`/products/topping-groups/${groupId}/items`, data);
+    const response = await api.post<ToppingGroup>(`/api/products/topping-groups/${groupId}/items`, data);
     return response.data;
   },
 
   updateToppingItem: async (groupId: string, itemId: string, data: UpdateToppingItemDto): Promise<ToppingGroup> => {
-    const response = await api.put<ToppingGroup>(`/products/topping-groups/${groupId}/items/${itemId}`, data);
+    const response = await api.put<ToppingGroup>(`/api/products/topping-groups/${groupId}/items/${itemId}`, data);
     return response.data;
   },
 
   removeToppingItem: async (groupId: string, itemId: string): Promise<ToppingGroup> => {
-    const response = await api.delete<ToppingGroup>(`/products/topping-groups/${groupId}/items/${itemId}`);
+    const response = await api.delete<ToppingGroup>(`/api/products/topping-groups/${groupId}/items/${itemId}`);
     return response.data;
   },
 
   reorderToppingItems: async (groupId: string, itemIds: string[]): Promise<ToppingGroup> => {
-    const response = await api.put<ToppingGroup>(`/products/topping-groups/${groupId}/items/reorder`, { itemIds });
+    const response = await api.put<ToppingGroup>(`/api/products/topping-groups/${groupId}/items/reorder`, { itemIds });
     return response.data;
   },
 
   // === Product Topping Group Assignment ===
 
   getProductToppingGroups: async (productId: string): Promise<ToppingGroup[]> => {
-    const response = await api.get<ToppingGroup[]>(`/products/${productId}/topping-groups`);
+    const response = await api.get<ToppingGroup[]>(`/api/products/${productId}/topping-groups`);
     return response.data;
   },
 
   assignToppingGroupsToProduct: async (productId: string, groupIds: string[]): Promise<ToppingGroup[]> => {
-    const response = await api.post<ToppingGroup[]>(`/products/${productId}/topping-groups`, { groupIds });
+    const response = await api.post<ToppingGroup[]>(`/api/products/${productId}/topping-groups`, { groupIds });
     return response.data;
   },
 
   addToppingGroupToProduct: async (productId: string, groupId: string): Promise<ToppingGroup[]> => {
-    const response = await api.post<ToppingGroup[]>(`/products/${productId}/topping-groups/${groupId}`);
+    const response = await api.post<ToppingGroup[]>(`/api/products/${productId}/topping-groups/${groupId}`);
     return response.data;
   },
 
   removeToppingGroupFromProduct: async (productId: string, groupId: string): Promise<ToppingGroup[]> => {
-    const response = await api.delete<ToppingGroup[]>(`/products/${productId}/topping-groups/${groupId}`);
+    const response = await api.delete<ToppingGroup[]>(`/api/products/${productId}/topping-groups/${groupId}`);
     return response.data;
   },
 
@@ -345,53 +345,53 @@ export const productService = {
 
   getAllNotes: async (brandId?: string): Promise<ProductNote[]> => {
     const params = brandId ? { brandId } : {};
-    const response = await api.get<ProductNote[]>("/products/notes/all", { params });
+    const response = await api.get<ProductNote[]>("/api/products/notes/all", { params });
     return response.data;
   },
 
   createNote: async (data: CreateProductNoteDto): Promise<ProductNote> => {
-    const response = await api.post<ProductNote>("/products/notes", data);
+    const response = await api.post<ProductNote>("/api/products/notes", data);
     return response.data;
   },
 
   updateNote: async (noteId: string, data: UpdateProductNoteDto): Promise<ProductNote> => {
-    const response = await api.put<ProductNote>(`/products/notes/${noteId}`, data);
+    const response = await api.put<ProductNote>(`/api/products/notes/${noteId}`, data);
     return response.data;
   },
 
   deleteNote: async (noteId: string): Promise<void> => {
-    await api.delete(`/products/notes/${noteId}`);
+    await api.delete(`/api/products/notes/${noteId}`);
   },
 
   getProductNotes: async (productId: string): Promise<ProductNoteAssignment[]> => {
-    const response = await api.get<ProductNoteAssignment[]>(`/products/${productId}/notes`);
+    const response = await api.get<ProductNoteAssignment[]>(`/api/products/${productId}/notes`);
     return response.data;
   },
 
   assignNotesToProduct: async (productId: string, noteIds: string[]): Promise<ProductNoteAssignment[]> => {
-    const response = await api.post<ProductNoteAssignment[]>(`/products/${productId}/notes`, { noteIds });
+    const response = await api.post<ProductNoteAssignment[]>(`/api/products/${productId}/notes`, { noteIds });
     return response.data;
   },
 
   addNoteToProduct: async (productId: string, noteId: string): Promise<ProductNoteAssignment[]> => {
-    const response = await api.post<ProductNoteAssignment[]>(`/products/${productId}/notes/${noteId}`);
+    const response = await api.post<ProductNoteAssignment[]>(`/api/products/${productId}/notes/${noteId}`);
     return response.data;
   },
 
   removeNoteFromProduct: async (productId: string, noteId: string): Promise<ProductNoteAssignment[]> => {
-    const response = await api.delete<ProductNoteAssignment[]>(`/products/${productId}/notes/${noteId}`);
+    const response = await api.delete<ProductNoteAssignment[]>(`/api/products/${productId}/notes/${noteId}`);
     return response.data;
   },
 
   // === Note to Multiple Products Assignment ===
 
   getProductsByNote: async (noteId: string): Promise<Product[]> => {
-    const response = await api.get<Product[]>(`/products/notes/${noteId}/products`);
+    const response = await api.get<Product[]>(`/api/products/notes/${noteId}/api/products`);
     return response.data;
   },
 
   assignNoteToProducts: async (noteId: string, productIds: string[]): Promise<{ noteId: string; productCount: number; products: Product[] }> => {
-    const response = await api.post<{ noteId: string; productCount: number; products: Product[] }>(`/products/notes/${noteId}/products`, { productIds });
+    const response = await api.post<{ noteId: string; productCount: number; products: Product[] }>(`/api/products/notes/${noteId}/api/products`, { productIds });
     return response.data;
   },
 
@@ -400,34 +400,34 @@ export const productService = {
   getAvailableProductsForCombo: async (brandId?: string): Promise<Product[]> => {
     const params: Record<string, any> = {};
     if (brandId) params.brandId = brandId;
-    const response = await api.get<Product[]>("/products/combo/available-products", { params });
+    const response = await api.get<Product[]>("/api/products/combo/available-products", { params });
     return response.data;
   },
 
   getComboItems: async (comboId: string): Promise<ComboItem[]> => {
-    const response = await api.get<ComboItem[]>(`/products/${comboId}/combo-items`);
+    const response = await api.get<ComboItem[]>(`/api/products/${comboId}/combo-items`);
     return response.data;
   },
 
   assignComboItems: async (comboId: string, items: { productId: string; quantity?: number }[]): Promise<ComboItem[]> => {
-    const response = await api.post<ComboItem[]>(`/products/${comboId}/combo-items`, { items });
+    const response = await api.post<ComboItem[]>(`/api/products/${comboId}/combo-items`, { items });
     return response.data;
   },
 
   addItemToCombo: async (comboId: string, productId: string, quantity?: number): Promise<ComboItem[]> => {
-    const response = await api.post<ComboItem[]>(`/products/${comboId}/combo-items/${productId}`, { quantity });
+    const response = await api.post<ComboItem[]>(`/api/products/${comboId}/combo-items/${productId}`, { quantity });
     return response.data;
   },
 
   removeItemFromCombo: async (comboId: string, productId: string): Promise<ComboItem[]> => {
-    const response = await api.delete<ComboItem[]>(`/products/${comboId}/combo-items/${productId}`);
+    const response = await api.delete<ComboItem[]>(`/api/products/${comboId}/combo-items/${productId}`);
     return response.data;
   },
 
   // === Bulk Import ===
 
   bulkImport: async (items: BulkProductItem[], brandId: string): Promise<ProductBulkImportResult> => {
-    const response = await api.post<ProductBulkImportResult>("/products/bulk-import", { items, brandId });
+    const response = await api.post<ProductBulkImportResult>("/api/products/bulk-import", { items, brandId });
     return response.data;
   },
 
@@ -467,7 +467,7 @@ export const productService = {
       });
 
       try {
-        const response = await api.post<ProductBulkImportResult>("/products/bulk-import", {
+        const response = await api.post<ProductBulkImportResult>("/api/products/bulk-import", {
           items: batch,
           brandId,
         });
@@ -571,7 +571,7 @@ const processProductBulkInBatches = async (
 
 export const bulkProductService = {
   updateCategory: async (productIds: string[], categoryId: string): Promise<ProductBulkOperationResult> => {
-    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-category", {
+    const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-category", {
       productIds,
       categoryId,
     });
@@ -587,7 +587,7 @@ export const bulkProductService = {
       productIds,
       options?.batchSize || 50,
       async (batch) => {
-        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-category", {
+        const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-category", {
           productIds: batch,
           categoryId,
         });
@@ -598,7 +598,7 @@ export const bulkProductService = {
   },
 
   toggleActive: async (productIds: string[], isActive: boolean): Promise<ProductBulkOperationResult> => {
-    const response = await api.post<ProductBulkOperationResult>("/products/bulk/toggle-active", {
+    const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/toggle-active", {
       productIds,
       isActive,
     });
@@ -614,7 +614,7 @@ export const bulkProductService = {
       productIds,
       options?.batchSize || 50,
       async (batch) => {
-        const response = await api.post<ProductBulkOperationResult>("/products/bulk/toggle-active", {
+        const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/toggle-active", {
           productIds: batch,
           isActive,
         });
@@ -625,7 +625,7 @@ export const bulkProductService = {
   },
 
   delete: async (productIds: string[]): Promise<ProductBulkOperationResult> => {
-    const response = await api.post<ProductBulkOperationResult>("/products/bulk/delete", {
+    const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/delete", {
       productIds,
     });
     return response.data;
@@ -639,7 +639,7 @@ export const bulkProductService = {
       productIds,
       options?.batchSize || 50,
       async (batch) => {
-        const response = await api.post<ProductBulkOperationResult>("/products/bulk/delete", {
+        const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/delete", {
           productIds: batch,
         });
         return response.data;
@@ -649,7 +649,7 @@ export const bulkProductService = {
   },
 
   updateVatRate: async (productIds: string[], vatRate: number): Promise<ProductBulkOperationResult> => {
-    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-vat-rate", {
+    const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-vat-rate", {
       productIds,
       vatRate,
     });
@@ -665,7 +665,7 @@ export const bulkProductService = {
       productIds,
       options?.batchSize || 50,
       async (batch) => {
-        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-vat-rate", {
+        const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-vat-rate", {
           productIds: batch,
           vatRate,
         });
@@ -676,7 +676,7 @@ export const bulkProductService = {
   },
 
   updatePrice: async (productIds: string[], price: number): Promise<ProductBulkOperationResult> => {
-    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-price", {
+    const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-price", {
       productIds,
       price,
     });
@@ -692,7 +692,7 @@ export const bulkProductService = {
       productIds,
       options?.batchSize || 50,
       async (batch) => {
-        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-price", {
+        const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-price", {
           productIds: batch,
           price,
         });
@@ -703,7 +703,7 @@ export const bulkProductService = {
   },
 
   updatePrintLabel: async (productIds: string[], printLabel: boolean): Promise<ProductBulkOperationResult> => {
-    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-print-label", {
+    const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-print-label", {
       productIds,
       printLabel,
     });
@@ -719,7 +719,7 @@ export const bulkProductService = {
       productIds,
       options?.batchSize || 50,
       async (batch) => {
-        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-print-label", {
+        const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-print-label", {
           productIds: batch,
           printLabel,
         });
@@ -730,7 +730,7 @@ export const bulkProductService = {
   },
 
   updatePrintSeafood: async (productIds: string[], printSeafood: boolean): Promise<ProductBulkOperationResult> => {
-    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-print-seafood", {
+    const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-print-seafood", {
       productIds,
       printSeafood,
     });
@@ -746,7 +746,7 @@ export const bulkProductService = {
       productIds,
       options?.batchSize || 50,
       async (batch) => {
-        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-print-seafood", {
+        const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-print-seafood", {
           productIds: batch,
           printSeafood,
         });
@@ -757,7 +757,7 @@ export const bulkProductService = {
   },
 
   updatePrintDish: async (productIds: string[], printDish: boolean): Promise<ProductBulkOperationResult> => {
-    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-print-dish", {
+    const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-print-dish", {
       productIds,
       printDish,
     });
@@ -773,7 +773,7 @@ export const bulkProductService = {
       productIds,
       options?.batchSize || 50,
       async (batch) => {
-        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-print-dish", {
+        const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-print-dish", {
           productIds: batch,
           printDish,
         });
@@ -784,7 +784,7 @@ export const bulkProductService = {
   },
 
   updateUnit: async (productIds: string[], unit: string): Promise<ProductBulkOperationResult> => {
-    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-unit", {
+    const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-unit", {
       productIds,
       unit,
     });
@@ -800,7 +800,7 @@ export const bulkProductService = {
       productIds,
       options?.batchSize || 50,
       async (batch) => {
-        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-unit", {
+        const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-unit", {
           productIds: batch,
           unit,
         });
@@ -811,7 +811,7 @@ export const bulkProductService = {
   },
 
   updateSellingType: async (productIds: string[], sellingType: SellingType): Promise<ProductBulkOperationResult> => {
-    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-selling-type", {
+    const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-selling-type", {
       productIds,
       sellingType,
     });
@@ -827,7 +827,7 @@ export const bulkProductService = {
       productIds,
       options?.batchSize || 50,
       async (batch) => {
-        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-selling-type", {
+        const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-selling-type", {
           productIds: batch,
           sellingType,
         });
@@ -838,7 +838,7 @@ export const bulkProductService = {
   },
 
   updatePreparationTime: async (productIds: string[], preparationTime: number): Promise<ProductBulkOperationResult> => {
-    const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-preparation-time", {
+    const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-preparation-time", {
       productIds,
       preparationTime,
     });
@@ -854,7 +854,7 @@ export const bulkProductService = {
       productIds,
       options?.batchSize || 50,
       async (batch) => {
-        const response = await api.post<ProductBulkOperationResult>("/products/bulk/update-preparation-time", {
+        const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/update-preparation-time", {
           productIds: batch,
           preparationTime,
         });
@@ -865,7 +865,7 @@ export const bulkProductService = {
   },
 
   updateAvatars: async (items: { productCode: string; avatarUrl: string }[]): Promise<BulkAvatarUpdateResult> => {
-    const response = await api.post<BulkAvatarUpdateResult>("/products/bulk/update-avatar", {
+    const response = await api.post<BulkAvatarUpdateResult>("/api/products/bulk/update-avatar", {
       items,
     });
     return response.data;
@@ -900,7 +900,7 @@ export const bulkProductService = {
       });
 
       try {
-        const response = await api.post<BulkAvatarUpdateResult>("/products/bulk/update-avatar", {
+        const response = await api.post<BulkAvatarUpdateResult>("/api/products/bulk/update-avatar", {
           items: batch,
         });
         aggregatedResult.success += response.data.success;
@@ -929,7 +929,7 @@ export const bulkProductService = {
   },
 
   assignNotes: async (productIds: string[], noteIds: string[]): Promise<ProductBulkOperationResult> => {
-    const response = await api.post<ProductBulkOperationResult>("/products/bulk/assign-notes", {
+    const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/assign-notes", {
       productIds,
       noteIds,
     });
@@ -945,7 +945,7 @@ export const bulkProductService = {
       productIds,
       options?.batchSize || 50,
       async (batch) => {
-        const response = await api.post<ProductBulkOperationResult>("/products/bulk/assign-notes", {
+        const response = await api.post<ProductBulkOperationResult>("/api/products/bulk/assign-notes", {
           productIds: batch,
           noteIds,
         });

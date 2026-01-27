@@ -350,7 +350,7 @@ export const billTemplateService = {
    * Lấy tất cả templates
    */
   getAllTemplates: async (): Promise<BillTemplate[]> => {
-    const response = await api.get(`/bill-templates`);
+    const response = await api.get(`/api/bill-templates`);
     return response.data;
   },
 
@@ -359,12 +359,12 @@ export const billTemplateService = {
    * Mẫu in bill được xây dựng ở cấp thương hiệu
    */
   getTemplatesByBrand: async (brandId: string): Promise<BillTemplate[]> => {
-    const response = await api.get(`/bill-templates/brand/${brandId}`);
+    const response = await api.get(`/api/bill-templates/brand/${brandId}`);
     return response.data;
   },
 
   getTemplate: async (id: string): Promise<BillTemplate> => {
-    const response = await api.get(`/bill-templates/${id}`);
+    const response = await api.get(`/api/bill-templates/${id}`);
     return response.data;
   },
 
@@ -372,79 +372,79 @@ export const billTemplateService = {
    * Tạo template mới cho thương hiệu
    */
   createTemplate: async (data: CreateBillTemplateDto): Promise<BillTemplate> => {
-    const response = await api.post(`/bill-templates`, data);
+    const response = await api.post(`/api/bill-templates`, data);
     return response.data;
   },
 
   updateTemplate: async (id: string, data: UpdateBillTemplateDto): Promise<BillTemplate> => {
-    const response = await api.put(`/bill-templates/${id}`, data);
+    const response = await api.put(`/api/bill-templates/${id}`, data);
     return response.data;
   },
 
   toggleTemplate: async (id: string): Promise<BillTemplate> => {
-    const response = await api.patch(`/bill-templates/${id}/toggle`);
+    const response = await api.patch(`/api/bill-templates/${id}/toggle`);
     return response.data;
   },
 
   setDefaultTemplate: async (id: string): Promise<BillTemplate> => {
-    const response = await api.patch(`/bill-templates/${id}/set-default`);
+    const response = await api.patch(`/api/bill-templates/${id}/set-default`);
     return response.data;
   },
 
   deleteTemplate: async (id: string): Promise<void> => {
-    await api.delete(`/bill-templates/${id}`);
+    await api.delete(`/api/bill-templates/${id}`);
   },
 
   // ==================== PRINTER CONFIGS (Branch Level) ====================
 
   // Bill Printer Configs
   getAllPrinterConfigs: async (brandId: string): Promise<BillPrinterConfig[]> => {
-    const response = await api.get(`/bill-printer-configs?brandId=${brandId}`);
+    const response = await api.get(`/api/bill-printer-configs?brandId=${brandId}`);
     return response.data;
   },
 
   getPrinterConfigsByBranch: async (branchId: string): Promise<BillPrinterConfig[]> => {
-    const response = await api.get(`/bill-printer-configs/branch/${branchId}`);
+    const response = await api.get(`/api/bill-printer-configs/branch/${branchId}`);
     return response.data;
   },
 
   getPrinterConfig: async (id: string): Promise<BillPrinterConfig> => {
-    const response = await api.get(`/bill-printer-configs/${id}`);
+    const response = await api.get(`/api/bill-printer-configs/${id}`);
     return response.data;
   },
 
   createPrinterConfig: async (data: CreateBillPrinterConfigDto): Promise<BillPrinterConfig> => {
-    const response = await api.post(`/bill-printer-configs`, data);
+    const response = await api.post(`/api/bill-printer-configs`, data);
     return response.data;
   },
 
   updatePrinterConfig: async (id: string, data: UpdateBillPrinterConfigDto): Promise<BillPrinterConfig> => {
-    const response = await api.put(`/bill-printer-configs/${id}`, data);
+    const response = await api.put(`/api/bill-printer-configs/${id}`, data);
     return response.data;
   },
 
   togglePrinterConfig: async (id: string): Promise<BillPrinterConfig> => {
-    const response = await api.patch(`/bill-printer-configs/${id}/toggle`);
+    const response = await api.patch(`/api/bill-printer-configs/${id}/toggle`);
     return response.data;
   },
 
   setDefaultPrinterConfig: async (id: string): Promise<BillPrinterConfig> => {
-    const response = await api.patch(`/bill-printer-configs/${id}/set-default`);
+    const response = await api.patch(`/api/bill-printer-configs/${id}/set-default`);
     return response.data;
   },
 
   deletePrinterConfig: async (id: string): Promise<void> => {
-    await api.delete(`/bill-printer-configs/${id}`);
+    await api.delete(`/api/bill-printer-configs/${id}`);
   },
 
   testPrinterConnection: async (id: string): Promise<{ success: boolean; message: string }> => {
-    const response = await api.post(`/bill-printer-configs/${id}/test`);
+    const response = await api.post(`/api/bill-printer-configs/${id}/test`);
     return response.data;
   },
 
   getPrinterConfigByTemplateId: async (templateId: string): Promise<BillPrinterConfig | null> => {
     try {
-      const response = await api.get(`/bill-printer-configs/by-template/${templateId}`);
+      const response = await api.get(`/api/bill-printer-configs/by-template/${templateId}`);
       return response.data;
     } catch {
       return null;

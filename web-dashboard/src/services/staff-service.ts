@@ -65,44 +65,44 @@ export const staffService = {
     const params: Record<string, string> = {};
     if (branchId) params.branchId = branchId;
     if (brandId) params.brandId = brandId;
-    const response = await api.get<Staff[]>("/staff", { params });
+    const response = await api.get<Staff[]>("/api/staff", { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<Staff> => {
-    const response = await api.get<Staff>(`/staff/${id}`);
+    const response = await api.get<Staff>(`/api/staff/${id}`);
     return response.data;
   },
 
   create: async (data: CreateStaffDto): Promise<Staff & { temporaryPassword: string }> => {
-    const response = await api.post<Staff & { temporaryPassword: string }>("/staff", data);
+    const response = await api.post<Staff & { temporaryPassword: string }>("/api/staff", data);
     return response.data;
   },
 
   update: async (id: string, data: UpdateStaffDto): Promise<Staff> => {
-    const response = await api.put<Staff>(`/staff/${id}`, data);
+    const response = await api.put<Staff>(`/api/staff/${id}`, data);
     return response.data;
   },
 
   toggleActive: async (id: string): Promise<Staff> => {
-    const response = await api.patch<Staff>(`/staff/${id}/toggle-active`);
+    const response = await api.patch<Staff>(`/api/staff/${id}/toggle-active`);
     return response.data;
   },
 
   resetPassword: async (id: string): Promise<{ temporaryPassword: string }> => {
-    const response = await api.post<{ temporaryPassword: string }>(`/staff/${id}/reset-password`);
+    const response = await api.post<{ temporaryPassword: string }>(`/api/staff/${id}/reset-password`);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/staff/${id}`);
+    await api.delete(`/api/staff/${id}`);
   },
 
   bulkImport: async (
     items: BulkStaffItem[],
     usernamePrefix?: string
   ): Promise<BulkImportResult> => {
-    const response = await api.post<BulkImportResult>("/staff/bulk-import", {
+    const response = await api.post<BulkImportResult>("/api/staff/bulk-import", {
       items,
       usernamePrefix,
     });
@@ -144,7 +144,7 @@ export const staffService = {
       });
 
       try {
-        const response = await api.post<BulkImportResult>("/staff/bulk-import", {
+        const response = await api.post<BulkImportResult>("/api/staff/bulk-import", {
           items: batch,
           usernamePrefix,
         });
@@ -275,7 +275,7 @@ const processBulkInBatches = async <T>(
 
 export const bulkStaffService = {
   updateDepartment: async (staffIds: string[], departmentId: string): Promise<BulkOperationResult> => {
-    const response = await api.post<BulkOperationResult>("/staff/bulk/update-department", {
+    const response = await api.post<BulkOperationResult>("/api/staff/bulk/update-department", {
       staffIds,
       departmentId,
     });
@@ -292,7 +292,7 @@ export const bulkStaffService = {
       staffIds,
       batchSize,
       async (batch) => {
-        const response = await api.post<BulkOperationResult>("/staff/bulk/update-department", {
+        const response = await api.post<BulkOperationResult>("/api/staff/bulk/update-department", {
           staffIds: batch,
           departmentId,
         });
@@ -303,7 +303,7 @@ export const bulkStaffService = {
   },
 
   updateBranch: async (staffIds: string[], branchId: string): Promise<BulkOperationResult> => {
-    const response = await api.post<BulkOperationResult>("/staff/bulk/update-branch", {
+    const response = await api.post<BulkOperationResult>("/api/staff/bulk/update-branch", {
       staffIds,
       branchId,
     });
@@ -320,7 +320,7 @@ export const bulkStaffService = {
       staffIds,
       batchSize,
       async (batch) => {
-        const response = await api.post<BulkOperationResult>("/staff/bulk/update-branch", {
+        const response = await api.post<BulkOperationResult>("/api/staff/bulk/update-branch", {
           staffIds: batch,
           branchId,
         });
@@ -331,7 +331,7 @@ export const bulkStaffService = {
   },
 
   toggleActive: async (staffIds: string[], isActive: boolean): Promise<BulkOperationResult> => {
-    const response = await api.post<BulkOperationResult>("/staff/bulk/toggle-active", {
+    const response = await api.post<BulkOperationResult>("/api/staff/bulk/toggle-active", {
       staffIds,
       isActive,
     });
@@ -348,7 +348,7 @@ export const bulkStaffService = {
       staffIds,
       batchSize,
       async (batch) => {
-        const response = await api.post<BulkOperationResult>("/staff/bulk/toggle-active", {
+        const response = await api.post<BulkOperationResult>("/api/staff/bulk/toggle-active", {
           staffIds: batch,
           isActive,
         });
@@ -359,7 +359,7 @@ export const bulkStaffService = {
   },
 
   resetPassword: async (staffIds: string[], newPassword?: string): Promise<BulkOperationResult> => {
-    const response = await api.post<BulkOperationResult>("/staff/bulk/reset-password", {
+    const response = await api.post<BulkOperationResult>("/api/staff/bulk/reset-password", {
       staffIds,
       newPassword,
     });
@@ -376,7 +376,7 @@ export const bulkStaffService = {
       staffIds,
       batchSize,
       async (batch) => {
-        const response = await api.post<BulkOperationResult>("/staff/bulk/reset-password", {
+        const response = await api.post<BulkOperationResult>("/api/staff/bulk/reset-password", {
           staffIds: batch,
           newPassword,
         });
@@ -387,7 +387,7 @@ export const bulkStaffService = {
   },
 
   delete: async (staffIds: string[]): Promise<BulkOperationResult> => {
-    const response = await api.post<BulkOperationResult>("/staff/bulk/delete", {
+    const response = await api.post<BulkOperationResult>("/api/staff/bulk/delete", {
       staffIds,
     });
     return response.data;
@@ -402,7 +402,7 @@ export const bulkStaffService = {
       staffIds,
       batchSize,
       async (batch) => {
-        const response = await api.post<BulkOperationResult>("/staff/bulk/delete", {
+        const response = await api.post<BulkOperationResult>("/api/staff/bulk/delete", {
           staffIds: batch,
         });
         return response.data;

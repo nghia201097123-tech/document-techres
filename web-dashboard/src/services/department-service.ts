@@ -43,57 +43,57 @@ export interface CascadeToggleResult {
 export const departmentService = {
   getAll: async (companyId?: string): Promise<Department[]> => {
     const params = companyId ? { companyId } : {};
-    const response = await api.get<Department[]>("/departments", { params });
+    const response = await api.get<Department[]>("/api/departments", { params });
     return response.data;
   },
 
   getTree: async (companyId?: string): Promise<Department[]> => {
     const params = companyId ? { companyId } : {};
-    const response = await api.get<Department[]>("/departments/tree", { params });
+    const response = await api.get<Department[]>("/api/departments/tree", { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<Department> => {
-    const response = await api.get<Department>(`/departments/${id}`);
+    const response = await api.get<Department>(`/api/departments/${id}`);
     return response.data;
   },
 
   create: async (data: CreateDepartmentDto): Promise<Department> => {
-    const response = await api.post<Department>("/departments", data);
+    const response = await api.post<Department>("/api/departments", data);
     return response.data;
   },
 
   update: async (id: string, data: UpdateDepartmentDto): Promise<Department> => {
-    const response = await api.put<Department>(`/departments/${id}`, data);
+    const response = await api.put<Department>(`/api/departments/${id}`, data);
     return response.data;
   },
 
   toggleActive: async (id: string): Promise<Department> => {
-    const response = await api.patch<Department>(`/departments/${id}/toggle-active`);
+    const response = await api.patch<Department>(`/api/departments/${id}/toggle-active`);
     return response.data;
   },
 
   // Cascade toggle - deactivates/activates department, all children, and all staff
   toggleActiveCascade: async (id: string): Promise<CascadeToggleResult> => {
-    const response = await api.patch<CascadeToggleResult>(`/departments/${id}/toggle-active-cascade`);
+    const response = await api.patch<CascadeToggleResult>(`/api/departments/${id}/toggle-active-cascade`);
     return response.data;
   },
 
   // Get staff count for department and all children
   getStaffCount: async (id: string): Promise<DepartmentStaffCount> => {
-    const response = await api.get<DepartmentStaffCount>(`/departments/${id}/staff-count`);
+    const response = await api.get<DepartmentStaffCount>(`/api/departments/${id}/staff-count`);
     return response.data;
   },
 
   // Transfer all staff from department (and children) to target department, then delete
   transferStaffAndDelete: async (id: string, targetDepartmentId: string): Promise<{ transferredCount: number }> => {
-    const response = await api.post<{ transferredCount: number }>(`/departments/${id}/transfer-and-delete`, {
+    const response = await api.post<{ transferredCount: number }>(`/api/departments/${id}/transfer-and-delete`, {
       targetDepartmentId,
     });
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/departments/${id}`);
+    await api.delete(`/api/departments/${id}`);
   },
 };

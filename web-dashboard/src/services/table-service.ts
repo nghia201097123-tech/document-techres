@@ -53,41 +53,41 @@ export interface TableCountByArea {
 export const tableService = {
   getAll: async (branchId?: string): Promise<Table[]> => {
     const params = branchId ? { branchId } : {};
-    const response = await api.get<Table[]>("/tables", { params });
+    const response = await api.get<Table[]>("/api/tables", { params });
     return response.data;
   },
 
   getCountByArea: async (): Promise<TableCountByArea[]> => {
-    const response = await api.get<TableCountByArea[]>("/tables/count-by-area");
+    const response = await api.get<TableCountByArea[]>("/api/tables/count-by-area");
     return response.data;
   },
 
   getById: async (id: string): Promise<Table> => {
-    const response = await api.get<Table>(`/tables/${id}`);
+    const response = await api.get<Table>(`/api/tables/${id}`);
     return response.data;
   },
 
   create: async (data: CreateTableDto): Promise<Table> => {
-    const response = await api.post<Table>("/tables", data);
+    const response = await api.post<Table>("/api/tables", data);
     return response.data;
   },
 
   update: async (id: string, data: UpdateTableDto): Promise<Table> => {
-    const response = await api.put<Table>(`/tables/${id}`, data);
+    const response = await api.put<Table>(`/api/tables/${id}`, data);
     return response.data;
   },
 
   updateStatus: async (id: string, status: TableStatus): Promise<Table> => {
-    const response = await api.patch<Table>(`/tables/${id}/status`, { status });
+    const response = await api.patch<Table>(`/api/tables/${id}/status`, { status });
     return response.data;
   },
 
   toggleActive: async (id: string): Promise<Table> => {
-    const response = await api.patch<Table>(`/tables/${id}/toggle-active`);
+    const response = await api.patch<Table>(`/api/tables/${id}/toggle-active`);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/tables/${id}`);
+    await api.delete(`/api/tables/${id}`);
   },
 };
