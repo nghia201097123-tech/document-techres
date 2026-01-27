@@ -86,6 +86,17 @@ export class StoresService {
     accountId: string,
     dto: CreateStoreMappingsDto,
   ): Promise<FoodPlatformStoreMapping[]> {
+    // Debug logging
+    this.logger.log('═══════════════════════════════════════════════════════════');
+    this.logger.log('[createMappings] Received request:');
+    this.logger.log(`   accountId: ${accountId}`);
+    this.logger.log(`   mappings count: ${dto.mappings?.length || 0}`);
+    dto.mappings?.forEach((m, idx) => {
+      this.logger.log(`   mapping[${idx}].branchId: "${m.branchId}" (length: ${m.branchId?.length})`);
+      this.logger.log(`   mapping[${idx}].externalStoreId: "${m.externalStoreId}"`);
+    });
+    this.logger.log('═══════════════════════════════════════════════════════════');
+
     // Get account
     const account = await this.accountRepo.findOne({ where: { id: accountId } });
     if (!account) {
