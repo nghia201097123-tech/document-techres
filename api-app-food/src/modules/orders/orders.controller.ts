@@ -23,37 +23,30 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   /**
-   * Poll orders for a branch - CHỈ ĐỌC TỪ DB
+   * Poll orders for a branch
    * CCB gọi endpoint này mỗi 15 giây
+   *
+   * Flow:
+   * 1. Trả về danh sách đơn hàng từ DB (có cache Redis)
+   * 2. Đồng thời gửi signal qua Redis cho api-order-worker poll merchant APIs
+   * 3. Kết quả mới từ merchant sẽ được push qua WebSocket
    */
   @Get('poll')
   @ApiOperation({
-    summary: 'Lấy đơn hàng từ DB (có cache)',
-    description: 'CCB gọi endpoint này mỗi 15 giây để lấy đơn hàng. Chỉ đọc từ DB/cache, không gọi merchant APIs.',
+    summary: 'Poll đơn hàng (15s/lần)',
+    description: `CCB gọi endpoint này mỗi 15 giây.
+
+**Flow xử lý:**
+1. Trả về danh sách đơn hàng từ DB/cache
+2. Tự động gửi signal cho worker poll từ Grab/Shopee/BeFood
+3. Đơn hàng mới sẽ được push qua WebSocket`,
   })
-  @ApiQuery({ name: 'branchId', type: String, required: true })
-  @ApiQuery({ name: 'lastPollAt', type: Number, required: false })
+  @ApiQuery({ name: 'branchId', type: String, required: true, description: 'UUID của chi nhánh' })
+  @ApiQuery({ name: 'lastPollAt', type: Number, required: false, description: 'Timestamp lần poll trước (ms)' })
   @ApiResponse({ status: 200, description: 'Thành công' })
   async pollOrders(@Query() query: PollOrdersQueryDto) {
     const result = await this.ordersService.pollOrders(query);
     return result;
-  }
-
-  /**
-   * Trigger poll from merchant APIs
-   * Gửi message cho api-order-worker để poll đơn hàng từ Grab/Shopee/BeFood
-   */
-  @Post('trigger-poll/:branchId')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Trigger poll đơn hàng từ merchant APIs',
-    description: 'Gửi yêu cầu cho api-order-worker để poll đơn hàng từ Grab/Shopee/BeFood. Trả về ngay, kết quả sẽ được push qua WebSocket.',
-  })
-  @ApiParam({ name: 'branchId', description: 'Branch ID' })
-  @ApiResponse({ status: 200, description: 'Đã gửi yêu cầu poll' })
-  async triggerPoll(@Param('branchId') branchId: string) {
-    const result = await this.ordersService.triggerPoll(branchId);
-    return ApiResponseDto.success(result, result.message);
   }
 
   /**

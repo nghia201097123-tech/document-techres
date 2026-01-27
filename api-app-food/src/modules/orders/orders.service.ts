@@ -40,22 +40,33 @@ export class OrdersService {
   ) {}
 
   /**
-   * Poll orders for a branch - CHỈ ĐỌC TỪ DB (có cache Redis)
+   * Poll orders for a branch
    * CCB gọi endpoint này mỗi 15 giây
-   * KHÔNG gọi merchant APIs - việc này do api-order-worker xử lý
+   *
+   * Flow:
+   * 1. Đọc đơn hàng từ DB (có cache Redis)
+   * 2. Gửi signal qua Redis Pub/Sub cho api-order-worker poll merchant APIs
+   * 3. Trả về danh sách đơn hàng cho CCB
+   *
+   * Kết quả poll từ merchant sẽ được worker lưu vào DB và push qua WebSocket
    */
   async pollOrders(query: PollOrdersQueryDto): Promise<PollResponseDto> {
     const startTime = Date.now();
     const branchId = query.branchId;
 
-    this.logger.log(`[PollOrders] Reading orders from DB for branch ${branchId}`);
+    this.logger.log(`[PollOrders] Processing poll for branch ${branchId}`);
 
-    // 1. Check Redis cache first
+    // 1. Trigger api-order-worker để poll merchant APIs (non-blocking)
+    this.triggerWorkerPoll(branchId).catch(err => {
+      this.logger.error(`[PollOrders] Error triggering worker: ${err.message}`);
+    });
+
+    // 2. Check Redis cache first
     const cachedOrders = await this.redisPubSub.getCachedOrders(branchId);
     if (cachedOrders) {
       this.logger.log(`[PollOrders] Cache hit for branch ${branchId}: ${cachedOrders.length} orders`);
 
-      // Separate new and updated orders based on lastPollAt
+      // Filter by lastPollAt if provided
       const sinceDate = query.lastPollAt ? new Date(query.lastPollAt) : null;
       const newOrders = sinceDate
         ? cachedOrders.filter(o => new Date(o.createdAt) > sinceDate)
@@ -76,7 +87,7 @@ export class OrdersService {
       };
     }
 
-    // 2. Cache miss - Query from database
+    // 3. Cache miss - Query from database
     this.logger.log(`[PollOrders] Cache miss for branch ${branchId}, querying DB`);
 
     const whereConditions: any = { branchId };
@@ -97,7 +108,7 @@ export class OrdersService {
       take: 100, // Limit to prevent huge responses
     });
 
-    // 3. Cache the result
+    // 4. Cache the result
     await this.redisPubSub.cacheOrders(branchId, orders, 10); // 10 seconds TTL
 
     this.logger.log(`[PollOrders] Found ${orders.length} orders for branch ${branchId}`);
@@ -118,47 +129,36 @@ export class OrdersService {
   }
 
   /**
-   * Trigger poll - Gửi message cho api-order-worker để poll từ merchant APIs
-   * Trả về ngay lập tức, không đợi kết quả poll
+   * Trigger api-order-worker để poll merchant APIs
+   * Gọi async, không đợi kết quả
    */
-  async triggerPoll(branchId: string): Promise<{
-    status: string;
-    message: string;
-    accountsCount: number;
-  }> {
-    this.logger.log(`[TriggerPoll] Triggering poll for branch ${branchId}`);
+  private async triggerWorkerPoll(branchId: string): Promise<void> {
+    try {
+      // Get all active accounts for this branch
+      const mappings = await this.storesService.getActiveMappingsForBranch(branchId);
 
-    // 1. Get all active accounts for this branch
-    const mappings = await this.storesService.getActiveMappingsForBranch(branchId);
+      if (mappings.length === 0) {
+        this.logger.log(`[TriggerWorker] No active accounts for branch ${branchId}`);
+        return;
+      }
 
-    if (mappings.length === 0) {
-      return {
-        status: 'no_accounts',
-        message: 'Không có tài khoản nào được liên kết với chi nhánh này',
-        accountsCount: 0,
-      };
+      // Prepare account data to send to worker
+      const accounts = mappings.map(mapping => ({
+        accountId: mapping.accountId,
+        platform: mapping.account?.platform,
+        externalStoreId: mapping.externalStoreId,
+        accessToken: mapping.account?.accessToken,
+        refreshToken: mapping.account?.refreshToken,
+        externalMerchantId: mapping.account?.externalMerchantId,
+      }));
+
+      // Send trigger message to api-order-worker via Redis Pub/Sub
+      await this.redisPubSub.triggerPoll(branchId, accounts);
+
+      this.logger.log(`[TriggerWorker] Sent signal for branch ${branchId} with ${accounts.length} accounts`);
+    } catch (error: any) {
+      this.logger.error(`[TriggerWorker] Error: ${error.message}`);
     }
-
-    // 2. Prepare account data to send to worker
-    const accounts = mappings.map(mapping => ({
-      accountId: mapping.accountId,
-      platform: mapping.account?.platform,
-      externalStoreId: mapping.externalStoreId,
-      accessToken: mapping.account?.accessToken,
-      refreshToken: mapping.account?.refreshToken,
-      externalMerchantId: mapping.account?.externalMerchantId,
-    }));
-
-    // 3. Send trigger message to api-order-worker via Redis Pub/Sub
-    await this.redisPubSub.triggerPoll(branchId, accounts);
-
-    this.logger.log(`[TriggerPoll] Sent trigger for branch ${branchId} with ${accounts.length} accounts`);
-
-    return {
-      status: 'polling',
-      message: 'Đã gửi yêu cầu lấy đơn hàng đến worker',
-      accountsCount: accounts.length,
-    };
   }
 
   /**
