@@ -12,7 +12,7 @@ Hệ thống sử dụng APISIX Gateway để điều hướng request đến c�
 
 Request format:
 ```
-ProjectId: <port>       # Header chứa port của service đích
+x-svc-id: <port>        # Header chứa port của service đích
 Method: 0               # HTTP Method (0=GET, 1=POST, etc.)
 Token: Bearer <token>   # Auth token
 Request: <url>          # Full request URL
@@ -43,7 +43,7 @@ const GATEWAY_URL = "http://172.16.10.118:7080";
 const apiClient = axios.create({
   baseURL: GATEWAY_URL,
   headers: {
-    "ProjectId": "1502", // api-admin port
+    "x-svc-id": "1502", // api-admin port
   },
 });
 ```

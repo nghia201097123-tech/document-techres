@@ -1,10 +1,10 @@
 import axios, { AxiosInstance } from "axios";
 
 // APISIX Gateway Configuration
-// Gateway sẽ điều hướng request dựa trên header ProjectId (port của microservice)
+// Gateway sẽ điều hướng request dựa trên header x-svc-id (port của microservice)
 const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://172.16.10.118:7080";
 
-// Service Port IDs (dùng làm ProjectId header khi gọi qua gateway)
+// Service Port IDs (dùng làm x-svc-id header khi gọi qua gateway)
 export const SERVICE_PORTS = {
   API_ADMIN: process.env.NEXT_PUBLIC_API_ADMIN_PORT || "1502",
   API_DASHBOARD: process.env.NEXT_PUBLIC_API_DASHBOARD_PORT || "1503",
@@ -31,12 +31,12 @@ export const setInMemoryToken = (token: string | null) => {
 export const getInMemoryToken = () => inMemoryToken;
 
 // Factory function to create API client for specific service
-export const createServiceApi = (projectId: string): AxiosInstance => {
+export const createServiceApi = (serviceId: string): AxiosInstance => {
   const instance = axios.create({
     baseURL: GATEWAY_URL,
     headers: {
       "Content-Type": "application/json",
-      "ProjectId": projectId,
+      "x-svc-id": serviceId,
     },
   });
 
@@ -108,7 +108,7 @@ export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
-    "ProjectId": SERVICE_PORTS.API_ADMIN,
+    "x-svc-id": SERVICE_PORTS.API_ADMIN,
   },
 });
 
