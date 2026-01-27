@@ -11,10 +11,11 @@ async function bootstrap() {
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
-  // CORS
+  // CORS - Allow all origins for APISIX Gateway
   app.enableCors({
-    origin: true, // Allow all origins in development
+    origin: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'x-svc-id'],
     credentials: true,
   });
 

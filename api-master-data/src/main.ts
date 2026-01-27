@@ -20,10 +20,11 @@ async function bootstrap() {
     })
   );
 
-  // CORS
+  // CORS - Allow all origins for APISIX Gateway
   app.enableCors({
-    origin: "*",
-    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    origin: true,
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Tenant-ID", "x-svc-id"],
     credentials: true,
   });
 

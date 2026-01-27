@@ -17,11 +17,11 @@ async function bootstrap() {
     }),
   );
 
-  // CORS
-  const corsOrigins = configService.get<string>('CORS_ORIGIN', 'http://localhost:3000');
+  // CORS - Allow all origins for APISIX Gateway
   app.enableCors({
-    origin: corsOrigins.split(','),
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    origin: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'x-svc-id'],
     credentials: true,
   });
 

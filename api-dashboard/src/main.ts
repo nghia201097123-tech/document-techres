@@ -14,10 +14,11 @@ async function bootstrap() {
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
 
-  // CORS - allow web-dashboard and POS apps
+  // CORS - Allow all origins for APISIX Gateway
   app.enableCors({
-    origin: true, // Allow all origins for POS apps
+    origin: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'x-svc-id'],
     credentials: true,
   });
 
