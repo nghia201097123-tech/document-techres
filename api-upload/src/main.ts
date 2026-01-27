@@ -25,8 +25,10 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // API prefix
-  app.setGlobalPrefix('api');
+  // API prefix - exclude public health-check for gateway
+  app.setGlobalPrefix('api', {
+    exclude: ['api/public/health-check'],
+  });
 
   // Swagger
   const config = new DocumentBuilder()
@@ -40,7 +42,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  const port = configService.get<number>('SERVICE_PORT', 3003);
+  const port = configService.get<number>('SERVICE_PORT', 1505);
   await app.listen(port);
 
   console.log(`

@@ -6,8 +6,10 @@ import { AppModule } from "./app.module";
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Global prefix
-  app.setGlobalPrefix("api/v1");
+  // Global prefix - exclude public routes for health checks
+  app.setGlobalPrefix("api/v1", {
+    exclude: ["api/public/health-check", "public/health-check"],
+  });
 
   // Validation pipe
   app.useGlobalPipes(
@@ -35,7 +37,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("api/docs", app, document);
 
-  const port = process.env.SERVICE_PORT || 3004;
+  const port = process.env.SERVICE_PORT || 1504;
   await app.listen(port);
   console.log(`Master Data API is running on port ${port}`);
 }

@@ -34,7 +34,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  const port = process.env.SERVICE_PORT || 3007;
+  const port = process.env.SERVICE_PORT || 1507;
   await app.listen(port);
 
   logger.log(`🚀 Socket.IO service is running on: http://localhost:${port}`);
