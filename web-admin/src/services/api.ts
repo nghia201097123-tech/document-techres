@@ -14,11 +14,7 @@ export const SERVICE_PORTS = {
   SOCKET: process.env.NEXT_PUBLIC_SOCKET_PORT || "1507",
 };
 
-// Legacy API URL (fallback)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || `${GATEWAY_URL}/api`;
-
 console.log("[API] Gateway URL:", GATEWAY_URL);
-console.log("[API] Base URL:", API_BASE_URL);
 console.log("[API] Service Ports:", SERVICE_PORTS);
 
 // In-memory token storage as fallback when localStorage isn't persisted yet
@@ -30,7 +26,7 @@ export const setInMemoryToken = (token: string | null) => {
 
 export const getInMemoryToken = () => inMemoryToken;
 
-// Factory function to create API client for specific service
+// Factory function to create API client for specific service via APISIX Gateway
 export const createServiceApi = (serviceId: string): AxiosInstance => {
   const instance = axios.create({
     baseURL: GATEWAY_URL,
@@ -96,79 +92,14 @@ export const createServiceApi = (serviceId: string): AxiosInstance => {
   return instance;
 };
 
-// Pre-configured API clients for each service
+// Pre-configured API clients for each service (gọi qua APISIX Gateway)
 export const apiAdmin = createServiceApi(SERVICE_PORTS.API_ADMIN);
 export const apiDashboard = createServiceApi(SERVICE_PORTS.API_DASHBOARD);
 export const apiMasterData = createServiceApi(SERVICE_PORTS.API_MASTER_DATA);
 export const apiUpload = createServiceApi(SERVICE_PORTS.API_UPLOAD);
 export const apiOAuth = createServiceApi(SERVICE_PORTS.API_OAUTH);
 
-// Default API client (uses API_ADMIN for backward compatibility)
-export const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-    "x-svc-id": SERVICE_PORTS.API_ADMIN,
-  },
-});
-
-// Request interceptor to add auth token
-api.interceptors.request.use(
-  (config) => {
-    if (typeof window !== "undefined") {
-      let token: string | null = null;
-
-      // First try localStorage
-      const authStorage = localStorage.getItem("auth-storage");
-      if (authStorage) {
-        try {
-          const { state } = JSON.parse(authStorage);
-          if (state?.token) {
-            token = state.token;
-          }
-        } catch (e) {
-          console.error("Error parsing auth storage:", e);
-        }
-      }
-
-      // Fallback to in-memory token if localStorage doesn't have it yet
-      if (!token && inMemoryToken) {
-        token = inMemoryToken;
-      }
-
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor to handle errors
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Only redirect to login if we're not already on login-related pages
-      if (typeof window !== "undefined") {
-        const currentPath = window.location.pathname;
-        const isAuthPage = currentPath.startsWith("/login") ||
-          currentPath.startsWith("/forgot-password") ||
-          currentPath.startsWith("/register");
-
-        if (!isAuthPage) {
-          // Clear auth and redirect to login
-          localStorage.removeItem("auth-storage");
-          inMemoryToken = null;
-          window.location.href = "/login";
-        }
-      }
-    }
-    return Promise.reject(error);
-  }
-);
+// Default API client - sử dụng apiAdmin cho web-admin
+export const api = apiAdmin;
 
 export default api;

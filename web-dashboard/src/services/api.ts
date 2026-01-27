@@ -14,14 +14,10 @@ export const SERVICE_PORTS = {
   SOCKET: process.env.NEXT_PUBLIC_SOCKET_PORT || "1507",
 };
 
-// Legacy API URL (fallback)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || `${GATEWAY_URL}/api/tenant`;
-
 console.log("[Dashboard API] Gateway URL:", GATEWAY_URL);
-console.log("[Dashboard API] Base URL:", API_BASE_URL);
 console.log("[Dashboard API] Service Ports:", SERVICE_PORTS);
 
-// Factory function to create API client for specific service
+// Factory function to create API client for specific service via APISIX Gateway
 export const createServiceApi = (serviceId: string): AxiosInstance => {
   const instance = axios.create({
     baseURL: GATEWAY_URL,
@@ -73,62 +69,14 @@ export const createServiceApi = (serviceId: string): AxiosInstance => {
   return instance;
 };
 
-// Pre-configured API clients for each service
+// Pre-configured API clients for each service (gọi qua APISIX Gateway)
 export const apiAdmin = createServiceApi(SERVICE_PORTS.API_ADMIN);
 export const apiDashboard = createServiceApi(SERVICE_PORTS.API_DASHBOARD);
 export const apiMasterData = createServiceApi(SERVICE_PORTS.API_MASTER_DATA);
 export const apiUpload = createServiceApi(SERVICE_PORTS.API_UPLOAD);
 export const apiOAuth = createServiceApi(SERVICE_PORTS.API_OAUTH);
 
-// Default API client (uses API_DASHBOARD for dashboard)
-export const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-    "x-svc-id": SERVICE_PORTS.API_DASHBOARD,
-  },
-});
-
-// Request interceptor to add auth token and tenant_id
-api.interceptors.request.use(
-  (config) => {
-    if (typeof window !== "undefined") {
-      const authStorage = localStorage.getItem("dashboard-auth-storage");
-      if (authStorage) {
-        try {
-          const { state } = JSON.parse(authStorage);
-          if (state?.token) {
-            config.headers.Authorization = `Bearer ${state.token}`;
-          }
-          // Add tenant_id to header for multi-tenant isolation
-          if (state?.tenantId) {
-            config.headers["X-Tenant-ID"] = state.tenantId;
-          }
-        } catch (e) {
-          console.error("Error parsing auth storage:", e);
-        }
-      }
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor to handle errors
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Unauthorized - clear auth and redirect to login
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("dashboard-auth-storage");
-        window.location.href = "/login";
-      }
-    }
-    return Promise.reject(error);
-  }
-);
+// Default API client - sử dụng apiDashboard cho web-dashboard
+export const api = apiDashboard;
 
 export default api;
