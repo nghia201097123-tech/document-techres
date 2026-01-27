@@ -29,17 +29,17 @@ import { FoodPlatformAccount } from './database/entities/food-platform-account.e
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
-        host: configService.get('DB_HOST', 'localhost'),
-        port: configService.get('DB_PORT', 5432),
-        username: configService.get('DB_USERNAME', 'postgres'),
-        password: configService.get('DB_PASSWORD', 'postgres'),
-        database: configService.get('DB_DATABASE', 'food_platform'),
+        host: configService.get('CONFIG_POSTGRESQL_HOST_APP_FOOD', '172.16.10.146'),
+        port: configService.get('CONFIG_POSTGRESQL_PORT_APP_FOOD', 5432),
+        username: configService.get('CONFIG_POSTGRESQL_USERNAME_APP_FOOD', 'techres_app_food'),
+        password: configService.get('CONFIG_POSTGRESQL_PASSWORD_APP_FOOD', 'techres_app_food'),
+        database: configService.get('CONFIG_POSTGRESQL_DB_NAME_APP_FOOD', 'techres_app_food'),
         entities: [
           FoodOrder,
           FoodOrderItem,
           FoodPlatformAccount,
         ],
-        synchronize: false,
+        synchronize: configService.get('DB_SYNCHRONIZE', 'false') === 'true',
         logging: configService.get('DB_LOGGING', 'false') === 'true',
       }),
     }),
@@ -50,7 +50,7 @@ import { FoodPlatformAccount } from './database/entities/food-platform-account.e
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         type: 'single',
-        url: configService.get('REDIS_URL', 'redis://localhost:6379'),
+        url: `redis://${configService.get('CONFIG_REDIS_HOST', '172.16.10.146')}:${configService.get('CONFIG_REDIS_PORT', 6379)}`,
       }),
     }),
 
@@ -60,8 +60,8 @@ import { FoodPlatformAccount } from './database/entities/food-platform-account.e
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         redis: {
-          host: configService.get('REDIS_HOST', 'localhost'),
-          port: configService.get('REDIS_PORT', 6379),
+          host: configService.get('CONFIG_REDIS_HOST', '172.16.10.146'),
+          port: configService.get('CONFIG_REDIS_PORT', 6379),
         },
         defaultJobOptions: {
           removeOnComplete: true,
