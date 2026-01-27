@@ -125,7 +125,6 @@ function transformBeFoodOrder(beFoodOrder: any) {
     paymentMethod: beFoodOrder.payment_method || 'BePay',
 
     // Extra
-    orderContentMessage: null,
     estimatedDeliveryTime: beFoodOrder.estimated_delivery_time || null,
     createdAt: beFoodOrder.created_at ? new Date(beFoodOrder.created_at) : new Date(),
   };

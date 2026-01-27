@@ -244,7 +244,6 @@ export class OrdersService {
         if (rawOrder.driverName) existing.driverName = rawOrder.driverName;
         if (rawOrder.driverPhone) existing.driverPhone = rawOrder.driverPhone;
         if (rawOrder.driverAvatar) existing.driverAvatar = rawOrder.driverAvatar;
-        if (rawOrder.orderContentMessage) existing.orderContentMessage = rawOrder.orderContentMessage;
 
         // Update customer info if missing
         if (rawOrder.customerPhone && !existing.customerPhone) {
@@ -296,7 +295,6 @@ export class OrdersService {
           driverPhone: rawOrder.driverPhone || null,
           driverAvatar: rawOrder.driverAvatar || null,
           estimatedDeliveryTime: rawOrder.estimatedDeliveryTime || null,
-          orderContentMessage: rawOrder.orderContentMessage || null,
           platformCreatedAt: rawOrder.createdAt,
         });
 
@@ -340,7 +338,6 @@ export class OrdersService {
       driverPhone: order.driverPhone,
       driverAvatar: order.driverAvatar,
       estimatedDeliveryTime: order.estimatedDeliveryTime,
-      orderContentMessage: order.orderContentMessage,
       createdAt: order.createdAt?.toISOString(),
       platformCreatedAt: order.platformCreatedAt?.toISOString(),
       acceptedAt: order.acceptedAt?.toISOString(),

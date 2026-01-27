@@ -62,7 +62,6 @@ interface GrabPaginationOrder {
     createdAt?: string;
     acceptedAt?: string;
   };
-  orderContentMessage?: string;
 }
 
 /**
@@ -183,7 +182,6 @@ function transformGrabOrder(grabOrder: GrabPaginationOrder) {
     paymentMethod: 'GrabPay',
 
     // Extra
-    orderContentMessage: grabOrder.orderContentMessage,
     estimatedDeliveryTime: null,
     createdAt: grabOrder.times?.createdAt ? new Date(grabOrder.times.createdAt) : new Date(),
   };

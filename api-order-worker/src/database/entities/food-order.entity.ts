@@ -106,11 +106,8 @@ export class FoodOrder {
   @Column({ name: 'driver_license_plate', type: 'varchar', length: 100, nullable: true })
   driverLicensePlate: string;
 
-  @Column({ name: 'estimated_delivery_time', type: 'varchar', length: 50, nullable: true })
+  @Column({ name: 'estimated_delivery_time', type: 'varchar', length: 255, nullable: true })
   estimatedDeliveryTime: string;
-
-  @Column({ name: 'order_content_message', type: 'text', nullable: true })
-  orderContentMessage: string;
 
   // Timestamps
   @CreateDateColumn({ name: 'created_at' })

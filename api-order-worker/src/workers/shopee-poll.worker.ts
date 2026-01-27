@@ -127,7 +127,6 @@ function transformShopeeOrder(shopeeOrder: any) {
     paymentMethod: shopeeOrder.payment_method || 'ShopeePay',
 
     // Extra
-    orderContentMessage: null,
     estimatedDeliveryTime: shopeeOrder.estimated_delivery_time || null,
     createdAt: shopeeOrder.created_at
       ? new Date(shopeeOrder.created_at * 1000)

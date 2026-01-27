@@ -49,7 +49,6 @@ export interface RawFoodOrder {
   isPaid: boolean;
   paymentMethod?: string;
   estimatedDeliveryTime?: string;
-  orderContentMessage?: string;
   createdAt?: Date;
   rawData?: any;
 }
