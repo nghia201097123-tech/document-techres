@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, MoreThanOrEqual } from 'typeorm';
 import {
   FoodOrder,
   FoodOrderStatus,
@@ -19,6 +19,7 @@ import {
 import { ConnectorFactory, RawFoodOrder, RawFoodOrderItem } from '../connectors';
 import { StoresService } from '../stores/stores.service';
 import { AccountsService } from '../accounts/accounts.service';
+import { RedisPubSubService } from '../redis/redis-pubsub.service';
 import { PollOrdersQueryDto, GetOrdersQueryDto, PollResponseDto } from './dto/order.dto';
 
 @Injectable()
@@ -35,333 +36,129 @@ export class OrdersService {
     private readonly storesService: StoresService,
     private readonly accountsService: AccountsService,
     private readonly connectorFactory: ConnectorFactory,
+    private readonly redisPubSub: RedisPubSubService,
   ) {}
 
   /**
-   * Poll orders for a branch
-   * CCB calls this endpoint every 5 seconds
+   * Poll orders for a branch - CHỈ ĐỌC TỪ DB (có cache Redis)
+   * CCB gọi endpoint này mỗi 15 giây
+   * KHÔNG gọi merchant APIs - việc này do api-order-worker xử lý
    */
   async pollOrders(query: PollOrdersQueryDto): Promise<PollResponseDto> {
     const startTime = Date.now();
-    const errors: { accountId: string; platform: string; message: string }[] = [];
+    const branchId = query.branchId;
 
-    // 1. Get store mappings for this branch
-    const mappings = await this.storesService.getActiveMappingsForBranch(
-      query.branchId,
-    );
+    this.logger.log(`[PollOrders] Reading orders from DB for branch ${branchId}`);
 
-    if (mappings.length === 0) {
+    // 1. Check Redis cache first
+    const cachedOrders = await this.redisPubSub.getCachedOrders(branchId);
+    if (cachedOrders) {
+      this.logger.log(`[PollOrders] Cache hit for branch ${branchId}: ${cachedOrders.length} orders`);
+
+      // Separate new and updated orders based on lastPollAt
+      const sinceDate = query.lastPollAt ? new Date(query.lastPollAt) : null;
+      const newOrders = sinceDate
+        ? cachedOrders.filter(o => new Date(o.createdAt) > sinceDate)
+        : cachedOrders;
+
       return {
         success: true,
-        newOrders: [],
+        newOrders,
         updatedOrders: [],
         meta: {
           pollTimestamp: Date.now(),
           accountsPolled: 0,
-          totalOrdersFetched: 0,
+          totalOrdersFetched: cachedOrders.length,
           processingTimeMs: Date.now() - startTime,
+          source: 'cache',
         },
         errors: [],
       };
     }
 
-    // 2. Poll orders from each mapped store in parallel
-    const sinceDate = query.lastPollAt ? new Date(query.lastPollAt) : undefined;
+    // 2. Cache miss - Query from database
+    this.logger.log(`[PollOrders] Cache miss for branch ${branchId}, querying DB`);
 
-    const pollResults = await Promise.allSettled(
-      mappings.map((mapping) => this.pollFromStore(mapping, sinceDate)),
-    );
+    const whereConditions: any = { branchId };
 
-    // 3. Collect all orders and errors
-    const allOrders: RawFoodOrder[] = [];
+    // Only get orders from last 24 hours by default
+    const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    whereConditions.createdAt = MoreThanOrEqual(last24Hours);
 
-    pollResults.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
-        allOrders.push(...result.value);
-      } else {
-        const mapping = mappings[index];
-        errors.push({
-          accountId: mapping.accountId,
-          platform: mapping.account?.platform || 'unknown',
-          message: result.reason?.message || 'Unknown error',
-        });
-      }
+    // Filter by lastPollAt if provided
+    if (query.lastPollAt) {
+      whereConditions.updatedAt = MoreThanOrEqual(new Date(query.lastPollAt));
+    }
+
+    const orders = await this.orderRepo.find({
+      where: whereConditions,
+      relations: ['orderItems'],
+      order: { createdAt: 'DESC' },
+      take: 100, // Limit to prevent huge responses
     });
 
-    // 4. Sync orders to database
-    const { newOrders, updatedOrders } = await this.syncOrdersToDb(
-      allOrders,
-      query.branchId,
-      mappings,
-    );
+    // 3. Cache the result
+    await this.redisPubSub.cacheOrders(branchId, orders, 10); // 10 seconds TTL
 
-    // 5. Auto-confirm orders with drivers (if enabled)
-    await this.processAutoConfirm(newOrders.concat(updatedOrders));
+    this.logger.log(`[PollOrders] Found ${orders.length} orders for branch ${branchId}`);
 
     return {
       success: true,
-      newOrders,
-      updatedOrders,
+      newOrders: orders,
+      updatedOrders: [],
       meta: {
         pollTimestamp: Date.now(),
-        accountsPolled: mappings.length,
-        totalOrdersFetched: allOrders.length,
+        accountsPolled: 0,
+        totalOrdersFetched: orders.length,
         processingTimeMs: Date.now() - startTime,
+        source: 'database',
       },
-      errors: errors.length > 0 ? errors : undefined,
+      errors: [],
     };
   }
 
   /**
-   * Poll orders from a specific store
+   * Trigger poll - Gửi message cho api-order-worker để poll từ merchant APIs
+   * Trả về ngay lập tức, không đợi kết quả poll
    */
-  private async pollFromStore(
-    mapping: FoodPlatformStoreMapping,
-    since?: Date,
-  ): Promise<RawFoodOrder[]> {
-    const account = mapping.account;
+  async triggerPoll(branchId: string): Promise<{
+    status: string;
+    message: string;
+    accountsCount: number;
+  }> {
+    this.logger.log(`[TriggerPoll] Triggering poll for branch ${branchId}`);
 
-    if (!account || account.status !== 'connected' || !account.isActive) {
-      return [];
+    // 1. Get all active accounts for this branch
+    const mappings = await this.storesService.getActiveMappingsForBranch(branchId);
+
+    if (mappings.length === 0) {
+      return {
+        status: 'no_accounts',
+        message: 'Không có tài khoản nào được liên kết với chi nhánh này',
+        accountsCount: 0,
+      };
     }
 
-    // Refresh token if needed
-    await this.accountsService.refreshTokenIfNeeded(account);
+    // 2. Prepare account data to send to worker
+    const accounts = mappings.map(mapping => ({
+      accountId: mapping.accountId,
+      platform: mapping.account?.platform,
+      externalStoreId: mapping.externalStoreId,
+      accessToken: mapping.account?.accessToken,
+      refreshToken: mapping.account?.refreshToken,
+      merchantId: mapping.account?.merchantId,
+    }));
 
-    // Get connector and poll
-    const connector = this.connectorFactory.getConnector(account.platform);
-    const orders = await connector.pollOrders(account, mapping.externalStoreId, since);
+    // 3. Send trigger message to api-order-worker via Redis Pub/Sub
+    await this.redisPubSub.triggerPoll(branchId, accounts);
 
-    // Enrich ALL orders with detail API to get full customer info, driver phone, etc.
-    // Pagination API doesn't return these fields
-    this.logger.log(`[Enrichment] Processing ${orders.length} orders for enrichment`);
+    this.logger.log(`[TriggerPoll] Sent trigger for branch ${branchId} with ${accounts.length} accounts`);
 
-    const enrichedOrders = await Promise.all(
-      orders.map(async (order) => {
-        // Always fetch detail to get customer_phone, customer_note, driver_phone, driver_avatar
-        // Only skip if we already have full data (customer_phone is the indicator)
-        const needsEnrichment = !order.customerPhone || !order.driverPhone;
-
-        this.logger.log(`[Enrichment] Order ${order.orderCode}: customerPhone="${order.customerPhone}", driverPhone="${order.driverPhone}", needsEnrichment=${needsEnrichment}, hasFetchMethod=${!!connector.fetchOrderDetail}`);
-
-        if (needsEnrichment && connector.fetchOrderDetail) {
-          try {
-            this.logger.log(`[Enrichment] Calling fetchOrderDetail for ${order.orderCode} (${order.externalOrderId})`);
-            const detailOrder = await connector.fetchOrderDetail(
-              account,
-              order.externalOrderId,
-              order.orderCode,
-            );
-            if (detailOrder) {
-              this.logger.log(`[Enrichment] Got detail for ${order.orderCode}: customerPhone="${detailOrder.customerPhone}", driverPhone="${detailOrder.driverPhone}", driverAvatar="${detailOrder.driverAvatar?.substring(0, 50)}..."`);
-              // Merge detail data into order
-              const merged = {
-                ...order,
-                customerPhone: detailOrder.customerPhone || order.customerPhone,
-                customerAddress: detailOrder.customerAddress || order.customerAddress,
-                customerNote: detailOrder.customerNote || order.customerNote,
-                driverPhone: detailOrder.driverPhone || order.driverPhone,
-                driverAvatar: detailOrder.driverAvatar || order.driverAvatar,
-                driverLicensePlate: detailOrder.driverLicensePlate || order.driverLicensePlate,
-                items: detailOrder.items?.length > 0 ? detailOrder.items : order.items,
-              };
-              this.logger.log(`[Enrichment] Merged ${order.orderCode}: customerPhone="${merged.customerPhone}", driverPhone="${merged.driverPhone}"`);
-              return merged;
-            }
-          } catch (error) {
-            this.logger.warn(`Failed to fetch order detail for ${order.orderCode}: ${error.message}`);
-          }
-        }
-        return order;
-      }),
-    );
-
-    this.logger.log(`[Enrichment] Completed. Returning ${enrichedOrders.length} orders`);
-    return enrichedOrders;
-  }
-
-  /**
-   * Sync orders to database
-   */
-  private async syncOrdersToDb(
-    rawOrders: RawFoodOrder[],
-    branchId: string,
-    mappings: FoodPlatformStoreMapping[],
-  ): Promise<{ newOrders: FoodOrder[]; updatedOrders: FoodOrder[] }> {
-    const newOrders: FoodOrder[] = [];
-    const updatedOrders: FoodOrder[] = [];
-
-    this.logger.log(`[SyncToDB] Syncing ${rawOrders.length} orders to database`);
-
-    for (const rawOrder of rawOrders) {
-      this.logger.log(`[SyncToDB] Processing ${rawOrder.orderCode}: customerPhone="${rawOrder.customerPhone}", driverPhone="${rawOrder.driverPhone}", driverAvatar="${rawOrder.driverAvatar?.substring(0, 30)}..."`);
-
-      // Find mapping for this order's platform
-      const mapping = mappings.find(
-        (m) => m.account?.platform === rawOrder.platform,
-      );
-
-      if (!mapping) continue;
-
-      // Check if order exists
-      const existingOrder = await this.orderRepo.findOne({
-        where: {
-          externalOrderId: rawOrder.externalOrderId,
-          platform: rawOrder.platform,
-        },
-      });
-
-      if (existingOrder) {
-        // Update existing order
-        const hasChanges = this.detectChanges(existingOrder, rawOrder);
-
-        if (hasChanges) {
-          existingOrder.previousStatus = existingOrder.status;
-          existingOrder.status = rawOrder.status as FoodOrderStatus;
-          // Update customer info if available
-          existingOrder.customerPhone = rawOrder.customerPhone || existingOrder.customerPhone;
-          existingOrder.customerAddress = rawOrder.customerAddress || existingOrder.customerAddress;
-          existingOrder.customerNote = rawOrder.customerNote || existingOrder.customerNote;
-          // Update driver info
-          existingOrder.driverName = rawOrder.driverName ?? existingOrder.driverName;
-          existingOrder.driverPhone = rawOrder.driverPhone ?? existingOrder.driverPhone;
-          existingOrder.driverAvatar = rawOrder.driverAvatar ?? existingOrder.driverAvatar;
-          existingOrder.driverLicensePlate = rawOrder.driverLicensePlate ?? existingOrder.driverLicensePlate;
-          existingOrder.estimatedDeliveryTime = rawOrder.estimatedDeliveryTime ?? existingOrder.estimatedDeliveryTime;
-          existingOrder.platformUpdatedAt = rawOrder.updatedAt;
-          existingOrder.lastSyncAt = new Date();
-          existingOrder.rawData = rawOrder.rawData ?? null;
-
-          await this.orderRepo.save(existingOrder);
-          updatedOrders.push(existingOrder);
-        }
-      } else {
-        // Create new order
-        const newOrder = this.orderRepo.create({
-          tenantId: mapping.tenantId,
-          branchId,
-          externalOrderId: rawOrder.externalOrderId,
-          orderCode: rawOrder.orderCode,
-          platform: rawOrder.platform,
-          status: rawOrder.status as FoodOrderStatus,
-
-          customerName: rawOrder.customerName,
-          customerPhone: rawOrder.customerPhone,
-          customerAddress: rawOrder.customerAddress,
-          customerNote: rawOrder.customerNote,
-
-          items: rawOrder.items, // Keep JSONB for backward compatibility
-
-          subtotal: rawOrder.subtotal,
-          deliveryFee: rawOrder.deliveryFee,
-          platformFee: rawOrder.platformFee,
-          discount: rawOrder.discount,
-          totalAmount: rawOrder.totalAmount,
-
-          isPaid: rawOrder.isPaid,
-          paymentMethod: rawOrder.paymentMethod,
-
-          driverName: rawOrder.driverName,
-          driverPhone: rawOrder.driverPhone,
-          driverAvatar: rawOrder.driverAvatar,
-          driverLicensePlate: rawOrder.driverLicensePlate,
-          estimatedDeliveryTime: rawOrder.estimatedDeliveryTime,
-
-          platformCreatedAt: rawOrder.createdAt,
-          platformUpdatedAt: rawOrder.updatedAt,
-          lastSyncAt: new Date(),
-
-          accountId: mapping.accountId,
-          storeMappingId: mapping.id,
-          rawData: rawOrder.rawData,
-        });
-
-        await this.orderRepo.save(newOrder);
-
-        // Save items to separate table
-        await this.saveOrderItems(newOrder.id, rawOrder.items);
-
-        newOrders.push(newOrder);
-      }
-    }
-
-    return { newOrders, updatedOrders };
-  }
-
-  /**
-   * Save order items to the food_order_items table
-   */
-  private async saveOrderItems(
-    orderId: string,
-    items: RawFoodOrderItem[],
-  ): Promise<void> {
-    if (!items || items.length === 0) return;
-
-    const orderItems = items.map((item, index) =>
-      this.orderItemRepo.create({
-        orderId,
-        productName: item.productName,
-        externalProductId: item.externalProductId || null,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        totalPrice: item.totalPrice,
-        discountAmount: item.discountAmount || 0,
-        note: item.note || null,
-        options: item.options || null,
-        modifiers: item.modifiers || null,
-        techresProductId: item.techresProductId || null,
-        status: FoodOrderItemStatus.PENDING,
-        sortOrder: index,
-      }),
-    );
-
-    await this.orderItemRepo.save(orderItems);
-  }
-
-  /**
-   * Detect changes between existing order and raw order
-   */
-  private detectChanges(existing: FoodOrder, raw: RawFoodOrder): boolean {
-    return (
-      existing.status !== raw.status ||
-      existing.driverName !== raw.driverName ||
-      existing.driverPhone !== raw.driverPhone ||
-      existing.driverAvatar !== raw.driverAvatar ||
-      // Update if we now have customer info that was missing before
-      (!existing.customerPhone && !!raw.customerPhone) ||
-      (!existing.customerNote && !!raw.customerNote)
-    );
-  }
-
-  /**
-   * Process auto-confirm for orders with drivers
-   */
-  private async processAutoConfirm(orders: FoodOrder[]): Promise<void> {
-    for (const order of orders) {
-      // Check if order has driver and is not yet accepted
-      if (
-        order.driverName &&
-        order.status === FoodOrderStatus.NEW &&
-        !order.isAutoConfirmed
-      ) {
-        // Get account to check auto-confirm setting
-        const account = await this.accountRepo.findOne({
-          where: { id: order.accountId },
-        });
-
-        if (account?.autoConfirmEnabled) {
-          try {
-            await this.acceptOrder(order.id);
-            this.logger.log(`Auto-confirmed order ${order.orderCode}`);
-          } catch (error) {
-            this.logger.error(
-              `Failed to auto-confirm order ${order.orderCode}`,
-              error,
-            );
-          }
-        }
-      }
-    }
+    return {
+      status: 'polling',
+      message: 'Đã gửi yêu cầu lấy đơn hàng đến worker',
+      accountsCount: accounts.length,
+    };
   }
 
   /**

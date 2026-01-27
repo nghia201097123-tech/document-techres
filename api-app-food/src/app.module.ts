@@ -19,6 +19,7 @@ import { ConnectorsModule } from './modules/connectors/connectors.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { PublicModule } from './modules/public/public.module';
 import { MenuModule } from './modules/menu/menu.module';
+import { RedisModule } from './modules/redis/redis.module';
 
 @Module({
   imports: [
@@ -52,6 +53,9 @@ import { MenuModule } from './modules/menu/menu.module';
 
     // Common
     CommonModule,
+
+    // Redis (for caching, pub/sub)
+    RedisModule,
 
     // Feature Modules
     ConnectorsModule,

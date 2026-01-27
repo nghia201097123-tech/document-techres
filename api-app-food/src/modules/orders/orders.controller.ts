@@ -23,20 +23,37 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   /**
-   * Poll orders for a branch
-   * CCB calls this endpoint every 5 seconds
+   * Poll orders for a branch - CHỈ ĐỌC TỪ DB
+   * CCB gọi endpoint này mỗi 15 giây
    */
   @Get('poll')
   @ApiOperation({
-    summary: 'Poll đơn hàng cho chi nhánh',
-    description: 'CCB gọi endpoint này mỗi 5 giây để lấy đơn hàng mới và cập nhật',
+    summary: 'Lấy đơn hàng từ DB (có cache)',
+    description: 'CCB gọi endpoint này mỗi 15 giây để lấy đơn hàng. Chỉ đọc từ DB/cache, không gọi merchant APIs.',
   })
-  @ApiQuery({ name: 'branchId', type: Number, required: true })
+  @ApiQuery({ name: 'branchId', type: String, required: true })
   @ApiQuery({ name: 'lastPollAt', type: Number, required: false })
   @ApiResponse({ status: 200, description: 'Thành công' })
   async pollOrders(@Query() query: PollOrdersQueryDto) {
     const result = await this.ordersService.pollOrders(query);
     return result;
+  }
+
+  /**
+   * Trigger poll from merchant APIs
+   * Gửi message cho api-order-worker để poll đơn hàng từ Grab/Shopee/BeFood
+   */
+  @Post('trigger-poll/:branchId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Trigger poll đơn hàng từ merchant APIs',
+    description: 'Gửi yêu cầu cho api-order-worker để poll đơn hàng từ Grab/Shopee/BeFood. Trả về ngay, kết quả sẽ được push qua WebSocket.',
+  })
+  @ApiParam({ name: 'branchId', description: 'Branch ID' })
+  @ApiResponse({ status: 200, description: 'Đã gửi yêu cầu poll' })
+  async triggerPoll(@Param('branchId') branchId: string) {
+    const result = await this.ordersService.triggerPoll(branchId);
+    return ApiResponseDto.success(result, result.message);
   }
 
   /**

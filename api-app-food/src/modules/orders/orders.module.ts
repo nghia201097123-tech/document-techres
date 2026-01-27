@@ -6,6 +6,7 @@ import { StoresModule } from '../stores/stores.module';
 import { AccountsModule } from '../accounts/accounts.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
+import { OrdersGateway } from './orders.gateway';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { OrdersService } from './orders.service';
     AccountsModule,
   ],
   controllers: [OrdersController],
-  providers: [OrdersService],
+  providers: [OrdersService, OrdersGateway],
   exports: [OrdersService],
 })
 export class OrdersModule {}
