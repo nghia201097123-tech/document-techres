@@ -30,9 +30,9 @@ interface OAuthLoginResponse {
 }
 
 export const authService = {
-  // api-oauth endpoint: /api/v1/auth/login
+  // api-oauth endpoint: /api/auth/login
   async login(data: LoginRequest): Promise<LoginResponse> {
-    const response = await apiOAuth.post<OAuthLoginResponse>("/api/v1/auth/login", data);
+    const response = await apiOAuth.post<OAuthLoginResponse>("/api/auth/login", data);
     const oauthData = response.data;
 
     // Transform OAuth response to expected format
@@ -52,14 +52,14 @@ export const authService = {
     };
   },
 
-  // api-oauth endpoint: /api/v1/auth/logout
+  // api-oauth endpoint: /api/auth/logout
   async logout(): Promise<void> {
-    await apiOAuth.post("/api/v1/auth/logout");
+    await apiOAuth.post("/api/auth/logout");
   },
 
-  // api-oauth endpoint: /api/v1/auth/profile
+  // api-oauth endpoint: /api/auth/profile
   async getCurrentUser(): Promise<AdminUser> {
-    const response = await apiOAuth.get<{ user: OAuthLoginResponse["user"] }>("/api/v1/auth/profile");
+    const response = await apiOAuth.get<{ user: OAuthLoginResponse["user"] }>("/api/auth/profile");
     const user = response.data.user || response.data;
 
     return {
@@ -73,19 +73,19 @@ export const authService = {
     };
   },
 
-  // api-oauth endpoint: /api/v1/auth/forgot-password
+  // api-oauth endpoint: /api/auth/forgot-password
   async forgotPassword(email: string): Promise<void> {
-    await apiOAuth.post("/api/v1/auth/forgot-password", { email });
+    await apiOAuth.post("/api/auth/forgot-password", { email });
   },
 
-  // api-oauth endpoint: /api/v1/auth/reset-password
+  // api-oauth endpoint: /api/auth/reset-password
   async resetPassword(token: string, newPassword: string): Promise<void> {
-    await apiOAuth.post("/api/v1/auth/reset-password", { token, newPassword });
+    await apiOAuth.post("/api/auth/reset-password", { token, newPassword });
   },
 
-  // api-oauth endpoint: /api/v1/auth/change-password
+  // api-oauth endpoint: /api/auth/change-password
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    await apiOAuth.post("/api/v1/auth/change-password", {
+    await apiOAuth.post("/api/auth/change-password", {
       currentPassword,
       newPassword,
     });
