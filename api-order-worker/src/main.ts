@@ -25,7 +25,7 @@ async function bootstrap() {
     }),
   );
 
-  const port = process.env.PORT || 3002;
+  const port = process.env.SERVICE_PORT || 3011;
   await app.listen(port);
 
   logger.log(`🚀 Order Worker Service is running on port ${port}`);

@@ -6,7 +6,7 @@
 
 import axios from 'axios';
 
-const SHOPEE_API_URL = process.env.SHOPEE_API_URL || 'https://api.shopeefood.vn/merchant/v4';
+const SHOPEE_API_URL = process.env.SHOPEE_FOOD_API_BASE_URL || 'https://api.shopeefood.vn/merchant/v4';
 
 const SHOPEE_STATUS_MAP: Record<string, string> = {
   '1': 'NEW',

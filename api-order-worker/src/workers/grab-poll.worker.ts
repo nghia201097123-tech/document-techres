@@ -7,7 +7,7 @@
 
 import axios from 'axios';
 
-const GRAB_API_URL = 'https://api.grab.com/food/merchant/v3';
+const GRAB_API_URL = process.env.GRAB_API_BASE_URL || 'https://api.grab.com/food/merchant/v3';
 
 const GRAB_STATUS_MAP: Record<string, string> = {
   'ORDER_NEW': 'NEW',

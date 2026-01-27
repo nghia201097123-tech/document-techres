@@ -7,7 +7,7 @@
 
 import axios from 'axios';
 
-const BEFOOD_API_URL = 'https://gw.be.com.vn/api/v1/be-merchant-gateway';
+const BEFOOD_API_URL = process.env.BEFOOD_API_BASE_URL || 'https://gw.be.com.vn/api/v1/be-merchant-gateway';
 
 const BEFOOD_STATUS_MAP: Record<string, string> = {
   'PENDING': 'NEW',
