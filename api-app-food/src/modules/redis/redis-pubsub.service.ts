@@ -10,10 +10,10 @@ export class RedisPubSubService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const redisConfig = {
-      host: process.env.CONFIG_REDIS_HOST || '172.16.10.146',
+      host: process.env.CONFIG_REDIS_HOST || '172.16.10.71',
       port: parseInt(process.env.CONFIG_REDIS_PORT || '6379', 10),
       password: process.env.CONFIG_REDIS_PASSWORD || undefined,
-      db: parseInt(process.env.CONFIG_REDIS_DB || '0', 10),
+      db: parseInt(process.env.CONFIG_REDIS_DB || '6', 10),
     };
 
     this.publisher = new Redis(redisConfig);

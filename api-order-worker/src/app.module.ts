@@ -48,10 +48,19 @@ import { FoodPlatformAccount } from './database/entities/food-platform-account.e
     RedisModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'single',
-        url: `redis://${configService.get('CONFIG_REDIS_HOST', '172.16.10.146')}:${configService.get('CONFIG_REDIS_PORT', 6379)}`,
-      }),
+      useFactory: (configService: ConfigService) => {
+        const password = configService.get('CONFIG_REDIS_PASSWORD', '');
+        const host = configService.get('CONFIG_REDIS_HOST', '172.16.10.71');
+        const port = configService.get('CONFIG_REDIS_PORT', 6379);
+        const db = configService.get('CONFIG_REDIS_DB', 6);
+
+        // Build URL with password if provided
+        const url = password
+          ? `redis://:${password}@${host}:${port}/${db}`
+          : `redis://${host}:${port}/${db}`;
+
+        return { type: 'single', url };
+      },
     }),
 
     // Bull Queue for job processing
@@ -60,8 +69,10 @@ import { FoodPlatformAccount } from './database/entities/food-platform-account.e
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         redis: {
-          host: configService.get('CONFIG_REDIS_HOST', '172.16.10.146'),
+          host: configService.get('CONFIG_REDIS_HOST', '172.16.10.71'),
           port: configService.get('CONFIG_REDIS_PORT', 6379),
+          password: configService.get('CONFIG_REDIS_PASSWORD', '') || undefined,
+          db: parseInt(configService.get('CONFIG_REDIS_DB', '6'), 10),
         },
         defaultJobOptions: {
           removeOnComplete: true,
