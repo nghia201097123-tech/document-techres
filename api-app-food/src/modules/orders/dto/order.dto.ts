@@ -90,6 +90,7 @@ export class PollResponseDto {
     accountsPolled: number;
     totalOrdersFetched: number;
     processingTimeMs: number;
+    source?: 'cache' | 'database';
   };
 
   @ApiPropertyOptional()

@@ -146,7 +146,7 @@ export class OrdersService {
       externalStoreId: mapping.externalStoreId,
       accessToken: mapping.account?.accessToken,
       refreshToken: mapping.account?.refreshToken,
-      merchantId: mapping.account?.merchantId,
+      externalMerchantId: mapping.account?.externalMerchantId,
     }));
 
     // 3. Send trigger message to api-order-worker via Redis Pub/Sub

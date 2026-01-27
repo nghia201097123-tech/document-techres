@@ -4,6 +4,7 @@ import { FoodOrder, FoodPlatformAccount, FoodOrderItemEntity } from '../../datab
 import { ConnectorsModule } from '../connectors/connectors.module';
 import { StoresModule } from '../stores/stores.module';
 import { AccountsModule } from '../accounts/accounts.module';
+import { RedisModule } from '../redis/redis.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 import { OrdersGateway } from './orders.gateway';
@@ -14,6 +15,7 @@ import { OrdersGateway } from './orders.gateway';
     ConnectorsModule,
     StoresModule,
     AccountsModule,
+    RedisModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService, OrdersGateway],

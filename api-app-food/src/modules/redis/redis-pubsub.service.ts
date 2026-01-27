@@ -28,11 +28,11 @@ export class RedisPubSubService implements OnModuleInit, OnModuleDestroy {
       this.logger.log('✅ Redis Subscriber connected');
     });
 
-    this.publisher.on('error', (err) => {
+    this.publisher.on('error', (err: Error) => {
       this.logger.error('Redis Publisher error:', err);
     });
 
-    this.subscriber.on('error', (err) => {
+    this.subscriber.on('error', (err: Error) => {
       this.logger.error('Redis Subscriber error:', err);
     });
   }
@@ -66,7 +66,7 @@ export class RedisPubSubService implements OnModuleInit, OnModuleDestroy {
   ): Promise<void> {
     await this.subscriber.psubscribe('new-orders:branch:*');
 
-    this.subscriber.on('pmessage', (pattern, channel, message) => {
+    this.subscriber.on('pmessage', (pattern: string, channel: string, message: string) => {
       try {
         // Channel format: new-orders:branch:123
         const parts = channel.split(':');
