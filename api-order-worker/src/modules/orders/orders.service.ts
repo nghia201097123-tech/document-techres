@@ -219,14 +219,15 @@ export class OrdersService {
         // Update existing order
         const platformStatus = rawOrder.status;
 
-        // TechRes flow: Chỉ sync COMPLETED/CANCELLED từ platform
-        if (platformStatus === 'COMPLETED' || platformStatus === 'CANCELLED') {
-          if (existing.status !== platformStatus) {
+        // TechRes flow: Chỉ sync completed/cancelled từ platform
+        const normalizedStatus = platformStatus.toLowerCase();
+        if (normalizedStatus === 'completed' || normalizedStatus === 'cancelled') {
+          if (existing.status !== normalizedStatus) {
             existing.previousStatus = existing.status;
-            existing.status = platformStatus as FoodOrderStatus;
+            existing.status = normalizedStatus as FoodOrderStatus;
             existing.lastSyncAt = new Date();
 
-            if (platformStatus === 'COMPLETED') {
+            if (normalizedStatus === 'completed') {
               existing.completedAt = new Date();
             } else {
               existing.cancelledAt = new Date();
@@ -261,11 +262,11 @@ export class OrdersService {
         savedOrders.push(existing);
       } else {
         // Create new order - TechRes flow: luôn bắt đầu với NEW
-        const platformStatus = rawOrder.status;
+        const platformStatus = rawOrder.status.toLowerCase();
         let initialStatus = FoodOrderStatus.NEW;
 
-        // Ngoại lệ: nếu platform đã COMPLETED/CANCELLED
-        if (platformStatus === 'COMPLETED' || platformStatus === 'CANCELLED') {
+        // Ngoại lệ: nếu platform đã completed/cancelled
+        if (platformStatus === 'completed' || platformStatus === 'cancelled') {
           initialStatus = platformStatus as FoodOrderStatus;
           this.logger.log(
             `[saveOrders] New order ${rawOrder.orderCode} already ${platformStatus} on platform`,
