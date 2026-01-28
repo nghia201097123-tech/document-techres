@@ -55,7 +55,7 @@ export const voucherService = {
   getAll: async (brandId?: string): Promise<Voucher[]> => {
     const params: Record<string, any> = {};
     if (brandId) params.brandId = brandId;
-    const response = await api.get<Voucher[]>("/vouchers", { params });
+    const response = await api.get<Voucher[]>("/api/vouchers", { params });
     return response.data;
   },
 
@@ -70,7 +70,7 @@ export const voucherService = {
   },
 
   create: async (data: CreateVoucherDto): Promise<Voucher> => {
-    const response = await api.post<Voucher>("/vouchers", data);
+    const response = await api.post<Voucher>("/api/vouchers", data);
     return response.data;
   },
 
