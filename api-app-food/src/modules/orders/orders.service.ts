@@ -240,9 +240,13 @@ export class OrdersService {
   }
 
   /**
-   * Accept/Confirm an order
+   * Accept/Confirm an order - TechRes internal status only
+   * Flow: Chỉ update trạng thái TechRes (new → accepted)
+   * KHÔNG gọi platform API - trạng thái merchant được sync riêng
    */
   async acceptOrder(orderId: string): Promise<FoodOrder> {
+    this.logger.log(`[AcceptOrder] Processing order ${orderId}`);
+
     const order = await this.getOrderById(orderId);
 
     if (order.status !== FoodOrderStatus.NEW) {
@@ -251,30 +255,16 @@ export class OrdersService {
       );
     }
 
-    const account = await this.accountRepo.findOne({
-      where: { id: order.accountId },
-    });
-
-    if (!account) {
-      throw new BadRequestException('Không tìm thấy tài khoản');
-    }
-
-    // Call platform API
-    const connector = this.connectorFactory.getConnector(order.platform);
-    const result = await connector.acceptOrder(account, order.externalOrderId);
-
-    if (!result.success) {
-      throw new BadRequestException(result.error || 'Xác nhận đơn thất bại');
-    }
-
-    // Update order
+    // Update TechRes status only - NO platform API call
     order.previousStatus = order.status;
     order.status = FoodOrderStatus.ACCEPTED;
     order.acceptedAt = new Date();
-    order.isAutoConfirmed = true;
     order.confirmedAt = new Date();
 
-    return this.orderRepo.save(order);
+    const savedOrder = await this.orderRepo.save(order);
+    this.logger.log(`[AcceptOrder] Order ${order.orderCode} confirmed successfully`);
+
+    return savedOrder;
   }
 
   /**
@@ -343,40 +333,33 @@ export class OrdersService {
   }
 
   /**
-   * Cancel an order
+   * Cancel an order - TechRes internal status only
+   * Flow: Chỉ update trạng thái TechRes (any → cancelled)
+   * KHÔNG gọi platform API - đây là huỷ đơn nội bộ TechRes
    */
   async cancelOrder(orderId: string, reason: string): Promise<FoodOrder> {
+    this.logger.log(`[CancelOrder] Processing order ${orderId}, reason: ${reason}`);
+
     const order = await this.getOrderById(orderId);
 
     if (order.status === FoodOrderStatus.COMPLETED) {
       throw new BadRequestException('Không thể hủy đơn đã hoàn thành');
     }
 
-    const account = await this.accountRepo.findOne({
-      where: { id: order.accountId },
-    });
-
-    if (!account) {
-      throw new BadRequestException('Không tìm thấy tài khoản');
+    if (order.status === FoodOrderStatus.CANCELLED) {
+      throw new BadRequestException('Đơn hàng đã bị huỷ trước đó');
     }
 
-    const connector = this.connectorFactory.getConnector(order.platform);
-    const result = await connector.cancelOrder(
-      account,
-      order.externalOrderId,
-      reason,
-    );
-
-    if (!result.success) {
-      throw new BadRequestException(result.error || 'Hủy đơn thất bại');
-    }
-
+    // Update TechRes status only - NO platform API call
     order.previousStatus = order.status;
     order.status = FoodOrderStatus.CANCELLED;
     order.cancelledAt = new Date();
     order.cancelReason = reason;
 
-    return this.orderRepo.save(order);
+    const savedOrder = await this.orderRepo.save(order);
+    this.logger.log(`[CancelOrder] Order ${order.orderCode} cancelled successfully`);
+
+    return savedOrder;
   }
 
   /**
