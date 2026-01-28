@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { apiOAuth } from "./api";
 import type { LoginResponse, Staff, Company } from "@/types";
 
 export interface LoginCredentials {
@@ -26,10 +26,10 @@ interface DashboardLoginResponse {
 export const authService = {
   /**
    * Đăng nhập với tenant_id + username + password
-   * APISIX routing: /api/tenant/auth/login -> api-dashboard /api/auth/login
+   * api-oauth endpoint: /api/auth/login (x-svc-id: 1506)
    */
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
-    const response = await api.post<DashboardLoginResponse>("/api/tenant/auth/login", {
+    const response = await apiOAuth.post<DashboardLoginResponse>("/api/auth/login", {
       tenantId: credentials.tenantId,
       username: credentials.username,
       password: credentials.password,
@@ -69,10 +69,10 @@ export const authService = {
 
   /**
    * Đổi mật khẩu
-   * APISIX routing: /api/tenant/auth/change-password -> api-dashboard /api/auth/change-password
+   * api-oauth endpoint: /api/auth/change-password (x-svc-id: 1506)
    */
   changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
-    await api.post("/api/tenant/auth/change-password", {
+    await apiOAuth.post("/api/auth/change-password", {
       currentPassword,
       newPassword,
     });
@@ -80,10 +80,10 @@ export const authService = {
 
   /**
    * Lấy thông tin user hiện tại
-   * APISIX routing: /api/tenant/auth/me -> api-dashboard /api/auth/me
+   * api-oauth endpoint: /api/auth/profile (x-svc-id: 1506)
    */
   getMe: async (): Promise<LoginResponse> => {
-    const response = await api.get<{ user: DashboardLoginResponse["user"] }>("/api/tenant/auth/me");
+    const response = await apiOAuth.get<{ user: DashboardLoginResponse["user"] }>("/api/auth/profile");
     const user = response.data.user || response.data;
 
     // Get stored auth info for tenantId
@@ -130,19 +130,19 @@ export const authService = {
 
   /**
    * Quên mật khẩu - gửi email reset
-   * APISIX routing: /api/tenant/auth/forgot-password -> api-dashboard /api/auth/forgot-password
+   * api-oauth endpoint: /api/auth/forgot-password (x-svc-id: 1506)
    */
   forgotPassword: async (tenantId: string, email: string): Promise<void> => {
-    await api.post("/api/tenant/auth/forgot-password", { tenantId, email });
+    await apiOAuth.post("/api/auth/forgot-password", { tenantId, email });
   },
 
   /**
    * Đăng xuất
-   * APISIX routing: /api/tenant/auth/logout -> api-dashboard /api/auth/logout
+   * api-oauth endpoint: /api/auth/logout (x-svc-id: 1506)
    */
   logout: async (): Promise<void> => {
     try {
-      await api.post("/api/tenant/auth/logout");
+      await apiOAuth.post("/api/auth/logout");
     } catch (error) {
       console.error("Logout API error:", error);
     }
