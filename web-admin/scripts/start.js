@@ -31,7 +31,13 @@ const command = process.argv[2] || 'start';
 // Get port from SERVICE_PORT or default
 const port = process.env.SERVICE_PORT || '3000';
 
+// NOTE: Next.js automatically sets NODE_ENV based on command:
+// - `next dev` → NODE_ENV = 'development'
+// - `next start` → NODE_ENV = 'production' (always!)
+// Any NODE_ENV value in .env file will be OVERRIDDEN by Next.js
+const effectiveNodeEnv = command === 'dev' ? 'development' : 'production';
 console.log(`Starting Next.js in ${command} mode on port ${port}...`);
+console.log(`NODE_ENV will be set to: ${effectiveNodeEnv} (by Next.js)`);
 
 // Build args
 const args = command === 'dev'
