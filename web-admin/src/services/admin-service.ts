@@ -53,36 +53,36 @@ export interface FilterParams {
 
 export const adminService = {
   async getAll(params?: FilterParams): Promise<PaginatedResponse<AdminUser>> {
-    const response = await api.get<PaginatedResponse<AdminUser>>("/admin-users", { params });
+    const response = await api.get<PaginatedResponse<AdminUser>>("/api/admin-users", { params });
     return response.data;
   },
 
   async getById(id: string): Promise<AdminUser> {
-    const response = await api.get<AdminUser>(`/admin-users/${id}`);
+    const response = await api.get<AdminUser>(`/api/admin-users/${id}`);
     return response.data;
   },
 
   async create(data: CreateAdminUserDto): Promise<AdminUser> {
-    const response = await api.post<AdminUser>("/admin-users", data);
+    const response = await api.post<AdminUser>("/api/admin-users", data);
     return response.data;
   },
 
   async update(id: string, data: UpdateAdminUserDto): Promise<AdminUser> {
-    const response = await api.patch<AdminUser>(`/admin-users/${id}`, data);
+    const response = await api.patch<AdminUser>(`/api/admin-users/${id}`, data);
     return response.data;
   },
 
   async delete(id: string): Promise<void> {
-    await api.delete(`/admin-users/${id}`);
+    await api.delete(`/api/admin-users/${id}`);
   },
 
   async toggleStatus(id: string): Promise<AdminUser> {
-    const response = await api.patch<AdminUser>(`/admin-users/${id}/toggle-status`);
+    const response = await api.patch<AdminUser>(`/api/admin-users/${id}/toggle-status`);
     return response.data;
   },
 
   async getProfile(): Promise<AdminUser> {
-    const response = await api.get<AdminUser>("/admin-users/me");
+    const response = await api.get<AdminUser>("/api/admin-users/me");
     return response.data;
   },
 };

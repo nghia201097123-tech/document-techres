@@ -59,40 +59,40 @@ export const branchService = {
           )
         )
       : undefined;
-    const response = await api.get<BranchListResponse>("/branches", {
+    const response = await api.get<BranchListResponse>("/api/branches", {
       params: cleanParams,
     });
     return response.data;
   },
 
   async getById(id: string): Promise<Branch> {
-    const response = await api.get<Branch>(`/branches/${id}`);
+    const response = await api.get<Branch>(`/api/branches/${id}`);
     return response.data;
   },
 
   async create(data: CreateBranchData): Promise<Branch> {
     const cleanedData = cleanBranchData(data);
-    const response = await api.post<Branch>("/branches", cleanedData);
+    const response = await api.post<Branch>("/api/branches", cleanedData);
     return response.data;
   },
 
   async update(id: string, data: UpdateBranchData): Promise<Branch> {
     const cleanedData = cleanBranchData(data);
-    const response = await api.patch<Branch>(`/branches/${id}`, cleanedData);
+    const response = await api.patch<Branch>(`/api/branches/${id}`, cleanedData);
     return response.data;
   },
 
   async delete(id: string): Promise<void> {
-    await api.delete(`/branches/${id}`);
+    await api.delete(`/api/branches/${id}`);
   },
 
   async toggleStatus(id: string): Promise<Branch> {
-    const response = await api.patch<Branch>(`/branches/${id}/toggle-status`);
+    const response = await api.patch<Branch>(`/api/branches/${id}/toggle-status`);
     return response.data;
   },
 
   async getByBrand(brandId: string): Promise<Branch[]> {
-    const response = await api.get<BranchListResponse>("/branches", {
+    const response = await api.get<BranchListResponse>("/api/branches", {
       params: { brandId, limit: 100 },
     });
     return response.data.data;

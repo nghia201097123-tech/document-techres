@@ -56,31 +56,31 @@ export interface FilterParams {
 
 export const packageService = {
   async getAll(params?: FilterParams): Promise<PaginatedResponse<Package>> {
-    const response = await api.get<PaginatedResponse<Package>>("/packages", { params });
+    const response = await api.get<PaginatedResponse<Package>>("/api/packages", { params });
     return response.data;
   },
 
   async getById(id: string): Promise<Package> {
-    const response = await api.get<Package>(`/packages/${id}`);
+    const response = await api.get<Package>(`/api/packages/${id}`);
     return response.data;
   },
 
   async create(data: CreatePackageDto): Promise<Package> {
-    const response = await api.post<Package>("/packages", data);
+    const response = await api.post<Package>("/api/packages", data);
     return response.data;
   },
 
   async update(id: string, data: UpdatePackageDto): Promise<Package> {
-    const response = await api.patch<Package>(`/packages/${id}`, data);
+    const response = await api.patch<Package>(`/api/packages/${id}`, data);
     return response.data;
   },
 
   async delete(id: string): Promise<void> {
-    await api.delete(`/packages/${id}`);
+    await api.delete(`/api/packages/${id}`);
   },
 
   async toggleStatus(id: string): Promise<Package> {
-    const response = await api.patch<Package>(`/packages/${id}/toggle-status`);
+    const response = await api.patch<Package>(`/api/packages/${id}/toggle-status`);
     return response.data;
   },
 };

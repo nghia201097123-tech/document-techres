@@ -142,43 +142,43 @@ export const companyService = {
           )
         )
       : undefined;
-    const response = await api.get<CompanyListResponse>("/companies", {
+    const response = await api.get<CompanyListResponse>("/api/companies", {
       params: cleanParams,
     });
     return response.data;
   },
 
   async getById(id: string): Promise<Company> {
-    const response = await api.get<Company>(`/companies/${id}`);
+    const response = await api.get<Company>(`/api/companies/${id}`);
     return response.data;
   },
 
   async create(data: CreateCompanyData): Promise<Company> {
-    const response = await api.post<Company>("/companies", data);
+    const response = await api.post<Company>("/api/companies", data);
     return response.data;
   },
 
   async update(id: string, data: UpdateCompanyData): Promise<Company> {
-    const response = await api.patch<Company>(`/companies/${id}`, data);
+    const response = await api.patch<Company>(`/api/companies/${id}`, data);
     return response.data;
   },
 
   async delete(id: string): Promise<void> {
-    await api.delete(`/companies/${id}`);
+    await api.delete(`/api/companies/${id}`);
   },
 
   async toggleStatus(id: string): Promise<Company> {
-    const response = await api.patch<Company>(`/companies/${id}/toggle-status`);
+    const response = await api.patch<Company>(`/api/companies/${id}/toggle-status`);
     return response.data;
   },
 
   async createWithWizard(data: CreateCompanyWizardData): Promise<WizardResponse> {
-    const response = await api.post<WizardResponse>("/companies/wizard", data);
+    const response = await api.post<WizardResponse>("/api/companies/wizard", data);
     return response.data;
   },
 
   async getAll(): Promise<Company[]> {
-    const response = await api.get<CompanyListResponse>("/companies", {
+    const response = await api.get<CompanyListResponse>("/api/companies", {
       params: { limit: 100 },
     });
     return response.data.data;
@@ -186,25 +186,25 @@ export const companyService = {
 
   // Check if alias is available
   async checkAlias(alias: string): Promise<{ available: boolean; alias: string }> {
-    const response = await api.get<{ available: boolean; alias: string }>(`/companies/check-alias/${alias}`);
+    const response = await api.get<{ available: boolean; alias: string }>(`/api/companies/check-alias/${alias}`);
     return response.data;
   },
 
   // Quick Create - tạo nhanh công ty với tên và tiên định danh
   async quickCreate(data: QuickCreateData): Promise<WizardResponse> {
-    const response = await api.post<WizardResponse>("/companies/quick-create", data);
+    const response = await api.post<WizardResponse>("/api/companies/quick-create", data);
     return response.data;
   },
 
   // Create with multiple branches
   async createWithBranches(data: CreateCompanyWithBranchesData): Promise<WizardResponse & { additionalBranches?: Array<{ id: string; name: string; code: string }> }> {
-    const response = await api.post<WizardResponse & { additionalBranches?: Array<{ id: string; name: string; code: string }> }>("/companies/wizard-bulk", data);
+    const response = await api.post<WizardResponse & { additionalBranches?: Array<{ id: string; name: string; code: string }> }>("/api/companies/wizard-bulk", data);
     return response.data;
   },
 
   // Clone company
   async clone(data: CloneCompanyData): Promise<WizardResponse> {
-    const response = await api.post<WizardResponse>("/companies/clone", data);
+    const response = await api.post<WizardResponse>("/api/companies/clone", data);
     return response.data;
   },
 
@@ -217,7 +217,7 @@ export const companyService = {
     categoriesCount: number;
     staffCount: number;
   }> {
-    const response = await api.get(`/companies/${id}/clone-details`);
+    const response = await api.get(`/api/companies/${id}/clone-details`);
     return response.data;
   },
 };

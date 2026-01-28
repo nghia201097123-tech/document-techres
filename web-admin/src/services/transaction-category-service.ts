@@ -46,35 +46,35 @@ export interface PaginatedResponse<T> {
 
 export const transactionCategoryService = {
   async getAll(params?: FilterParams): Promise<PaginatedResponse<TransactionCategory>> {
-    const response = await api.get<PaginatedResponse<TransactionCategory>>("/transaction-categories", { params });
+    const response = await api.get<PaginatedResponse<TransactionCategory>>("/api/transaction-categories", { params });
     return response.data;
   },
 
   async getById(id: string): Promise<TransactionCategory> {
-    const response = await api.get<TransactionCategory>(`/transaction-categories/${id}`);
+    const response = await api.get<TransactionCategory>(`/api/transaction-categories/${id}`);
     return response.data;
   },
 
   async create(data: CreateTransactionCategoryDto): Promise<TransactionCategory> {
-    const response = await api.post<TransactionCategory>("/transaction-categories", data);
+    const response = await api.post<TransactionCategory>("/api/transaction-categories", data);
     return response.data;
   },
 
   async update(id: string, data: UpdateTransactionCategoryDto): Promise<TransactionCategory> {
-    const response = await api.put<TransactionCategory>(`/transaction-categories/${id}`, data);
+    const response = await api.put<TransactionCategory>(`/api/transaction-categories/${id}`, data);
     return response.data;
   },
 
   async delete(id: string): Promise<void> {
-    await api.delete(`/transaction-categories/${id}`);
+    await api.delete(`/api/transaction-categories/${id}`);
   },
 
   async toggleActive(id: string): Promise<TransactionCategory> {
-    const response = await api.patch<TransactionCategory>(`/transaction-categories/${id}/toggle-active`);
+    const response = await api.patch<TransactionCategory>(`/api/transaction-categories/${id}/toggle-active`);
     return response.data;
   },
 
   async seedDefaults(): Promise<void> {
-    await api.post("/transaction-categories/seed");
+    await api.post("/api/transaction-categories/seed");
   },
 };

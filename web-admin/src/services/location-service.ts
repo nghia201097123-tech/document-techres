@@ -27,7 +27,7 @@ export const locationService = {
    * Lấy danh sách 34 tỉnh/thành phố (sau sáp nhập 07/2025)
    */
   async getProvinces(): Promise<Province[]> {
-    const response = await api.get<Province[]>("/locations/provinces");
+    const response = await api.get<Province[]>("/api/locations/provinces");
     return response.data;
   },
 
@@ -37,7 +37,7 @@ export const locationService = {
    */
   async getWards(provinceCode: string): Promise<Ward[]> {
     const response = await api.get<Ward[]>(
-      `/locations/provinces/${provinceCode}/wards`
+      `/api/locations/provinces/${provinceCode}/wards`
     );
     return response.data;
   },
@@ -47,7 +47,7 @@ export const locationService = {
    */
   async seedLocations(): Promise<{ provinces: number; wards: number }> {
     const response = await api.post<{ provinces: number; wards: number }>(
-      "/locations/seed"
+      "/api/locations/seed"
     );
     return response.data;
   },

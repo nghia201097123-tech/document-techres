@@ -54,40 +54,40 @@ export const brandService = {
           )
         )
       : undefined;
-    const response = await api.get<BrandListResponse>("/brands", {
+    const response = await api.get<BrandListResponse>("/api/brands", {
       params: cleanParams,
     });
     return response.data;
   },
 
   async getById(id: string): Promise<Brand> {
-    const response = await api.get<Brand>(`/brands/${id}`);
+    const response = await api.get<Brand>(`/api/brands/${id}`);
     return response.data;
   },
 
   async create(data: CreateBrandData): Promise<Brand> {
     const cleanedData = cleanBrandData(data);
-    const response = await api.post<Brand>("/brands", cleanedData);
+    const response = await api.post<Brand>("/api/brands", cleanedData);
     return response.data;
   },
 
   async update(id: string, data: UpdateBrandData): Promise<Brand> {
     const cleanedData = cleanBrandData(data);
-    const response = await api.patch<Brand>(`/brands/${id}`, cleanedData);
+    const response = await api.patch<Brand>(`/api/brands/${id}`, cleanedData);
     return response.data;
   },
 
   async delete(id: string): Promise<void> {
-    await api.delete(`/brands/${id}`);
+    await api.delete(`/api/brands/${id}`);
   },
 
   async toggleStatus(id: string): Promise<Brand> {
-    const response = await api.patch<Brand>(`/brands/${id}/toggle-status`);
+    const response = await api.patch<Brand>(`/api/brands/${id}/toggle-status`);
     return response.data;
   },
 
   async getByCompany(companyId: string): Promise<Brand[]> {
-    const response = await api.get<BrandListResponse>("/brands", {
+    const response = await api.get<BrandListResponse>("/api/brands", {
       params: { companyId, limit: 100 },
     });
     return response.data.data;

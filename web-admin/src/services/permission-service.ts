@@ -51,47 +51,47 @@ export interface FilterParams {
 export const permissionService = {
   // Permission endpoints
   async getAllPermissions(params?: FilterParams): Promise<PaginatedResponse<Permission>> {
-    const response = await api.get<PaginatedResponse<Permission>>("/permissions", { params });
+    const response = await api.get<PaginatedResponse<Permission>>("/api/permissions", { params });
     return response.data;
   },
 
   async getPermissionsByModule(module: string): Promise<Permission[]> {
-    const response = await api.get<Permission[]>(`/permissions/module/${module}`);
+    const response = await api.get<Permission[]>(`/api/permissions/module/${module}`);
     return response.data;
   },
 
   async getPermissionById(id: string): Promise<Permission> {
-    const response = await api.get<Permission>(`/permissions/${id}`);
+    const response = await api.get<Permission>(`/api/permissions/${id}`);
     return response.data;
   },
 
   // Permission Group endpoints
   async getAllGroups(params?: FilterParams): Promise<PaginatedResponse<PermissionGroup>> {
-    const response = await api.get<PaginatedResponse<PermissionGroup>>("/permission-groups", { params });
+    const response = await api.get<PaginatedResponse<PermissionGroup>>("/api/permission-groups", { params });
     return response.data;
   },
 
   async getGroupById(id: string): Promise<PermissionGroup> {
-    const response = await api.get<PermissionGroup>(`/permission-groups/${id}`);
+    const response = await api.get<PermissionGroup>(`/api/permission-groups/${id}`);
     return response.data;
   },
 
   async createGroup(data: CreatePermissionGroupDto): Promise<PermissionGroup> {
-    const response = await api.post<PermissionGroup>("/permission-groups", data);
+    const response = await api.post<PermissionGroup>("/api/permission-groups", data);
     return response.data;
   },
 
   async updateGroup(id: string, data: UpdatePermissionGroupDto): Promise<PermissionGroup> {
-    const response = await api.patch<PermissionGroup>(`/permission-groups/${id}`, data);
+    const response = await api.patch<PermissionGroup>(`/api/permission-groups/${id}`, data);
     return response.data;
   },
 
   async deleteGroup(id: string): Promise<void> {
-    await api.delete(`/permission-groups/${id}`);
+    await api.delete(`/api/permission-groups/${id}`);
   },
 
   async toggleGroupStatus(id: string): Promise<PermissionGroup> {
-    const response = await api.patch<PermissionGroup>(`/permission-groups/${id}/toggle-status`);
+    const response = await api.patch<PermissionGroup>(`/api/permission-groups/${id}/toggle-status`);
     return response.data;
   },
 };

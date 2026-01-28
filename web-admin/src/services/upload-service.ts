@@ -23,14 +23,14 @@ export interface UploadResult {
 export const uploadService = {
   /**
    * Upload một hình ảnh
-   * api-upload endpoint: /api/uploads/image
+   * api-upload endpoint: /api/api/uploads/image
    */
   uploadImage: async (file: File, folder?: string): Promise<UploadResult> => {
     const formData = new FormData();
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await apiUpload.post<UploadResult>("/uploads/image", formData, {
+    const response = await apiUpload.post<UploadResult>("/api/uploads/image", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
       timeout: 120000, // 2 minutes for large files
@@ -40,7 +40,7 @@ export const uploadService = {
 
   /**
    * Upload nhiều hình ảnh (tối đa 10 file)
-   * api-upload endpoint: /api/uploads/images
+   * api-upload endpoint: /api/api/uploads/images
    */
   uploadImages: async (files: File[], folder?: string): Promise<UploadResult[]> => {
     const formData = new FormData();
@@ -49,7 +49,7 @@ export const uploadService = {
     });
 
     const params = folder ? { folder } : {};
-    const response = await apiUpload.post<UploadResult[]>("/uploads/images", formData, {
+    const response = await apiUpload.post<UploadResult[]>("/api/uploads/images", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
       timeout: 120000,
@@ -59,14 +59,14 @@ export const uploadService = {
 
   /**
    * Upload file bất kỳ
-   * api-upload endpoint: /api/uploads/file
+   * api-upload endpoint: /api/api/uploads/file
    */
   uploadFile: async (file: File, folder?: string): Promise<UploadResult> => {
     const formData = new FormData();
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await apiUpload.post<UploadResult>("/uploads/file", formData, {
+    const response = await apiUpload.post<UploadResult>("/api/uploads/file", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
       timeout: 120000,
