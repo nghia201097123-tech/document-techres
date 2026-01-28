@@ -27,7 +27,7 @@ android {
         debug {
             isMinifyEnabled = false
             // APISIX Gateway URL - điều hướng request qua header x-svc-id
-            buildConfigField("String", "APISIX_GATEWAY_URL", "\"http://172.16.10.118:7080/\"")
+            buildConfigField("String", "APISIX_GATEWAY_URL", "\"https://beta.api.gateway.overate-vntech.com/\"")
             // Service port IDs (dùng làm x-svc-id header)
             buildConfigField("String", "SVC_ID_OAUTH", "\"1506\"")
             buildConfigField("String", "SVC_ID_DASHBOARD", "\"1503\"")
@@ -35,12 +35,12 @@ android {
             buildConfigField("String", "SVC_ID_UPLOAD", "\"1505\"")
             buildConfigField("String", "SVC_ID_SOCKET", "\"1507\"")
             // Legacy URLs (for backwards compatibility)
-            buildConfigField("String", "API_BASE_URL", "\"http://172.16.10.118:7080/\"")
-            buildConfigField("String", "API_POS_BASE_URL", "\"http://172.16.10.118:7080/\"")
-            buildConfigField("String", "API_GATEWAY_URL", "\"http://172.16.10.118:7080/\"")
-            buildConfigField("String", "API_FOOD_BASE_URL", "\"http://172.16.10.201:3010/\"")
+            buildConfigField("String", "API_BASE_URL", "\"https://beta.api.gateway.overate-vntech.com/\"")
+            buildConfigField("String", "API_POS_BASE_URL", "\"https://beta.api.gateway.overate-vntech.com/\"")
+            buildConfigField("String", "API_GATEWAY_URL", "\"https://beta.api.gateway.overate-vntech.com/\"")
+            buildConfigField("String", "API_FOOD_BASE_URL", "\"http://192.168.1.125:3010/\"")
             // Socket-service (port 1507)
-            buildConfigField("String", "SOCKET_URL", "\"http://172.16.10.118:1507\"")
+            buildConfigField("String", "SOCKET_URL", "\"https://beta-socket.techres.vn\"")
         }
         release {
             isMinifyEnabled = true
