@@ -110,28 +110,28 @@ export class FoodOrder {
   estimatedDeliveryTime: string;
 
   // Timestamps
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt: Date;
 
-  @Column({ name: 'platform_created_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'platform_created_at', type: 'timestamptz', nullable: true })
   platformCreatedAt: Date;
 
-  @Column({ name: 'accepted_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'accepted_at', type: 'timestamptz', nullable: true })
   acceptedAt: Date;
 
-  @Column({ name: 'prepared_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'prepared_at', type: 'timestamptz', nullable: true })
   preparedAt: Date;
 
-  @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'completed_at', type: 'timestamptz', nullable: true })
   completedAt: Date;
 
-  @Column({ name: 'cancelled_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'cancelled_at', type: 'timestamptz', nullable: true })
   cancelledAt: Date;
 
-  @Column({ name: 'last_sync_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'last_sync_at', type: 'timestamptz', nullable: true })
   lastSyncAt: Date;
 
   // Account relation

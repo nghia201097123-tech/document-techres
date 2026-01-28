@@ -69,7 +69,7 @@ export class FoodPlatformAccount {
   @Column({ name: 'refresh_token', type: 'text', nullable: true })
   refreshToken: string;
 
-  @Column({ name: 'token_expires_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'token_expires_at', type: 'timestamptz', nullable: true })
   tokenExpiresAt: Date;
 
   // External merchant info (from platform)
@@ -87,10 +87,10 @@ export class FoodPlatformAccount {
   @Column({ name: 'poll_interval_seconds', type: 'int', default: 30 })
   pollIntervalSeconds: number;
 
-  @Column({ name: 'last_poll_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'last_poll_at', type: 'timestamptz', nullable: true })
   lastPollAt: Date;
 
-  @Column({ name: 'next_poll_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'next_poll_at', type: 'timestamptz', nullable: true })
   nextPollAt: Date;
 
   @Column({ name: 'error_count', type: 'int', default: 0 })
@@ -100,9 +100,9 @@ export class FoodPlatformAccount {
   lastError: string;
 
   // Timestamps
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt: Date;
 }
