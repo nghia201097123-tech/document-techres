@@ -310,7 +310,12 @@ export class OrdersService {
       );
     }
 
-    return this.orderRepo.save(order);
+    const savedOrder = await this.orderRepo.save(order);
+
+    // Invalidate cache để lần poll tiếp theo lấy data mới từ DB
+    await this.redisPubSub.invalidateCache(order.branchId);
+
+    return savedOrder;
   }
 
   /**
@@ -369,7 +374,12 @@ export class OrdersService {
       order.acceptedAt = new Date();
     }
 
-    return this.orderRepo.save(order);
+    const savedOrder = await this.orderRepo.save(order);
+
+    // Invalidate cache
+    await this.redisPubSub.invalidateCache(order.branchId);
+
+    return savedOrder;
   }
 
   /**
@@ -409,7 +419,12 @@ export class OrdersService {
 
     order.preparedAt = new Date();
 
-    return this.orderRepo.save(order);
+    const savedOrder = await this.orderRepo.save(order);
+
+    // Invalidate cache
+    await this.redisPubSub.invalidateCache(order.branchId);
+
+    return savedOrder;
   }
 
   /**
@@ -453,7 +468,12 @@ export class OrdersService {
     order.status = FoodOrderStatus.COMPLETED;
     order.completedAt = new Date();
 
-    return this.orderRepo.save(order);
+    const savedOrder = await this.orderRepo.save(order);
+
+    // Invalidate cache
+    await this.redisPubSub.invalidateCache(order.branchId);
+
+    return savedOrder;
   }
 
   /**
@@ -519,7 +539,12 @@ export class OrdersService {
         `reason: ${reason}`,
     );
 
-    return this.orderRepo.save(order);
+    const savedOrder = await this.orderRepo.save(order);
+
+    // Invalidate cache để lần poll tiếp theo lấy data mới từ DB
+    await this.redisPubSub.invalidateCache(order.branchId);
+
+    return savedOrder;
   }
 
   /**
@@ -529,6 +554,12 @@ export class OrdersService {
     const order = await this.getOrderById(orderId);
     order.isPrinted = true;
     order.printedAt = new Date();
-    return this.orderRepo.save(order);
+
+    const savedOrder = await this.orderRepo.save(order);
+
+    // Invalidate cache
+    await this.redisPubSub.invalidateCache(order.branchId);
+
+    return savedOrder;
   }
 }
