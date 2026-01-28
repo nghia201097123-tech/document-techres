@@ -4,8 +4,13 @@ export class AddMerchantStatusColumn1706800000000 implements MigrationInterface 
   name = 'AddMerchantStatusColumn1706800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // Drop FK constraint from food_order_items first
+    await queryRunner.query(`
+      ALTER TABLE IF EXISTS "food_order_items"
+      DROP CONSTRAINT IF EXISTS "FK_food_order_items_order"
+    `);
+
     // Drop food_orders table (user allowed since test data)
-    // Use plain DROP without CASCADE to preserve other enums
     await queryRunner.query(`DROP TABLE IF EXISTS "food_orders"`);
 
     // Drop and recreate food_order_status_enum with new simplified values
@@ -117,6 +122,13 @@ export class AddMerchantStatusColumn1706800000000 implements MigrationInterface 
     `);
     await queryRunner.query(`
       CREATE INDEX "IDX_food_orders_status_merchant_status" ON "food_orders" ("status", "merchant_status")
+    `);
+
+    // Recreate FK constraint from food_order_items to food_orders
+    await queryRunner.query(`
+      ALTER TABLE "food_order_items"
+      ADD CONSTRAINT "FK_food_order_items_order"
+      FOREIGN KEY ("order_id") REFERENCES "food_orders"("id") ON DELETE CASCADE
     `);
   }
 
