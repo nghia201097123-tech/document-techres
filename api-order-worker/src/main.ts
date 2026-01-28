@@ -6,8 +6,10 @@ async function bootstrap() {
   const logger = new Logger('OrderWorkerService');
   const app = await NestFactory.create(AppModule);
 
-  // Global prefix
-  app.setGlobalPrefix('api/v1');
+  // Global prefix (exclude /api/public routes)
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['/api/public/health-check', '/api/public/(.*)'],
+  });
 
   // CORS
   app.enableCors({

@@ -9,6 +9,7 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { WorkersModule } from './modules/workers/workers.module';
 import { QueueModule } from './modules/queue/queue.module';
 import { ConnectorsModule } from './modules/connectors/connectors.module';
+import { HealthModule } from './modules/health/health.module';
 
 // Entities
 import { FoodOrder } from './database/entities/food-order.entity';
@@ -87,6 +88,7 @@ import { FoodPlatformAccount } from './database/entities/food-platform-account.e
     }),
 
     // Feature Modules
+    HealthModule,
     ConnectorsModule,
     WorkersModule,
     QueueModule,
