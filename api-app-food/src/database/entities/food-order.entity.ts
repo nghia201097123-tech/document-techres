@@ -151,42 +151,42 @@ export class FoodOrder {
   @Column({ type: 'boolean', default: false, name: 'is_printed' })
   isPrinted: boolean;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'confirmed_at' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'confirmed_at' })
   confirmedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'printed_at' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'printed_at' })
   printedAt: Date;
 
   // Timestamps
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'accepted_at' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'accepted_at' })
   acceptedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'prepared_at' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'prepared_at' })
   preparedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'completed_at' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'completed_at' })
   completedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'cancelled_at' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'cancelled_at' })
   cancelledAt: Date;
 
   @Column({ type: 'varchar', length: 255, nullable: true, name: 'cancel_reason' })
   cancelReason: string;
 
   // Platform sync info
-  @Column({ type: 'timestamp', nullable: true, name: 'platform_created_at' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'platform_created_at' })
   platformCreatedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'platform_updated_at' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'platform_updated_at' })
   platformUpdatedAt: Date;
 
-  @Column({ type: 'timestamp', name: 'last_sync_at', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ type: 'timestamptz', name: 'last_sync_at', default: () => 'CURRENT_TIMESTAMP' })
   lastSyncAt: Date;
 
   // Relations

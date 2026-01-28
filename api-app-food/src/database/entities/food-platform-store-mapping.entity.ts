@@ -72,12 +72,12 @@ export class FoodPlatformStoreMapping {
   isActive: boolean;
 
   // Timestamps
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'last_synced_at' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'last_synced_at' })
   lastSyncedAt: Date;
 }

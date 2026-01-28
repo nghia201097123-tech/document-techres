@@ -90,7 +90,7 @@ export class FoodPlatformAccount {
   @Column({ type: 'varchar', length: 100, nullable: true, name: 'otp_session_id' })
   otpSessionId: string | null;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'otp_expires_at' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'otp_expires_at' })
   otpExpiresAt: Date | null;
 
   // Tokens
@@ -100,7 +100,7 @@ export class FoodPlatformAccount {
   @Column({ type: 'text', nullable: true, name: 'refresh_token' })
   refreshToken: string | null;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'token_expires_at' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'token_expires_at' })
   tokenExpiresAt: Date | null;
 
   // External merchant info (from platform)
@@ -132,10 +132,10 @@ export class FoodPlatformAccount {
   @Column({ type: 'int', default: 30, name: 'poll_interval_seconds' })
   pollIntervalSeconds: number;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'last_poll_at' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'last_poll_at' })
   lastPollAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'next_poll_at' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'next_poll_at' })
   nextPollAt: Date;
 
   // Error tracking
@@ -146,10 +146,10 @@ export class FoodPlatformAccount {
   lastError: string | null;
 
   // Timestamps
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt: Date;
 
   // Relations

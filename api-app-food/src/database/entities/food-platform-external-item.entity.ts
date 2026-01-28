@@ -76,12 +76,12 @@ export class FoodPlatformExternalItem {
   rawData: Record<string, unknown> | null;
 
   // Timestamps
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true, name: 'synced_at' })
+  @Column({ type: 'timestamptz', nullable: true, name: 'synced_at' })
   syncedAt: Date | null;
 }
