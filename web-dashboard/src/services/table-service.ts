@@ -53,7 +53,7 @@ export interface TableCountByArea {
 export const tableService = {
   getAll: async (branchId?: string): Promise<Table[]> => {
     const params = branchId ? { branchId } : {};
-    const response = await api.get<Table[]>("/tables", { params });
+    const response = await api.get<Table[]>("/api/tables", { params });
     return response.data;
   },
 
@@ -68,7 +68,7 @@ export const tableService = {
   },
 
   create: async (data: CreateTableDto): Promise<Table> => {
-    const response = await api.post<Table>("/tables", data);
+    const response = await api.post<Table>("/api/tables", data);
     return response.data;
   },
 

@@ -43,7 +43,7 @@ export interface CascadeToggleResult {
 export const departmentService = {
   getAll: async (companyId?: string): Promise<Department[]> => {
     const params = companyId ? { companyId } : {};
-    const response = await api.get<Department[]>("/departments", { params });
+    const response = await api.get<Department[]>("/api/departments", { params });
     return response.data;
   },
 
@@ -59,7 +59,7 @@ export const departmentService = {
   },
 
   create: async (data: CreateDepartmentDto): Promise<Department> => {
-    const response = await api.post<Department>("/departments", data);
+    const response = await api.post<Department>("/api/departments", data);
     return response.data;
   },
 

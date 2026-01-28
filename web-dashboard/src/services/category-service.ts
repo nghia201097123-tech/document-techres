@@ -41,7 +41,7 @@ export const categoryService = {
     const params: Record<string, any> = {};
     if (brandId) params.brandId = brandId;
     if (productType) params.productType = productType;
-    const response = await api.get<Category[]>("/categories", { params });
+    const response = await api.get<Category[]>("/api/categories", { params });
     return response.data;
   },
 
@@ -57,7 +57,7 @@ export const categoryService = {
   },
 
   create: async (data: CreateCategoryDto): Promise<Category> => {
-    const response = await api.post<Category>("/categories", data);
+    const response = await api.post<Category>("/api/categories", data);
     return response.data;
   },
 

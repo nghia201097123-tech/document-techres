@@ -239,7 +239,7 @@ export interface UpdateKitchenDto {
 export const kitchenService = {
   getAll: async (branchId?: string): Promise<Kitchen[]> => {
     const params = branchId ? { branchId } : {};
-    const response = await api.get<Kitchen[]>("/kitchen", { params });
+    const response = await api.get<Kitchen[]>("/api/kitchen", { params });
     return response.data;
   },
 
@@ -249,7 +249,7 @@ export const kitchenService = {
   },
 
   create: async (data: CreateKitchenDto): Promise<Kitchen> => {
-    const response = await api.post<Kitchen>("/kitchen", data);
+    const response = await api.post<Kitchen>("/api/kitchen", data);
     return response.data;
   },
 
@@ -289,12 +289,12 @@ export const kitchenService = {
   },
 
   getProductKitchens: async (productId: string): Promise<Kitchen[]> => {
-    const response = await api.get<Kitchen[]>(`/api/kitchen/product/${productId}/api/kitchens`);
+    const response = await api.get<Kitchen[]>(`/api/kitchen/product/${productId}/kitchens`);
     return response.data;
   },
 
   setProductKitchens: async (productId: string, kitchenIds: string[]): Promise<Kitchen[]> => {
-    const response = await api.put<Kitchen[]>(`/api/kitchen/product/${productId}/api/kitchens`, { kitchenIds });
+    const response = await api.put<Kitchen[]>(`/api/kitchen/product/${productId}/kitchens`, { kitchenIds });
     return response.data;
   },
 

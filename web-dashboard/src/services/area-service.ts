@@ -32,7 +32,7 @@ export interface UpdateAreaDto {
 export const areaService = {
   getAll: async (branchId?: string): Promise<Area[]> => {
     const params = branchId ? { branchId } : {};
-    const response = await api.get<Area[]>("/areas", { params });
+    const response = await api.get<Area[]>("/api/areas", { params });
     return response.data;
   },
 
@@ -42,7 +42,7 @@ export const areaService = {
   },
 
   create: async (data: CreateAreaDto): Promise<Area> => {
-    const response = await api.post<Area>("/areas", data);
+    const response = await api.post<Area>("/api/areas", data);
     return response.data;
   },
 

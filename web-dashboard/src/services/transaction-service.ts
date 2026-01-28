@@ -157,7 +157,7 @@ export const transactionCategoryService = {
         )
       : undefined;
     const response = await api.get<TransactionCategoryListResponse>(
-      "/transaction-categories",
+      "/api/transaction-categories",
       { params: cleanParams }
     );
     return response.data;
@@ -169,7 +169,7 @@ export const transactionCategoryService = {
   async getDropdown(type?: TransactionType): Promise<TransactionCategory[]> {
     const params = type ? { type } : undefined;
     const response = await api.get<TransactionCategory[]>(
-      "/transaction-categories/dropdown",
+      "/api/transaction-categories/dropdown",
       { params }
     );
     return response.data;
@@ -192,7 +192,7 @@ export const transactionCategoryService = {
     data: CreateTransactionCategoryDto
   ): Promise<TransactionCategory> {
     const response = await api.post<TransactionCategory>(
-      "/transaction-categories",
+      "/api/transaction-categories",
       data
     );
     return response.data;
@@ -234,7 +234,7 @@ export const transactionCategoryService = {
    */
   async seed(): Promise<{ message: string; created: number }> {
     const response = await api.post<{ message: string; created: number }>(
-      "/transaction-categories/seed"
+      "/api/transaction-categories/seed"
     );
     return response.data;
   },
@@ -269,7 +269,7 @@ export const transactionVoucherService = {
         )
       : undefined;
     const response = await api.get<TransactionVoucherListResponse>(
-      "/transaction-vouchers",
+      "/api/transaction-vouchers",
       { params: cleanParams }
     );
     return response.data;
@@ -290,7 +290,7 @@ export const transactionVoucherService = {
    */
   async create(data: CreateTransactionVoucherDto): Promise<TransactionVoucher> {
     const response = await api.post<TransactionVoucher>(
-      "/transaction-vouchers",
+      "/api/transaction-vouchers",
       data
     );
     return response.data;
@@ -358,7 +358,7 @@ export const transactionVoucherService = {
     toDate: string;
   }): Promise<CashBankReportResponse> {
     const response = await api.get<CashBankReportResponse>(
-      "/transaction-vouchers/cash-book",
+      "/api/transaction-vouchers/cash-book",
       { params }
     );
     return response.data;
@@ -374,7 +374,7 @@ export const transactionVoucherService = {
     toDate: string;
   }): Promise<CashBankReportResponse> {
     const response = await api.get<CashBankReportResponse>(
-      "/transaction-vouchers/bank-book",
+      "/api/transaction-vouchers/bank-book",
       { params }
     );
     return response.data;

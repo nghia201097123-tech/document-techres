@@ -12,7 +12,7 @@ export interface Branch {
 export const branchService = {
   getAll: async (brandId?: string): Promise<Branch[]> => {
     const params = brandId ? { brandId } : {};
-    const response = await api.get<Branch[]>("/branches", { params });
+    const response = await api.get<Branch[]>("/api/branches", { params });
     return response.data;
   },
 };

@@ -222,7 +222,7 @@ export const productService = {
     const params: Record<string, any> = {};
     if (brandId) params.brandId = brandId;
     if (type) params.type = type;
-    const response = await api.get<Product[]>("/products", { params });
+    const response = await api.get<Product[]>("/api/products", { params });
     return response.data;
   },
 
@@ -239,7 +239,7 @@ export const productService = {
   },
 
   create: async (data: CreateProductDto): Promise<Product> => {
-    const response = await api.post<Product>("/products", data);
+    const response = await api.post<Product>("/api/products", data);
     return response.data;
   },
 
@@ -386,7 +386,7 @@ export const productService = {
   // === Note to Multiple Products Assignment ===
 
   getProductsByNote: async (noteId: string): Promise<Product[]> => {
-    const response = await api.get<Product[]>(`/api/products/notes/${noteId}/api/products`);
+    const response = await api.get<Product[]>(`/api/products/notes/${noteId}/products`);
     return response.data;
   },
 

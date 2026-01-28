@@ -65,7 +65,7 @@ export const staffService = {
     const params: Record<string, string> = {};
     if (branchId) params.branchId = branchId;
     if (brandId) params.brandId = brandId;
-    const response = await api.get<Staff[]>("/staff", { params });
+    const response = await api.get<Staff[]>("/api/staff", { params });
     return response.data;
   },
 
@@ -75,7 +75,7 @@ export const staffService = {
   },
 
   create: async (data: CreateStaffDto): Promise<Staff & { temporaryPassword: string }> => {
-    const response = await api.post<Staff & { temporaryPassword: string }>("/staff", data);
+    const response = await api.post<Staff & { temporaryPassword: string }>("/api/staff", data);
     return response.data;
   },
 

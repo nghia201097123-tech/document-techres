@@ -32,7 +32,7 @@ export const surchargeService = {
   getAll: async (brandId?: string): Promise<Surcharge[]> => {
     const params: Record<string, any> = {};
     if (brandId) params.brandId = brandId;
-    const response = await api.get<Surcharge[]>("/surcharges", { params });
+    const response = await api.get<Surcharge[]>("/api/surcharges", { params });
     return response.data;
   },
 
@@ -42,7 +42,7 @@ export const surchargeService = {
   },
 
   create: async (data: CreateSurchargeDto): Promise<Surcharge> => {
-    const response = await api.post<Surcharge>("/surcharges", data);
+    const response = await api.post<Surcharge>("/api/surcharges", data);
     return response.data;
   },
 

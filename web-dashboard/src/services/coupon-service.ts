@@ -104,7 +104,7 @@ export const couponService = {
     orderAmount: number
   ): Promise<ValidateCouponResult> => {
     const response = await api.post(
-      "/coupons/validate",
+      "/api/coupons/validate",
       { code, orderAmount },
       { params: { branchId } }
     );

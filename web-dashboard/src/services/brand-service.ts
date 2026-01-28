@@ -9,7 +9,7 @@ export interface Brand {
 
 export const brandService = {
   getAll: async (): Promise<Brand[]> => {
-    const response = await api.get<Brand[]>("/brands");
+    const response = await api.get<Brand[]>("/api/brands");
     return response.data;
   },
 };

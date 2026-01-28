@@ -27,7 +27,7 @@ export interface AssignStaffPermissionsDto {
 export const permissionService = {
   // Get all permissions
   getAll: async (): Promise<Permission[]> => {
-    const response = await api.get<Permission[]>("/permissions");
+    const response = await api.get<Permission[]>("/api/permissions");
     return response.data;
   },
 
