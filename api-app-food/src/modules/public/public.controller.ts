@@ -525,12 +525,14 @@ export class PublicController {
 
   /**
    * Map status string to FoodOrderStatus - TechRes simplified flow
-   * Đơn mới (NEW) -> Đã xác nhận (PREPARING) -> Hoàn tất (COMPLETED) / Huỷ (CANCELLED)
+   * Đơn mới (NEW) -> Đã xác nhận (CONFIRMED) -> Hoàn tất (COMPLETED) / Huỷ (CANCELLED)
    */
   private mapStatusToFoodOrderStatus(status: string): FoodOrderStatus {
     const statusMap: Record<string, FoodOrderStatus> = {
       'new': FoodOrderStatus.NEW,
-      'preparing': FoodOrderStatus.PREPARING,
+      'confirmed': FoodOrderStatus.CONFIRMED,
+      // Backward compatibility for old 'preparing' status
+      'preparing': FoodOrderStatus.CONFIRMED,
       'completed': FoodOrderStatus.COMPLETED,
       'cancelled': FoodOrderStatus.CANCELLED,
     };
@@ -965,7 +967,7 @@ export class PublicController {
   ): Promise<void> {
     const activeStatuses = [
       FoodOrderStatus.NEW,
-      FoodOrderStatus.PREPARING,
+      FoodOrderStatus.CONFIRMED,
     ];
 
     const activeOrdersInDb = await this.orderRepo.find({

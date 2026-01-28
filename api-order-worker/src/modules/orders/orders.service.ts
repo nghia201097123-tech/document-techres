@@ -292,10 +292,7 @@ export class OrdersService {
         // 1. Đơn đã được xác nhận (CONFIRMED) bởi CCB
         // 2. Merchant status = COMPLETED hoặc một trong các trạng thái huỷ
         if (existing.status === FoodOrderStatus.CONFIRMED) {
-          if (
-            this.isMerchantCompleted(newMerchantStatus) &&
-            existing.status !== FoodOrderStatus.COMPLETED
-          ) {
+          if (this.isMerchantCompleted(newMerchantStatus)) {
             existing.previousStatus = existing.status;
             existing.status = FoodOrderStatus.COMPLETED;
             existing.completedAt = new Date();
@@ -304,10 +301,7 @@ export class OrdersService {
               `[saveOrders] Auto-complete TechRes order ${existing.orderCode} ` +
                 `(merchant status: ${newMerchantStatus})`,
             );
-          } else if (
-            this.isMerchantCancelled(newMerchantStatus) &&
-            existing.status !== FoodOrderStatus.CANCELLED
-          ) {
+          } else if (this.isMerchantCancelled(newMerchantStatus)) {
             existing.previousStatus = existing.status;
             existing.status = FoodOrderStatus.CANCELLED;
             existing.cancelledAt = new Date();

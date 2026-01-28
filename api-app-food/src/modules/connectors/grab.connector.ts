@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
-import { FoodPlatformAccount, FoodPlatformType, FoodOrderStatus } from '../../database/entities';
+import { FoodPlatformAccount, FoodPlatformType } from '../../database/entities';
 import { BasePlatformConnector } from './base.connector';
 import {
   LoginCredentials,
@@ -20,31 +20,34 @@ import {
 } from './interfaces/connector.interface';
 
 /**
- * GrabFood Status Mapping - Simplified TechRes Flow
- * Maps GrabFood API states to TechRes statuses:
- * - Đơn mới (NEW)
- * - Đã xác nhận (PREPARING) - all in-progress states
- * - Hoàn tất (COMPLETED)
- * - Huỷ (CANCELLED)
+ * GrabFood Status Mapping
+ * Returns the raw Grab status for storage in merchantStatus column
+ * The worker will map these to MerchantOrderStatus enum
+ *
+ * Grab API statuses:
+ * - ORDER_IN_PREPARE: Đang xử lý
+ * - ORDER_EXECUTING: Đang giao
+ * - COMPLETED: Hoàn tất
+ * - CANCELLED, CANCELLED_MAX, CANCELLED_PASSENGER, CANCELLED_OPERATOR, FAILED: Huỷ
  */
 const GRAB_STATUS_MAP: Record<string, string> = {
-  // Đơn mới (NEW)
-  'ORDER_NEW': FoodOrderStatus.NEW,
-  // Đã xác nhận (PREPARING) - all in-progress states map to PREPARING
-  'ORDER_IN_PREPARE': FoodOrderStatus.PREPARING,
-  'ORDER_EXECUTING': FoodOrderStatus.PREPARING,
-  'ORDER_READY': FoodOrderStatus.PREPARING,
-  'ORDER_IN_DELIVERY': FoodOrderStatus.PREPARING,
-  // Hoàn tất (COMPLETED)
-  'ORDER_DELIVERED': FoodOrderStatus.COMPLETED,
-  'COMPLETED': FoodOrderStatus.COMPLETED,
-  // Huỷ (CANCELLED)
-  'ORDER_CANCELLED': FoodOrderStatus.CANCELLED,
-  'CANCELLED': FoodOrderStatus.CANCELLED,
-  'CANCELLED_MAX': FoodOrderStatus.CANCELLED,
-  'CANCELLED_PASSENGER': FoodOrderStatus.CANCELLED,
-  'CANCELLED_OPERATOR': FoodOrderStatus.CANCELLED,
-  'FAILED': FoodOrderStatus.CANCELLED,
+  // Trạng thái đang xử lý
+  'ORDER_NEW': 'ORDER_IN_PREPARE',
+  'ORDER_IN_PREPARE': 'ORDER_IN_PREPARE',
+  'ORDER_READY': 'ORDER_IN_PREPARE',
+  // Trạng thái đang giao
+  'ORDER_EXECUTING': 'ORDER_EXECUTING',
+  'ORDER_IN_DELIVERY': 'ORDER_EXECUTING',
+  // Trạng thái hoàn tất
+  'ORDER_DELIVERED': 'COMPLETED',
+  'COMPLETED': 'COMPLETED',
+  // Trạng thái huỷ - giữ nguyên để lưu chi tiết
+  'ORDER_CANCELLED': 'CANCELLED',
+  'CANCELLED': 'CANCELLED',
+  'CANCELLED_MAX': 'CANCELLED_MAX',
+  'CANCELLED_PASSENGER': 'CANCELLED_PASSENGER',
+  'CANCELLED_OPERATOR': 'CANCELLED_OPERATOR',
+  'FAILED': 'FAILED',
 };
 
 /**
@@ -1020,7 +1023,7 @@ export class GrabConnector extends BasePlatformConnector {
       return {
         success: true,
         orderId,
-        newStatus: FoodOrderStatus.ACCEPTED,
+        newStatus: 'ORDER_IN_PREPARE', // Accepted -> still in prepare phase
       };
     } catch (error) {
       this.logger.error(`GrabFood accept order ${orderId} failed`, error);
@@ -1049,7 +1052,7 @@ export class GrabConnector extends BasePlatformConnector {
       return {
         success: true,
         orderId,
-        newStatus: FoodOrderStatus.READY,
+        newStatus: 'ORDER_IN_PREPARE', // Ready -> still in prepare phase before driver picks up
       };
     } catch (error) {
       this.logger.error(`GrabFood mark ready ${orderId} failed`, error);
@@ -1078,7 +1081,7 @@ export class GrabConnector extends BasePlatformConnector {
       return {
         success: true,
         orderId,
-        newStatus: FoodOrderStatus.COMPLETED,
+        newStatus: 'COMPLETED',
       };
     } catch (error) {
       this.logger.error(`GrabFood complete order ${orderId} failed`, error);
@@ -1106,7 +1109,7 @@ export class GrabConnector extends BasePlatformConnector {
       return {
         success: true,
         orderId,
-        newStatus: FoodOrderStatus.CANCELLED,
+        newStatus: 'CANCELLED',
       };
     } catch (error) {
       this.logger.error(`GrabFood cancel order ${orderId} failed`, error);

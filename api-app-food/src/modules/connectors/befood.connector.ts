@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
-import { FoodPlatformAccount, FoodPlatformType, FoodOrderStatus } from '../../database/entities';
+import { FoodPlatformAccount, FoodPlatformType } from '../../database/entities';
 import { BasePlatformConnector } from './base.connector';
 import {
   LoginCredentials,
@@ -14,30 +14,33 @@ import {
 } from './interfaces/connector.interface';
 
 /**
- * BeFood Status Mapping - Simplified TechRes Flow
- * Maps BeFood API states to TechRes statuses:
- * - Đơn mới (NEW)
- * - Đã xác nhận (PREPARING) - all in-progress states
- * - Hoàn tất (COMPLETED)
- * - Huỷ (CANCELLED)
+ * BeFood Status Mapping
+ * Maps BeFood API states to standard MerchantOrderStatus values
+ * These values will be stored in merchantStatus column
+ *
+ * Mapping to Grab-compatible statuses:
+ * - ORDER_IN_PREPARE: Đang xử lý
+ * - ORDER_EXECUTING: Đang giao
+ * - COMPLETED: Hoàn tất
+ * - CANCELLED: Huỷ
  */
 const BEFOOD_STATUS_MAP: Record<string, string> = {
-  // Đơn mới (NEW)
-  'PENDING': FoodOrderStatus.NEW,
-  'NEW': FoodOrderStatus.NEW,
-  // Đã xác nhận (PREPARING) - all in-progress states
-  'CONFIRMED': FoodOrderStatus.PREPARING,
-  'ACCEPTED': FoodOrderStatus.PREPARING,
-  'PREPARING': FoodOrderStatus.PREPARING,
-  'READY': FoodOrderStatus.PREPARING,
-  'DELIVERING': FoodOrderStatus.PREPARING,
-  'SHIPPING': FoodOrderStatus.PREPARING,
-  // Hoàn tất (COMPLETED)
-  'COMPLETED': FoodOrderStatus.COMPLETED,
-  'DELIVERED': FoodOrderStatus.COMPLETED,
-  // Huỷ (CANCELLED)
-  'CANCELLED': FoodOrderStatus.CANCELLED,
-  'REJECTED': FoodOrderStatus.CANCELLED,
+  // Trạng thái đang xử lý -> ORDER_IN_PREPARE
+  'PENDING': 'ORDER_IN_PREPARE',
+  'NEW': 'ORDER_IN_PREPARE',
+  'CONFIRMED': 'ORDER_IN_PREPARE',
+  'ACCEPTED': 'ORDER_IN_PREPARE',
+  'PREPARING': 'ORDER_IN_PREPARE',
+  'READY': 'ORDER_IN_PREPARE',
+  // Trạng thái đang giao -> ORDER_EXECUTING
+  'DELIVERING': 'ORDER_EXECUTING',
+  'SHIPPING': 'ORDER_EXECUTING',
+  // Trạng thái hoàn tất -> COMPLETED
+  'COMPLETED': 'COMPLETED',
+  'DELIVERED': 'COMPLETED',
+  // Trạng thái huỷ -> CANCELLED
+  'CANCELLED': 'CANCELLED',
+  'REJECTED': 'CANCELLED',
 };
 
 /**

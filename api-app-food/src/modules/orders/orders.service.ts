@@ -320,10 +320,10 @@ export class OrdersService {
   async acceptOrder(orderId: string): Promise<FoodOrder> {
     const order = await this.getOrderById(orderId);
 
-    // Chỉ gọi platform API nếu merchant chưa accept
+    // Chỉ gọi platform API nếu merchant đang ở trạng thái đang xử lý
+    // Không cần gọi nếu đã giao, hoàn tất, hoặc đã huỷ
     if (
-      order.merchantStatus !== MerchantOrderStatus.PENDING &&
-      order.merchantStatus !== MerchantOrderStatus.ACCEPTED
+      order.merchantStatus !== MerchantOrderStatus.ORDER_IN_PREPARE
     ) {
       this.logger.log(
         `[AcceptOrder] ${order.orderCode}: Skipping platform API call, ` +

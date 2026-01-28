@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FoodPlatformAccount, FoodPlatformType, FoodOrderStatus } from '../../database/entities';
+import { FoodPlatformAccount, FoodPlatformType } from '../../database/entities';
 import { BasePlatformConnector } from './base.connector';
 import {
   LoginCredentials,
@@ -13,32 +13,35 @@ import {
 } from './interfaces/connector.interface';
 
 /**
- * ShopeeFood Status Mapping - Simplified TechRes Flow
- * Maps ShopeeFood API states to TechRes statuses:
- * - Đơn mới (NEW)
- * - Đã xác nhận (PREPARING) - all in-progress states
- * - Hoàn tất (COMPLETED)
- * - Huỷ (CANCELLED)
+ * ShopeeFood Status Mapping
+ * Maps ShopeeFood API states to standard MerchantOrderStatus values
+ * These values will be stored in merchantStatus column
+ *
+ * Mapping to Grab-compatible statuses:
+ * - ORDER_IN_PREPARE: Đang xử lý
+ * - ORDER_EXECUTING: Đang giao
+ * - COMPLETED: Hoàn tất
+ * - CANCELLED: Huỷ
  */
 const SHOPEE_STATUS_MAP: Record<string, string> = {
-  // Đơn mới (NEW)
-  '1': FoodOrderStatus.NEW,
-  'PENDING': FoodOrderStatus.NEW,
-  // Đã xác nhận (PREPARING) - all in-progress states
-  '2': FoodOrderStatus.PREPARING,
-  '3': FoodOrderStatus.PREPARING,
-  '4': FoodOrderStatus.PREPARING,
-  '5': FoodOrderStatus.PREPARING,
-  'CONFIRMED': FoodOrderStatus.PREPARING,
-  'PREPARING': FoodOrderStatus.PREPARING,
-  'READY': FoodOrderStatus.PREPARING,
-  'SHIPPING': FoodOrderStatus.PREPARING,
-  // Hoàn tất (COMPLETED)
-  '6': FoodOrderStatus.COMPLETED,
-  'COMPLETED': FoodOrderStatus.COMPLETED,
-  // Huỷ (CANCELLED)
-  '7': FoodOrderStatus.CANCELLED,
-  'CANCELLED': FoodOrderStatus.CANCELLED,
+  // Trạng thái đang xử lý -> ORDER_IN_PREPARE
+  '1': 'ORDER_IN_PREPARE', // Đơn mới
+  'PENDING': 'ORDER_IN_PREPARE',
+  '2': 'ORDER_IN_PREPARE', // Đã xác nhận
+  '3': 'ORDER_IN_PREPARE', // Đang chuẩn bị
+  '4': 'ORDER_IN_PREPARE', // Sẵn sàng
+  'CONFIRMED': 'ORDER_IN_PREPARE',
+  'PREPARING': 'ORDER_IN_PREPARE',
+  'READY': 'ORDER_IN_PREPARE',
+  // Trạng thái đang giao -> ORDER_EXECUTING
+  '5': 'ORDER_EXECUTING', // Đang giao
+  'SHIPPING': 'ORDER_EXECUTING',
+  // Trạng thái hoàn tất -> COMPLETED
+  '6': 'COMPLETED',
+  'COMPLETED': 'COMPLETED',
+  // Trạng thái huỷ -> CANCELLED
+  '7': 'CANCELLED',
+  'CANCELLED': 'CANCELLED',
 };
 
 /**
@@ -341,7 +344,7 @@ export class ShopeeConnector extends BasePlatformConnector {
       return {
         success: true,
         orderId,
-        newStatus: FoodOrderStatus.ACCEPTED,
+        newStatus: 'ORDER_IN_PREPARE', // Accepted -> still in prepare phase
       };
     } catch (error) {
       this.logger.error(`ShopeeFood accept order ${orderId} failed`, error);
@@ -368,7 +371,7 @@ export class ShopeeConnector extends BasePlatformConnector {
       return {
         success: true,
         orderId,
-        newStatus: FoodOrderStatus.READY,
+        newStatus: 'ORDER_IN_PREPARE', // Ready -> still in prepare phase before driver picks up
       };
     } catch (error) {
       this.logger.error(`ShopeeFood mark ready ${orderId} failed`, error);
@@ -395,7 +398,7 @@ export class ShopeeConnector extends BasePlatformConnector {
       return {
         success: true,
         orderId,
-        newStatus: FoodOrderStatus.COMPLETED,
+        newStatus: 'COMPLETED',
       };
     } catch (error) {
       this.logger.error(`ShopeeFood complete order ${orderId} failed`, error);
@@ -424,7 +427,7 @@ export class ShopeeConnector extends BasePlatformConnector {
       return {
         success: true,
         orderId,
-        newStatus: FoodOrderStatus.CANCELLED,
+        newStatus: 'CANCELLED',
       };
     } catch (error) {
       this.logger.error(`ShopeeFood cancel order ${orderId} failed`, error);

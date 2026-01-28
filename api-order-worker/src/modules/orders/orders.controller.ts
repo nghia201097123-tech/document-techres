@@ -34,7 +34,7 @@ export class OrdersController {
         orders,
         totalOrders: counts.total,
         newOrders: counts.new,
-        processingOrders: counts.preparing,
+        confirmedOrders: counts.confirmed, // Đơn đã xác nhận bởi CCB
         completedOrders: counts.completed,
         cancelledOrders: counts.cancelled,
         polledAt: new Date().toISOString(),
