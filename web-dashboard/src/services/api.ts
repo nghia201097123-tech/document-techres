@@ -2,7 +2,7 @@ import axios, { AxiosInstance } from "axios";
 
 // APISIX Gateway Configuration
 // Gateway sẽ điều hướng request dựa trên header x-svc-id (port của microservice)
-export const GATEWAY_URL = process.env.NEXT_PUBLIC_API_URL || "http://172.16.10.118:7080";
+export const GATEWAY_URL = process.env.NEXT_PUBLIC_API_URL || "https://beta.api.gateway.overate-vntech.com";
 
 // Service IDs (dùng làm x-svc-id header khi gọi qua gateway)
 export const SERVICE_IDS = {

@@ -12,8 +12,8 @@ export async function register() {
     console.log(`║   NODE_ENV: ${process.env.NODE_ENV || "development (default)"}`.padEnd(67) + "║");
     console.log("╠════════════════════════════════════════════════════════════════╣");
     console.log("║ APISIX Gateway:                                                ║");
-    console.log(`║   NEXT_PUBLIC_API_URL: ${process.env.NEXT_PUBLIC_API_URL || "http://172.16.10.118:7080 (default)"}`.padEnd(67) + "║");
-    console.log(`║   CONFIG_RESOURCE_URL: ${process.env.CONFIG_RESOURCE_URL || "http://172.16.10.118:7080/s3 (default)"}`.padEnd(67) + "║");
+    console.log(`║   NEXT_PUBLIC_API_URL: ${process.env.NEXT_PUBLIC_API_URL || "https://beta.api.gateway.overate-vntech.com (default)"}`.padEnd(67) + "║");
+    console.log(`║   CONFIG_RESOURCE_URL: ${process.env.CONFIG_RESOURCE_URL || "https://beta.api.gateway.overate-vntech.com/s3 (default)"}`.padEnd(67) + "║");
     console.log("╠════════════════════════════════════════════════════════════════╣");
     console.log("║ Service IDs (x-svc-id header):                                 ║");
     console.log(`║   API_ADMIN (1502): ${process.env.CONFIG_NODEJS_ADMIN_SERVICE_ID || "1502 (default)"}`.padEnd(67) + "║");
