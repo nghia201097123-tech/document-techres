@@ -21,7 +21,7 @@ export async function register() {
     console.log(`║   NODE_ENV: ${modeLabel}`.padEnd(67) + "║");
     console.log("╠════════════════════════════════════════════════════════════════╣");
     console.log("║ APISIX Gateway:                                                ║");
-    console.log(`║   NEXT_PUBLIC_API_URL: ${process.env.NEXT_PUBLIC_API_URL || "https://beta.api.gateway.overate-vntech.com (default)"}`.padEnd(67) + "║");
+    console.log(`║   CONFIG_API_GATEWAY_URL: ${process.env.CONFIG_API_GATEWAY_URL || "https://beta.api.gateway.overate-vntech.com (default)"}`.padEnd(67) + "║");
     console.log(`║   CONFIG_RESOURCE_URL: ${process.env.CONFIG_RESOURCE_URL || "https://beta.api.gateway.overate-vntech.com/s3 (default)"}`.padEnd(67) + "║");
     console.log("╠════════════════════════════════════════════════════════════════╣");
     console.log("║ Service IDs (x-svc-id header):                                 ║");
