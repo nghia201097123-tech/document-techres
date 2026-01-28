@@ -5,6 +5,7 @@ import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { WorkerManagerService, RawFoodOrder, AccountData } from '../workers/worker-manager.service';
 import { FoodOrder, FoodOrderStatus, MerchantOrderStatus } from '../../database/entities/food-order.entity';
+import { FoodOrderItem } from '../../database/entities/food-order-item.entity';
 import { FoodPlatformAccount, AccountStatus } from '../../database/entities/food-platform-account.entity';
 
 @Injectable()
@@ -14,6 +15,8 @@ export class OrdersService {
   constructor(
     @InjectRepository(FoodOrder)
     private orderRepo: Repository<FoodOrder>,
+    @InjectRepository(FoodOrderItem)
+    private orderItemRepo: Repository<FoodOrderItem>,
     @InjectRepository(FoodPlatformAccount)
     private accountRepo: Repository<FoodPlatformAccount>,
     @InjectRedis()
@@ -382,14 +385,48 @@ export class OrdersService {
         savedOrders.push(saved);
         newOrderIds.push(saved.id);
 
+        // Save order items to food_order_items table
+        if (rawOrder.items && rawOrder.items.length > 0) {
+          await this.saveOrderItems(saved.id, rawOrder.items);
+        }
+
         this.logger.log(
           `[saveOrders] Created new order: ${saved.orderCode} ` +
-            `(TechRes: ${initialTechResStatus}, Merchant: ${newMerchantStatus})`,
+            `(TechRes: ${initialTechResStatus}, Merchant: ${newMerchantStatus}, Items: ${rawOrder.items?.length || 0})`,
         );
       }
     }
 
     return { savedOrders, newOrderIds };
+  }
+
+  /**
+   * Save order items to food_order_items table
+   */
+  private async saveOrderItems(orderId: string, items: any[]): Promise<void> {
+    try {
+      // Delete existing items for this order (in case of re-sync)
+      await this.orderItemRepo.delete({ orderId });
+
+      // Create new items
+      const orderItems = items.map((item) =>
+        this.orderItemRepo.create({
+          orderId,
+          externalProductId: item.externalProductId || item.id || null,
+          productName: item.name || item.productName || 'Unknown',
+          quantity: item.quantity || 1,
+          unitPrice: item.unitPrice || item.price || 0,
+          totalPrice: item.totalPrice || (item.quantity || 1) * (item.unitPrice || item.price || 0),
+          note: item.note || item.specialInstruction || null,
+          options: item.options ? JSON.stringify(item.options) : null,
+        }),
+      );
+
+      await this.orderItemRepo.save(orderItems);
+      this.logger.debug(`[saveOrderItems] Saved ${orderItems.length} items for order ${orderId}`);
+    } catch (error: any) {
+      this.logger.error(`[saveOrderItems] Failed to save items for order ${orderId}: ${error.message}`);
+    }
   }
 
   /**

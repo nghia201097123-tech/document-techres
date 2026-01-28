@@ -5,12 +5,13 @@ import { OrdersService } from './orders.service';
 import { OrdersGateway } from './orders.gateway';
 import { RedisSubscriberService } from './redis-subscriber.service';
 import { FoodOrder } from '../../database/entities/food-order.entity';
+import { FoodOrderItem } from '../../database/entities/food-order-item.entity';
 import { FoodPlatformAccount } from '../../database/entities/food-platform-account.entity';
 import { WorkersModule } from '../workers/workers.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([FoodOrder, FoodPlatformAccount]),
+    TypeOrmModule.forFeature([FoodOrder, FoodOrderItem, FoodPlatformAccount]),
     WorkersModule,
   ],
   controllers: [OrdersController],
