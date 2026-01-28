@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Param, Query, Logger, UnauthorizedExceptio
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { FoodPlatformAccount, FoodPlatformStoreMapping, FoodPlatformExternalItem, FoodPlatformItemMapping, FoodOrder, FoodOrderStatus, AccountStatus, FoodPlatformType } from '../../database/entities';
+import { FoodPlatformAccount, FoodPlatformStoreMapping, FoodPlatformExternalItem, FoodPlatformItemMapping, FoodOrder, FoodOrderItem, FoodOrderStatus, AccountStatus, FoodPlatformType } from '../../database/entities';
 import { AccountsService } from '../accounts/accounts.service';
 import { OrdersService } from '../orders/orders.service';
 import { ConnectorFactory } from '../connectors/connector.factory';
@@ -27,6 +27,8 @@ export class PublicController {
     private readonly itemMappingRepo: Repository<FoodPlatformItemMapping>,
     @InjectRepository(FoodOrder)
     private readonly orderRepo: Repository<FoodOrder>,
+    @InjectRepository(FoodOrderItem)
+    private readonly orderItemRepo: Repository<FoodOrderItem>,
     private readonly accountsService: AccountsService,
     private readonly ordersService: OrdersService,
     private readonly connectorFactory: ConnectorFactory,
@@ -1069,7 +1071,42 @@ export class PublicController {
       newOrder.rawData = rawOrder.rawData || null;
 
       const saved = await this.orderRepo.save(newOrder);
+
+      // Save order items to food_order_items table
+      if (rawOrder.items && rawOrder.items.length > 0) {
+        await this.saveOrderItems(saved.id, rawOrder.items);
+      }
+
       return { order: saved, isNew: true };
+    }
+  }
+
+  /**
+   * Save order items to food_order_items table
+   */
+  private async saveOrderItems(orderId: string, items: any[]): Promise<void> {
+    try {
+      // Delete existing items for this order (in case of re-sync)
+      await this.orderItemRepo.delete({ orderId });
+
+      // Create new items
+      const orderItems = items.map((item) =>
+        this.orderItemRepo.create({
+          orderId,
+          externalProductId: item.externalProductId || item.grabItemID || item.id || null,
+          productName: item.name || item.productName || 'Unknown',
+          quantity: item.quantity || 1,
+          unitPrice: item.unitPrice || item.price || 0,
+          totalPrice: item.totalPrice || (item.quantity || 1) * (item.unitPrice || item.price || 0),
+          note: item.note || item.specialInstruction || null,
+          options: item.modifiers ? JSON.stringify(item.modifiers) : (item.options ? JSON.stringify(item.options) : null),
+        }),
+      );
+
+      await this.orderItemRepo.save(orderItems);
+      this.logger.log(`[saveOrderItems] Saved ${orderItems.length} items for order ${orderId}`);
+    } catch (error: any) {
+      this.logger.error(`[saveOrderItems] Failed to save items for order ${orderId}: ${error.message}`);
     }
   }
 
