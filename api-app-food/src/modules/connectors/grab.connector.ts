@@ -596,11 +596,11 @@ export class GrabConnector extends BasePlatformConnector {
   }
 
   /**
-   * Map GrabFood status to TechRes status
+   * Map GrabFood status to MerchantOrderStatus string
    * Implements IPlatformConnector.mapStatusToTechRes
    */
   mapStatusToTechRes(platformStatus: string): string {
-    return GRAB_STATUS_MAP[platformStatus] || FoodOrderStatus.NEW;
+    return GRAB_STATUS_MAP[platformStatus] || 'ORDER_IN_PREPARE';
   }
 
   /**

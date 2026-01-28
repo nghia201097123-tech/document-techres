@@ -491,11 +491,11 @@ export class BeFoodConnector extends BasePlatformConnector {
   }
 
   /**
-   * Map BeFood status to TechRes status
+   * Map BeFood status to MerchantOrderStatus string
    * Implements IPlatformConnector.mapStatusToTechRes
    */
   mapStatusToTechRes(platformStatus: string): string {
-    return BEFOOD_STATUS_MAP[platformStatus?.toUpperCase()] || FoodOrderStatus.NEW;
+    return BEFOOD_STATUS_MAP[platformStatus?.toUpperCase()] || 'ORDER_IN_PREPARE';
   }
 
   /**

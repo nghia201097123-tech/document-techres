@@ -274,11 +274,11 @@ export class ShopeeConnector extends BasePlatformConnector {
   }
 
   /**
-   * Map ShopeeFood status to TechRes status
+   * Map ShopeeFood status to MerchantOrderStatus string
    * Implements IPlatformConnector.mapStatusToTechRes
    */
   mapStatusToTechRes(platformStatus: string): string {
-    return SHOPEE_STATUS_MAP[platformStatus?.toString()] || FoodOrderStatus.NEW;
+    return SHOPEE_STATUS_MAP[platformStatus?.toString()] || 'ORDER_IN_PREPARE';
   }
 
   /**
