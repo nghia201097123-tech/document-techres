@@ -9,7 +9,7 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('SERVICE_PORT', 3010);
-  const apiPrefix = configService.get<string>('API_PREFIX', 'api');
+  const apiPrefix = 'api'; // Hardcoded, no longer in .env
 
   // Global prefix
   app.setGlobalPrefix(apiPrefix);

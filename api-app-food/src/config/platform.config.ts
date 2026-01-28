@@ -1,5 +1,9 @@
 import { registerAs } from '@nestjs/config';
 
+// Default encryption key for development (32 bytes = 64 hex chars)
+// IMPORTANT: Override this in production with a secure random key
+const DEFAULT_ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
 export default registerAs('platform', () => ({
   grab: {
     baseUrl: process.env.GRAB_API_BASE_URL || 'https://api.grab.com/mex-app',
@@ -27,5 +31,5 @@ export default registerAs('platform', () => ({
     loginWindowMinutes: parseInt(process.env.LOGIN_WINDOW_MINUTES || '15', 10),
     loginLockoutMinutes: parseInt(process.env.LOGIN_LOCKOUT_MINUTES || '30', 10),
   },
-  encryptionKey: process.env.ENCRYPTION_KEY || '',
+  encryptionKey: process.env.ENCRYPTION_KEY || DEFAULT_ENCRYPTION_KEY,
 }));
