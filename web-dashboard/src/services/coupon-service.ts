@@ -61,7 +61,7 @@ export interface ValidateCouponResult {
 export const couponService = {
   getAll: async (branchId?: string): Promise<Coupon[]> => {
     const params = branchId ? { branchId } : {};
-    const response = await api.get("/api/coupons", { params });
+    const response = await api.get("/coupons", { params });
     return response.data;
   },
 
@@ -78,7 +78,7 @@ export const couponService = {
   },
 
   create: async (branchId: string, data: CreateCouponDto): Promise<Coupon> => {
-    const response = await api.post("/api/coupons", data, {
+    const response = await api.post("/coupons", data, {
       params: { branchId },
     });
     return response.data;
@@ -104,7 +104,7 @@ export const couponService = {
     orderAmount: number
   ): Promise<ValidateCouponResult> => {
     const response = await api.post(
-      "/api/coupons/validate",
+      "/coupons/validate",
       { code, orderAmount },
       { params: { branchId } }
     );

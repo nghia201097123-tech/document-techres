@@ -57,7 +57,7 @@ export const seasonalPriceService = {
   getAll: async (branchId?: string): Promise<SeasonalPrice[]> => {
     const params: Record<string, any> = {};
     if (branchId) params.branchId = branchId;
-    const response = await api.get<SeasonalPrice[]>("/api/seasonal-prices", { params });
+    const response = await api.get<SeasonalPrice[]>("/seasonal-prices", { params });
     return response.data;
   },
 
@@ -67,7 +67,7 @@ export const seasonalPriceService = {
   },
 
   create: async (data: CreateSeasonalPriceDto): Promise<SeasonalPrice> => {
-    const response = await api.post<SeasonalPrice>("/api/seasonal-prices", data);
+    const response = await api.post<SeasonalPrice>("/seasonal-prices", data);
     return response.data;
   },
 

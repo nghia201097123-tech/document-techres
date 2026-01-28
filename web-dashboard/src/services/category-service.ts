@@ -41,13 +41,13 @@ export const categoryService = {
     const params: Record<string, any> = {};
     if (brandId) params.brandId = brandId;
     if (productType) params.productType = productType;
-    const response = await api.get<Category[]>("/api/categories", { params });
+    const response = await api.get<Category[]>("/categories", { params });
     return response.data;
   },
 
   getCountByType: async (brandId?: string): Promise<CategoryCount[]> => {
     const params = brandId ? { brandId } : {};
-    const response = await api.get<CategoryCount[]>("/api/categories/count-by-type", { params });
+    const response = await api.get<CategoryCount[]>("/categories/count-by-type", { params });
     return response.data;
   },
 
@@ -57,7 +57,7 @@ export const categoryService = {
   },
 
   create: async (data: CreateCategoryDto): Promise<Category> => {
-    const response = await api.post<Category>("/api/categories", data);
+    const response = await api.post<Category>("/categories", data);
     return response.data;
   },
 
@@ -76,7 +76,7 @@ export const categoryService = {
   },
 
   updateSortOrder: async (sortOrders: SortOrderItem[]): Promise<Category[]> => {
-    const response = await api.patch<Category[]>("/api/categories/sort-order", { sortOrders });
+    const response = await api.patch<Category[]>("/categories/sort-order", { sortOrders });
     return response.data;
   },
 };

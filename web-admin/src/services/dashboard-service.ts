@@ -24,10 +24,10 @@ export const dashboardService = {
   async getStats(): Promise<DashboardStats> {
     // Fetch counts from each endpoint
     const [companiesRes, brandsRes, branchesRes, packagesRes] = await Promise.all([
-      api.get("/api/companies", { params: { limit: 1 } }),
-      api.get("/api/brands", { params: { limit: 1 } }),
-      api.get("/api/branches", { params: { limit: 1 } }),
-      api.get("/api/packages", { params: { limit: 1 } }),
+      api.get("/companies", { params: { limit: 1 } }),
+      api.get("/brands", { params: { limit: 1 } }),
+      api.get("/branches", { params: { limit: 1 } }),
+      api.get("/packages", { params: { limit: 1 } }),
     ]);
 
     return {
@@ -39,7 +39,7 @@ export const dashboardService = {
   },
 
   async getRecentCompanies(limit: number = 5): Promise<RecentCompany[]> {
-    const response = await api.get("/api/companies", { params: { limit, page: 1 } });
+    const response = await api.get("/companies", { params: { limit, page: 1 } });
     return response.data.data?.map((c: any) => ({
       id: c.id,
       name: c.name,
@@ -48,7 +48,7 @@ export const dashboardService = {
   },
 
   async getRecentBranches(limit: number = 5): Promise<RecentBranch[]> {
-    const response = await api.get("/api/branches", { params: { limit, page: 1 } });
+    const response = await api.get("/branches", { params: { limit, page: 1 } });
     return response.data.data?.map((b: any) => ({
       id: b.id,
       name: b.name,

@@ -37,13 +37,13 @@ export const dashboardService = {
     const params: Record<string, any> = {};
     if (branchId) params.branchId = branchId;
     if (brandId) params.brandId = brandId;
-    const response = await api.get<DashboardStats>("/api/dashboard/stats", { params });
+    const response = await api.get<DashboardStats>("/dashboard/stats", { params });
     return response.data;
   },
 
   getRecentActivity: async (limit?: number): Promise<RecentActivity> => {
     const params = limit ? { limit } : {};
-    const response = await api.get<RecentActivity>("/api/dashboard/recent-activity", { params });
+    const response = await api.get<RecentActivity>("/dashboard/recent-activity", { params });
     return response.data;
   },
 };

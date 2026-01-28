@@ -15,7 +15,7 @@ export interface Ward {
 
 export const locationService = {
   async getProvinces(): Promise<Province[]> {
-    const response = await api.get<Province[]>("/api/locations/provinces");
+    const response = await api.get<Province[]>("/locations/provinces");
     return response.data;
   },
 
@@ -27,7 +27,7 @@ export const locationService = {
   },
 
   async getAllWards(): Promise<Ward[]> {
-    const response = await api.get<Ward[]>("/api/locations/wards");
+    const response = await api.get<Ward[]>("/locations/wards");
     return response.data;
   },
 
@@ -51,7 +51,7 @@ export const locationService = {
    */
   async seedLocations(): Promise<{ provinces: number; wards: number }> {
     const response = await api.post<{ provinces: number; wards: number }>(
-      "/api/locations/seed"
+      "/locations/seed"
     );
     return response.data;
   },

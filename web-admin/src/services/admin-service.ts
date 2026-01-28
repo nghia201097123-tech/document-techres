@@ -53,7 +53,7 @@ export interface FilterParams {
 
 export const adminService = {
   async getAll(params?: FilterParams): Promise<PaginatedResponse<AdminUser>> {
-    const response = await api.get<PaginatedResponse<AdminUser>>("/api/admin-users", { params });
+    const response = await api.get<PaginatedResponse<AdminUser>>("/admin-users", { params });
     return response.data;
   },
 
@@ -63,7 +63,7 @@ export const adminService = {
   },
 
   async create(data: CreateAdminUserDto): Promise<AdminUser> {
-    const response = await api.post<AdminUser>("/api/admin-users", data);
+    const response = await api.post<AdminUser>("/admin-users", data);
     return response.data;
   },
 
@@ -82,7 +82,7 @@ export const adminService = {
   },
 
   async getProfile(): Promise<AdminUser> {
-    const response = await api.get<AdminUser>("/api/admin-users/me");
+    const response = await api.get<AdminUser>("/admin-users/me");
     return response.data;
   },
 };

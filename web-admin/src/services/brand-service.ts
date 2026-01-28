@@ -54,7 +54,7 @@ export const brandService = {
           )
         )
       : undefined;
-    const response = await api.get<BrandListResponse>("/api/brands", {
+    const response = await api.get<BrandListResponse>("/brands", {
       params: cleanParams,
     });
     return response.data;
@@ -67,7 +67,7 @@ export const brandService = {
 
   async create(data: CreateBrandData): Promise<Brand> {
     const cleanedData = cleanBrandData(data);
-    const response = await api.post<Brand>("/api/brands", cleanedData);
+    const response = await api.post<Brand>("/brands", cleanedData);
     return response.data;
   },
 
@@ -87,7 +87,7 @@ export const brandService = {
   },
 
   async getByCompany(companyId: string): Promise<Brand[]> {
-    const response = await api.get<BrandListResponse>("/api/brands", {
+    const response = await api.get<BrandListResponse>("/brands", {
       params: { companyId, limit: 100 },
     });
     return response.data.data;

@@ -48,7 +48,7 @@ export const uploadService = {
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await apiUpload.post<UploadResult>("/api/uploads/image", formData, {
+    const response = await apiUpload.post<UploadResult>("/uploads/image", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
       timeout: 120000,
@@ -67,7 +67,7 @@ export const uploadService = {
     });
 
     const params = folder ? { folder } : {};
-    const response = await apiUpload.post<UploadResult[]>("/api/uploads/images", formData, {
+    const response = await apiUpload.post<UploadResult[]>("/uploads/images", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
       timeout: 120000,
@@ -84,7 +84,7 @@ export const uploadService = {
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await apiUpload.post<UploadResult>("/api/uploads/video", formData, {
+    const response = await apiUpload.post<UploadResult>("/uploads/video", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
       timeout: 120000,
@@ -101,7 +101,7 @@ export const uploadService = {
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await apiUpload.post<UploadResult>("/api/uploads/document", formData, {
+    const response = await apiUpload.post<UploadResult>("/uploads/document", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
       timeout: 120000,
@@ -118,7 +118,7 @@ export const uploadService = {
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await apiUpload.post<UploadResult>("/api/uploads/file", formData, {
+    const response = await apiUpload.post<UploadResult>("/uploads/file", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
       timeout: 120000,
@@ -137,7 +137,7 @@ export const uploadService = {
     });
 
     const params = folder ? { folder } : {};
-    const response = await apiUpload.post<UploadResult[]>("/api/uploads/multiple", formData, {
+    const response = await apiUpload.post<UploadResult[]>("/uploads/multiple", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
       timeout: 120000,
@@ -187,7 +187,7 @@ export const uploadService = {
    * api-upload endpoint: /api/uploads/health
    */
   healthCheck: async (): Promise<{ status: string; service: string; timestamp: string }> => {
-    const response = await apiUpload.get<{ status: string; service: string; timestamp: string }>("/api/uploads/health");
+    const response = await apiUpload.get<{ status: string; service: string; timestamp: string }>("/uploads/health");
     return response.data;
   },
 

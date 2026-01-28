@@ -30,7 +30,7 @@ export const uploadService = {
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await apiUpload.post<UploadResult>("/api/uploads/image", formData, {
+    const response = await apiUpload.post<UploadResult>("/uploads/image", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
       timeout: 120000, // 2 minutes for large files
@@ -49,7 +49,7 @@ export const uploadService = {
     });
 
     const params = folder ? { folder } : {};
-    const response = await apiUpload.post<UploadResult[]>("/api/uploads/images", formData, {
+    const response = await apiUpload.post<UploadResult[]>("/uploads/images", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
       timeout: 120000,
@@ -66,7 +66,7 @@ export const uploadService = {
     formData.append("file", file);
 
     const params = folder ? { folder } : {};
-    const response = await apiUpload.post<UploadResult>("/api/uploads/file", formData, {
+    const response = await apiUpload.post<UploadResult>("/uploads/file", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       params,
       timeout: 120000,

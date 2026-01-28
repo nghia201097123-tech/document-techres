@@ -26,7 +26,7 @@ export const unitService = {
   getAll: async (brandId?: string): Promise<Unit[]> => {
     const params: Record<string, any> = {};
     if (brandId) params.brandId = brandId;
-    const response = await api.get<Unit[]>("/api/units", { params });
+    const response = await api.get<Unit[]>("/units", { params });
     return response.data;
   },
 
@@ -36,7 +36,7 @@ export const unitService = {
   },
 
   create: async (data: CreateUnitDto): Promise<Unit> => {
-    const response = await api.post<Unit>("/api/units", data);
+    const response = await api.post<Unit>("/units", data);
     return response.data;
   },
 

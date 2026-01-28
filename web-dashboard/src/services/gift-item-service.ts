@@ -39,7 +39,7 @@ export const giftItemService = {
   getAll: async (branchId?: string): Promise<GiftItem[]> => {
     const params: Record<string, any> = {};
     if (branchId) params.branchId = branchId;
-    const response = await api.get<GiftItem[]>("/api/gift-items", { params });
+    const response = await api.get<GiftItem[]>("/gift-items", { params });
     return response.data;
   },
 
@@ -49,7 +49,7 @@ export const giftItemService = {
   },
 
   create: async (data: CreateGiftItemDto): Promise<GiftItem> => {
-    const response = await api.post<GiftItem>("/api/gift-items", data);
+    const response = await api.post<GiftItem>("/gift-items", data);
     return response.data;
   },
 
