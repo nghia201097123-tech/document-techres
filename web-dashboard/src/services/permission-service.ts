@@ -33,7 +33,7 @@ export const permissionService = {
 
   // Get permissions grouped by module
   getGrouped: async (): Promise<Record<string, Permission[]>> => {
-    const response = await api.get<Record<string, Permission[]>>("/permissions/grouped");
+    const response = await api.get<Record<string, Permission[]>>("/api/permissions/grouped");
     return response.data;
   },
 
@@ -45,7 +45,7 @@ export const permissionService = {
 
   // Assign permissions to department
   assignDepartmentPermissions: async (data: AssignDepartmentPermissionsDto): Promise<Permission[]> => {
-    const response = await api.post<Permission[]>("/permissions/department", data);
+    const response = await api.post<Permission[]>("/api/permissions/department", data);
     return response.data;
   },
 
@@ -63,7 +63,7 @@ export const permissionService = {
 
   // Assign permissions to staff
   assignStaffPermissions: async (data: AssignStaffPermissionsDto): Promise<StaffPermissionsResponse> => {
-    const response = await api.post<StaffPermissionsResponse>("/permissions/staff", data);
+    const response = await api.post<StaffPermissionsResponse>("/api/permissions/staff", data);
     return response.data;
   },
 

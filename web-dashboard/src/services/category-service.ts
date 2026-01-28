@@ -47,7 +47,7 @@ export const categoryService = {
 
   getCountByType: async (brandId?: string): Promise<CategoryCount[]> => {
     const params = brandId ? { brandId } : {};
-    const response = await api.get<CategoryCount[]>("/categories/count-by-type", { params });
+    const response = await api.get<CategoryCount[]>("/api/categories/count-by-type", { params });
     return response.data;
   },
 
@@ -76,7 +76,7 @@ export const categoryService = {
   },
 
   updateSortOrder: async (sortOrders: SortOrderItem[]): Promise<Category[]> => {
-    const response = await api.patch<Category[]>("/categories/sort-order", { sortOrders });
+    const response = await api.patch<Category[]>("/api/categories/sort-order", { sortOrders });
     return response.data;
   },
 };

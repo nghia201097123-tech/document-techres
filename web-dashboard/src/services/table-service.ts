@@ -58,7 +58,7 @@ export const tableService = {
   },
 
   getCountByArea: async (): Promise<TableCountByArea[]> => {
-    const response = await api.get<TableCountByArea[]>("/tables/count-by-area");
+    const response = await api.get<TableCountByArea[]>("/api/tables/count-by-area");
     return response.data;
   },
 
