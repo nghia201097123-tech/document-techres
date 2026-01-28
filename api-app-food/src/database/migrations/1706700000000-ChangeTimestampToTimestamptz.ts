@@ -6,20 +6,26 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  */
 export class ChangeTimestampToTimestamptz1706700000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // food_orders table
+    // food_orders table - skip if table doesn't exist (will be recreated by next migration)
     await queryRunner.query(`
-      ALTER TABLE food_orders
-        ALTER COLUMN created_at TYPE timestamptz USING created_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
-        ALTER COLUMN updated_at TYPE timestamptz USING updated_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
-        ALTER COLUMN confirmed_at TYPE timestamptz USING confirmed_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
-        ALTER COLUMN printed_at TYPE timestamptz USING printed_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
-        ALTER COLUMN accepted_at TYPE timestamptz USING accepted_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
-        ALTER COLUMN prepared_at TYPE timestamptz USING prepared_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
-        ALTER COLUMN completed_at TYPE timestamptz USING completed_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
-        ALTER COLUMN cancelled_at TYPE timestamptz USING cancelled_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
-        ALTER COLUMN platform_created_at TYPE timestamptz USING platform_created_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
-        ALTER COLUMN platform_updated_at TYPE timestamptz USING platform_updated_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
-        ALTER COLUMN last_sync_at TYPE timestamptz USING last_sync_at AT TIME ZONE 'Asia/Ho_Chi_Minh'
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'food_orders') THEN
+          ALTER TABLE food_orders
+            ALTER COLUMN created_at TYPE timestamptz USING created_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
+            ALTER COLUMN updated_at TYPE timestamptz USING updated_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
+            ALTER COLUMN confirmed_at TYPE timestamptz USING confirmed_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
+            ALTER COLUMN printed_at TYPE timestamptz USING printed_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
+            ALTER COLUMN accepted_at TYPE timestamptz USING accepted_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
+            ALTER COLUMN prepared_at TYPE timestamptz USING prepared_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
+            ALTER COLUMN completed_at TYPE timestamptz USING completed_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
+            ALTER COLUMN cancelled_at TYPE timestamptz USING cancelled_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
+            ALTER COLUMN platform_created_at TYPE timestamptz USING platform_created_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
+            ALTER COLUMN platform_updated_at TYPE timestamptz USING platform_updated_at AT TIME ZONE 'Asia/Ho_Chi_Minh',
+            ALTER COLUMN last_sync_at TYPE timestamptz USING last_sync_at AT TIME ZONE 'Asia/Ho_Chi_Minh';
+        END IF;
+      END
+      $$;
     `);
 
     // food_order_items table
@@ -79,20 +85,26 @@ export class ChangeTimestampToTimestamptz1706700000000 implements MigrationInter
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // food_orders table - revert to timestamp without timezone
+    // food_orders table - revert to timestamp without timezone (skip if not exists)
     await queryRunner.query(`
-      ALTER TABLE food_orders
-        ALTER COLUMN created_at TYPE timestamp,
-        ALTER COLUMN updated_at TYPE timestamp,
-        ALTER COLUMN confirmed_at TYPE timestamp,
-        ALTER COLUMN printed_at TYPE timestamp,
-        ALTER COLUMN accepted_at TYPE timestamp,
-        ALTER COLUMN prepared_at TYPE timestamp,
-        ALTER COLUMN completed_at TYPE timestamp,
-        ALTER COLUMN cancelled_at TYPE timestamp,
-        ALTER COLUMN platform_created_at TYPE timestamp,
-        ALTER COLUMN platform_updated_at TYPE timestamp,
-        ALTER COLUMN last_sync_at TYPE timestamp
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'food_orders') THEN
+          ALTER TABLE food_orders
+            ALTER COLUMN created_at TYPE timestamp,
+            ALTER COLUMN updated_at TYPE timestamp,
+            ALTER COLUMN confirmed_at TYPE timestamp,
+            ALTER COLUMN printed_at TYPE timestamp,
+            ALTER COLUMN accepted_at TYPE timestamp,
+            ALTER COLUMN prepared_at TYPE timestamp,
+            ALTER COLUMN completed_at TYPE timestamp,
+            ALTER COLUMN cancelled_at TYPE timestamp,
+            ALTER COLUMN platform_created_at TYPE timestamp,
+            ALTER COLUMN platform_updated_at TYPE timestamp,
+            ALTER COLUMN last_sync_at TYPE timestamp;
+        END IF;
+      END
+      $$;
     `);
 
     // food_order_items table
