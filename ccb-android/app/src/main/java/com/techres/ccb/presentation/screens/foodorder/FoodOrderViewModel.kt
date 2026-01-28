@@ -281,6 +281,7 @@ class FoodOrderViewModel @Inject constructor(
         return when (status.uppercase()) {
             "NEW" -> FoodOrderStatus.NEW
             "PREPARING" -> FoodOrderStatus.PREPARING
+            "CONFIRMED" -> FoodOrderStatus.PREPARING  // Server uses CONFIRMED, app uses PREPARING
             "COMPLETED" -> FoodOrderStatus.COMPLETED
             "CANCELLED" -> FoodOrderStatus.CANCELLED
             else -> FoodOrderStatus.NEW
@@ -379,7 +380,16 @@ class FoodOrderViewModel @Inject constructor(
                     showSuccess("Đã xác nhận đơn hàng")
                 } else {
                     Log.e(TAG, "acceptOrder: API failed - ${result.message}")
-                    showError(result.message ?: "Xác nhận đơn hàng thất bại")
+                    // Nếu đơn đã được xác nhận trên server, vẫn cập nhật local state
+                    val message = result.message ?: ""
+                    if (message.contains("confirmed", ignoreCase = true) ||
+                        message.contains("đã xác nhận", ignoreCase = true)) {
+                        Log.d(TAG, "acceptOrder: Order already confirmed on server, updating local state")
+                        updateOrderStatus(orderId, FoodOrderStatus.PREPARING)
+                        showSuccess("Đơn hàng đã được xác nhận")
+                    } else {
+                        showError(result.message ?: "Xác nhận đơn hàng thất bại")
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "acceptOrder: Exception - ${e.message}", e)
