@@ -11,10 +11,9 @@ export class HealthController {
   @Get('health-check')
   healthCheck() {
     return {
-      status: 'ok',
-      service: 'api-order-worker',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
+      status: 200,
+      message: 'Ok',
+      data: null,
     };
   }
 }
