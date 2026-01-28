@@ -26,10 +26,10 @@ interface DashboardLoginResponse {
 export const authService = {
   /**
    * Đăng nhập với tenant_id + username + password
-   * api-oauth endpoint: /api/auth/login (x-svc-id: 1506)
+   * APISIX: /auth/login -> /api/tenant/auth/login -> strip to /api/auth/login
    */
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
-    const response = await apiOAuth.post<DashboardLoginResponse>("/api/auth/login", {
+    const response = await apiOAuth.post<DashboardLoginResponse>("/auth/login", {
       tenantId: credentials.tenantId,
       username: credentials.username,
       password: credentials.password,
@@ -69,10 +69,9 @@ export const authService = {
 
   /**
    * Đổi mật khẩu
-   * api-oauth endpoint: /api/auth/change-password (x-svc-id: 1506)
    */
   changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
-    await apiOAuth.post("/api/auth/change-password", {
+    await apiOAuth.post("/auth/change-password", {
       currentPassword,
       newPassword,
     });
@@ -80,10 +79,9 @@ export const authService = {
 
   /**
    * Lấy thông tin user hiện tại
-   * api-oauth endpoint: /api/auth/profile (x-svc-id: 1506)
    */
   getMe: async (): Promise<LoginResponse> => {
-    const response = await apiOAuth.get<{ user: DashboardLoginResponse["user"] }>("/api/auth/profile");
+    const response = await apiOAuth.get<{ user: DashboardLoginResponse["user"] }>("/auth/profile");
     const user = response.data.user || response.data;
 
     // Get stored auth info for tenantId
@@ -130,19 +128,17 @@ export const authService = {
 
   /**
    * Quên mật khẩu - gửi email reset
-   * api-oauth endpoint: /api/auth/forgot-password (x-svc-id: 1506)
    */
   forgotPassword: async (tenantId: string, email: string): Promise<void> => {
-    await apiOAuth.post("/api/auth/forgot-password", { tenantId, email });
+    await apiOAuth.post("/auth/forgot-password", { tenantId, email });
   },
 
   /**
    * Đăng xuất
-   * api-oauth endpoint: /api/auth/logout (x-svc-id: 1506)
    */
   logout: async (): Promise<void> => {
     try {
-      await apiOAuth.post("/api/auth/logout");
+      await apiOAuth.post("/auth/logout");
     } catch (error) {
       console.error("Logout API error:", error);
     }
