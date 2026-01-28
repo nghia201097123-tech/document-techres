@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Param, Query, Logger, UnauthorizedException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, Query, Logger, UnauthorizedException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { FoodPlatformAccount, FoodPlatformStoreMapping, FoodPlatformExternalItem, FoodPlatformItemMapping, FoodOrder, FoodOrderStatus, AccountStatus, FoodPlatformType } from '../../database/entities';
 import { AccountsService } from '../accounts/accounts.service';
+import { OrdersService } from '../orders/orders.service';
 import { ConnectorFactory } from '../connectors/connector.factory';
 import { GrabConnector } from '../connectors/grab.connector';
 import { ShopeeConnector } from '../connectors/shopee.connector';
@@ -27,6 +28,7 @@ export class PublicController {
     @InjectRepository(FoodOrder)
     private readonly orderRepo: Repository<FoodOrder>,
     private readonly accountsService: AccountsService,
+    private readonly ordersService: OrdersService,
     private readonly connectorFactory: ConnectorFactory,
     // Platform-specific connectors for direct access when needed
     private readonly grabConnector: GrabConnector,
@@ -266,6 +268,120 @@ export class PublicController {
           reconnected: false,
           error: error.message,
         },
+      };
+    }
+  }
+
+  /**
+   * Xác nhận đơn hàng (CCB)
+   * App gọi API này khi nhân viên nhấn "Xác nhận"
+   */
+  @Post('confirm-order/:orderId')
+  @ApiOperation({ summary: 'Xác nhận đơn hàng' })
+  @ApiParam({ name: 'orderId', description: 'Order ID' })
+  @ApiResponse({ status: 200, description: 'Xác nhận thành công' })
+  async confirmOrder(@Param('orderId') orderId: string) {
+    this.logger.log(`[confirmOrder] orderId=${orderId}`);
+
+    try {
+      const order = await this.ordersService.confirmOrder(orderId);
+
+      this.logger.log(`[confirmOrder] Order ${order.orderCode} confirmed successfully, status=${order.status}`);
+
+      return {
+        status: 200,
+        message: 'Xác nhận đơn hàng thành công',
+        data: {
+          id: order.id,
+          orderCode: order.orderCode,
+          status: order.status,
+          merchantStatus: order.merchantStatus,
+          confirmedAt: order.confirmedAt,
+        },
+      };
+    } catch (error: any) {
+      this.logger.error(`[confirmOrder] Error: ${error.message}`);
+      return {
+        status: 400,
+        message: error.message || 'Không thể xác nhận đơn hàng',
+        data: null,
+      };
+    }
+  }
+
+  /**
+   * Huỷ đơn hàng (CCB)
+   * App gọi API này khi nhân viên nhấn "Huỷ"
+   */
+  @Post('cancel-order/:orderId')
+  @ApiOperation({ summary: 'Huỷ đơn hàng' })
+  @ApiParam({ name: 'orderId', description: 'Order ID' })
+  @ApiBody({ schema: { type: 'object', properties: { reason: { type: 'string' } } } })
+  @ApiResponse({ status: 200, description: 'Huỷ thành công' })
+  async cancelOrder(
+    @Param('orderId') orderId: string,
+    @Body() body: { reason?: string },
+  ) {
+    this.logger.log(`[cancelOrder] orderId=${orderId}, reason=${body.reason}`);
+
+    try {
+      const order = await this.ordersService.cancelOrder(orderId, body.reason || 'Huỷ bởi nhân viên');
+
+      this.logger.log(`[cancelOrder] Order ${order.orderCode} cancelled successfully`);
+
+      return {
+        status: 200,
+        message: 'Huỷ đơn hàng thành công',
+        data: {
+          id: order.id,
+          orderCode: order.orderCode,
+          status: order.status,
+          cancelledAt: order.cancelledAt,
+          cancelReason: order.cancelReason,
+        },
+      };
+    } catch (error: any) {
+      this.logger.error(`[cancelOrder] Error: ${error.message}`);
+      return {
+        status: 400,
+        message: error.message || 'Không thể huỷ đơn hàng',
+        data: null,
+      };
+    }
+  }
+
+  /**
+   * Hoàn tất đơn hàng (CCB)
+   * App gọi API này khi nhân viên nhấn "Hoàn tất"
+   */
+  @Post('complete-order/:orderId')
+  @ApiOperation({ summary: 'Hoàn tất đơn hàng' })
+  @ApiParam({ name: 'orderId', description: 'Order ID' })
+  @ApiResponse({ status: 200, description: 'Hoàn tất thành công' })
+  async completeOrder(@Param('orderId') orderId: string) {
+    this.logger.log(`[completeOrder] orderId=${orderId}`);
+
+    try {
+      const order = await this.ordersService.completeOrder(orderId);
+
+      this.logger.log(`[completeOrder] Order ${order.orderCode} completed successfully`);
+
+      return {
+        status: 200,
+        message: 'Hoàn tất đơn hàng thành công',
+        data: {
+          id: order.id,
+          orderCode: order.orderCode,
+          status: order.status,
+          completedAt: order.completedAt,
+        },
+      };
+    } catch (error: any) {
+      this.logger.error(`[completeOrder] Error: ${error.message}`);
+      return {
+        status: 400,
+        message: error.message || 'Không thể hoàn tất đơn hàng',
+        data: null,
       };
     }
   }
