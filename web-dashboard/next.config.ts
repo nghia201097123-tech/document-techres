@@ -6,8 +6,6 @@ const nextConfig: NextConfig = {
 
   // Experimental settings for better performance
   experimental: {
-    // Enable instrumentation for runtime ENV logging
-    instrumentationHook: true,
     // Optimize package imports to reduce bundle analysis time
     optimizePackageImports: ["lucide-react", "@radix-ui/react-icons"],
   },
