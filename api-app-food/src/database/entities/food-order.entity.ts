@@ -15,16 +15,28 @@ import { FoodPlatformStoreMapping } from './food-platform-store-mapping.entity';
 import { FoodOrderItemEntity } from './food-order-item.entity';
 
 /**
- * Food Order Status
+ * TechRes Order Status - Trạng thái đơn hàng phía TechRes
+ * Flow: NEW -> CONFIRMED -> COMPLETED/CANCELLED
  */
 export enum FoodOrderStatus {
-  NEW = 'new', // Đơn mới, chờ xác nhận
-  ACCEPTED = 'accepted', // Đã xác nhận
+  NEW = 'new', // Đơn mới, chờ xác nhận bởi nhân viên CCB
+  CONFIRMED = 'confirmed', // Đã xác nhận bởi nhân viên CCB
+  COMPLETED = 'completed', // Hoàn thành (tự động khi merchant hoàn tất)
+  CANCELLED = 'cancelled', // Đã hủy (bởi nhân viên hoặc tự động khi merchant huỷ)
+}
+
+/**
+ * Merchant Order Status - Trạng thái đơn hàng từ merchant (Grab/Shopee/BeFood)
+ * Được cập nhật tự động từ việc poll API của merchant
+ */
+export enum MerchantOrderStatus {
+  PENDING = 'pending', // Đơn mới từ merchant
+  ACCEPTED = 'accepted', // Merchant đã nhận đơn
   PREPARING = 'preparing', // Đang chuẩn bị
   READY = 'ready', // Sẵn sàng giao
   DELIVERING = 'delivering', // Đang giao (có tài xế)
-  COMPLETED = 'completed', // Hoàn thành
-  CANCELLED = 'cancelled', // Đã hủy
+  COMPLETED = 'completed', // Merchant đã hoàn thành
+  CANCELLED = 'cancelled', // Merchant đã huỷ
 }
 
 /**
@@ -74,7 +86,7 @@ export class FoodOrder {
   })
   platform: FoodPlatformType;
 
-  // Status
+  // TechRes Status - Trạng thái do CCB quản lý
   @Column({
     type: 'enum',
     enum: FoodOrderStatus,
@@ -82,8 +94,20 @@ export class FoodOrder {
   })
   status: FoodOrderStatus;
 
+  // Merchant Status - Trạng thái từ merchant (Grab/Shopee/BeFood)
+  @Column({
+    type: 'enum',
+    enum: MerchantOrderStatus,
+    default: MerchantOrderStatus.PENDING,
+    name: 'merchant_status',
+  })
+  merchantStatus: MerchantOrderStatus;
+
   @Column({ type: 'varchar', length: 50, nullable: true, name: 'previous_status' })
-  previousStatus: string; // For tracking status changes
+  previousStatus: string; // For tracking TechRes status changes
+
+  @Column({ type: 'varchar', length: 50, nullable: true, name: 'previous_merchant_status' })
+  previousMerchantStatus: string; // For tracking merchant status changes
 
   // Customer info
   @Column({ type: 'varchar', length: 255, name: 'customer_name' })

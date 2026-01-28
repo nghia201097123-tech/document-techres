@@ -9,6 +9,7 @@ import { Repository, In, MoreThanOrEqual } from 'typeorm';
 import {
   FoodOrder,
   FoodOrderStatus,
+  MerchantOrderStatus,
   FoodOrderItem,
   FoodPlatformAccount,
   FoodPlatformStoreMapping,
@@ -225,6 +226,12 @@ export class OrdersService {
       qb.andWhere('order.status = :status', { status: query.status });
     }
 
+    if (query.merchantStatus) {
+      qb.andWhere('order.merchantStatus = :merchantStatus', {
+        merchantStatus: query.merchantStatus,
+      });
+    }
+
     qb.orderBy('order.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -240,55 +247,120 @@ export class OrdersService {
   }
 
   /**
-   * Accept/Confirm an order
+   * Xác nhận đơn hàng (CCB)
+   *
+   * CCB Flow - Bước 3:
+   * - Nhân viên CCB nhấn "Xác nhận" để xác nhận đơn hàng
+   * - Cập nhật TechRes status: NEW -> CONFIRMED
+   * - Nếu merchantStatus đã COMPLETED -> auto-complete TechRes
+   * - Nếu merchantStatus đã CANCELLED -> auto-cancel TechRes
+   * - Nếu merchantStatus chưa kết thúc -> chờ worker auto-sync sau
    */
-  async acceptOrder(orderId: string): Promise<FoodOrder> {
+  async confirmOrder(orderId: string): Promise<FoodOrder> {
     const order = await this.getOrderById(orderId);
 
     if (order.status !== FoodOrderStatus.NEW) {
       throw new BadRequestException(
-        `Đơn hàng ${order.orderCode} không ở trạng thái chờ xác nhận`,
+        `Đơn hàng ${order.orderCode} không ở trạng thái chờ xác nhận (hiện tại: ${order.status})`,
       );
     }
 
-    const account = await this.accountRepo.findOne({
-      where: { id: order.accountId },
-    });
-
-    if (!account) {
-      throw new BadRequestException('Không tìm thấy tài khoản');
-    }
-
-    // Call platform API
-    const connector = this.connectorFactory.getConnector(order.platform);
-    const result = await connector.acceptOrder(account, order.externalOrderId);
-
-    if (!result.success) {
-      throw new BadRequestException(result.error || 'Xác nhận đơn thất bại');
-    }
-
-    // Update order
+    // Cập nhật TechRes status
     order.previousStatus = order.status;
-    order.status = FoodOrderStatus.ACCEPTED;
-    order.acceptedAt = new Date();
-    order.isAutoConfirmed = true;
+    order.status = FoodOrderStatus.CONFIRMED;
     order.confirmedAt = new Date();
+
+    this.logger.log(
+      `[ConfirmOrder] ${order.orderCode}: TechRes status: NEW -> CONFIRMED, ` +
+        `merchantStatus: ${order.merchantStatus}`,
+    );
+
+    // Auto-sync nếu merchantStatus đã kết thúc
+    if (order.merchantStatus === MerchantOrderStatus.COMPLETED) {
+      order.status = FoodOrderStatus.COMPLETED;
+      order.completedAt = new Date();
+      this.logger.log(
+        `[ConfirmOrder] ${order.orderCode}: Auto-complete vì merchantStatus = COMPLETED`,
+      );
+    } else if (order.merchantStatus === MerchantOrderStatus.CANCELLED) {
+      order.status = FoodOrderStatus.CANCELLED;
+      order.cancelledAt = new Date();
+      this.logger.log(
+        `[ConfirmOrder] ${order.orderCode}: Auto-cancel vì merchantStatus = CANCELLED`,
+      );
+    }
 
     return this.orderRepo.save(order);
   }
 
   /**
-   * Mark order as ready
+   * Accept order on merchant platform (optional)
+   * Gọi platform API để accept đơn nếu merchant chưa auto-accept
+   */
+  async acceptOrder(orderId: string): Promise<FoodOrder> {
+    const order = await this.getOrderById(orderId);
+
+    // Chỉ gọi platform API nếu merchant chưa accept
+    if (
+      order.merchantStatus !== MerchantOrderStatus.PENDING &&
+      order.merchantStatus !== MerchantOrderStatus.ACCEPTED
+    ) {
+      this.logger.log(
+        `[AcceptOrder] ${order.orderCode}: Skipping platform API call, ` +
+          `merchantStatus already: ${order.merchantStatus}`,
+      );
+      return order;
+    }
+
+    const account = await this.accountRepo.findOne({
+      where: { id: order.accountId },
+    });
+
+    if (!account) {
+      throw new BadRequestException('Không tìm thấy tài khoản');
+    }
+
+    try {
+      // Call platform API
+      const connector = this.connectorFactory.getConnector(order.platform);
+      const result = await connector.acceptOrder(account, order.externalOrderId);
+
+      if (!result.success) {
+        this.logger.warn(
+          `[AcceptOrder] ${order.orderCode}: Platform API failed: ${result.error}`,
+        );
+        // Không throw error, vì merchant có thể đã tự accept
+      } else {
+        this.logger.log(
+          `[AcceptOrder] ${order.orderCode}: Platform API accepted successfully`,
+        );
+      }
+    } catch (error: any) {
+      this.logger.warn(
+        `[AcceptOrder] ${order.orderCode}: Platform API error: ${error.message}`,
+      );
+    }
+
+    // Nếu chưa confirm thì confirm luôn
+    if (order.status === FoodOrderStatus.NEW) {
+      order.previousStatus = order.status;
+      order.status = FoodOrderStatus.CONFIRMED;
+      order.confirmedAt = new Date();
+      order.acceptedAt = new Date();
+    }
+
+    return this.orderRepo.save(order);
+  }
+
+  /**
+   * Mark order as ready on merchant platform (optional)
    */
   async markReady(orderId: string): Promise<FoodOrder> {
     const order = await this.getOrderById(orderId);
 
-    if (
-      order.status !== FoodOrderStatus.ACCEPTED &&
-      order.status !== FoodOrderStatus.PREPARING
-    ) {
+    if (order.status === FoodOrderStatus.COMPLETED || order.status === FoodOrderStatus.CANCELLED) {
       throw new BadRequestException(
-        `Đơn hàng ${order.orderCode} không thể đánh dấu sẵn sàng`,
+        `Đơn hàng ${order.orderCode} đã kết thúc, không thể đánh dấu sẵn sàng`,
       );
     }
 
@@ -300,25 +372,39 @@ export class OrdersService {
       throw new BadRequestException('Không tìm thấy tài khoản');
     }
 
-    const connector = this.connectorFactory.getConnector(order.platform);
-    const result = await connector.markReady(account, order.externalOrderId);
+    try {
+      const connector = this.connectorFactory.getConnector(order.platform);
+      const result = await connector.markReady(account, order.externalOrderId);
 
-    if (!result.success) {
-      throw new BadRequestException(result.error || 'Đánh dấu sẵn sàng thất bại');
+      if (!result.success) {
+        this.logger.warn(
+          `[MarkReady] ${order.orderCode}: Platform API failed: ${result.error}`,
+        );
+      }
+    } catch (error: any) {
+      this.logger.warn(
+        `[MarkReady] ${order.orderCode}: Platform API error: ${error.message}`,
+      );
     }
 
-    order.previousStatus = order.status;
-    order.status = FoodOrderStatus.READY;
     order.preparedAt = new Date();
 
     return this.orderRepo.save(order);
   }
 
   /**
-   * Complete an order
+   * Complete order on merchant platform
    */
   async completeOrder(orderId: string): Promise<FoodOrder> {
     const order = await this.getOrderById(orderId);
+
+    if (order.status === FoodOrderStatus.COMPLETED) {
+      return order; // Already completed
+    }
+
+    if (order.status === FoodOrderStatus.CANCELLED) {
+      throw new BadRequestException('Không thể hoàn tất đơn đã hủy');
+    }
 
     const account = await this.accountRepo.findOne({
       where: { id: order.accountId },
@@ -328,11 +414,19 @@ export class OrdersService {
       throw new BadRequestException('Không tìm thấy tài khoản');
     }
 
-    const connector = this.connectorFactory.getConnector(order.platform);
-    const result = await connector.completeOrder(account, order.externalOrderId);
+    try {
+      const connector = this.connectorFactory.getConnector(order.platform);
+      const result = await connector.completeOrder(account, order.externalOrderId);
 
-    if (!result.success) {
-      throw new BadRequestException(result.error || 'Hoàn tất đơn thất bại');
+      if (!result.success) {
+        this.logger.warn(
+          `[CompleteOrder] ${order.orderCode}: Platform API failed: ${result.error}`,
+        );
+      }
+    } catch (error: any) {
+      this.logger.warn(
+        `[CompleteOrder] ${order.orderCode}: Platform API error: ${error.message}`,
+      );
     }
 
     order.previousStatus = order.status;
@@ -343,7 +437,12 @@ export class OrdersService {
   }
 
   /**
-   * Cancel an order
+   * Huỷ đơn hàng (CCB)
+   *
+   * CCB Flow - Bước 3:
+   * - Nhân viên CCB nhấn "Huỷ" để huỷ đơn hàng
+   * - Cập nhật TechRes status: * -> CANCELLED
+   * - Gọi platform API để cancel đơn trên merchant (nếu có thể)
    */
   async cancelOrder(orderId: string, reason: string): Promise<FoodOrder> {
     const order = await this.getOrderById(orderId);
@@ -352,29 +451,53 @@ export class OrdersService {
       throw new BadRequestException('Không thể hủy đơn đã hoàn thành');
     }
 
+    if (order.status === FoodOrderStatus.CANCELLED) {
+      return order; // Already cancelled
+    }
+
     const account = await this.accountRepo.findOne({
       where: { id: order.accountId },
     });
 
-    if (!account) {
-      throw new BadRequestException('Không tìm thấy tài khoản');
-    }
+    // Gọi platform API để cancel nếu merchant chưa cancel
+    if (
+      account &&
+      order.merchantStatus !== MerchantOrderStatus.CANCELLED &&
+      order.merchantStatus !== MerchantOrderStatus.COMPLETED
+    ) {
+      try {
+        const connector = this.connectorFactory.getConnector(order.platform);
+        const result = await connector.cancelOrder(
+          account,
+          order.externalOrderId,
+          reason,
+        );
 
-    const connector = this.connectorFactory.getConnector(order.platform);
-    const result = await connector.cancelOrder(
-      account,
-      order.externalOrderId,
-      reason,
-    );
-
-    if (!result.success) {
-      throw new BadRequestException(result.error || 'Hủy đơn thất bại');
+        if (!result.success) {
+          this.logger.warn(
+            `[CancelOrder] ${order.orderCode}: Platform API failed: ${result.error}`,
+          );
+        } else {
+          this.logger.log(
+            `[CancelOrder] ${order.orderCode}: Platform API cancelled successfully`,
+          );
+        }
+      } catch (error: any) {
+        this.logger.warn(
+          `[CancelOrder] ${order.orderCode}: Platform API error: ${error.message}`,
+        );
+      }
     }
 
     order.previousStatus = order.status;
     order.status = FoodOrderStatus.CANCELLED;
     order.cancelledAt = new Date();
     order.cancelReason = reason;
+
+    this.logger.log(
+      `[CancelOrder] ${order.orderCode}: TechRes status: ${order.previousStatus} -> CANCELLED, ` +
+        `reason: ${reason}`,
+    );
 
     return this.orderRepo.save(order);
   }

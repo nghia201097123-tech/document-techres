@@ -7,7 +7,7 @@ import {
   IsString,
   Min,
 } from 'class-validator';
-import { FoodOrderStatus, FoodPlatformType } from '../../../database/entities';
+import { FoodOrderStatus, MerchantOrderStatus, FoodPlatformType } from '../../../database/entities';
 
 /**
  * Poll Orders Query DTO
@@ -43,10 +43,21 @@ export class GetOrdersQueryDto {
   @IsEnum(FoodPlatformType)
   platform?: FoodPlatformType;
 
-  @ApiPropertyOptional({ enum: FoodOrderStatus })
+  @ApiPropertyOptional({
+    enum: FoodOrderStatus,
+    description: 'TechRes status (NEW, CONFIRMED, COMPLETED, CANCELLED)',
+  })
   @IsOptional()
   @IsEnum(FoodOrderStatus)
   status?: FoodOrderStatus;
+
+  @ApiPropertyOptional({
+    enum: MerchantOrderStatus,
+    description: 'Merchant status (PENDING, ACCEPTED, PREPARING, READY, DELIVERING, COMPLETED, CANCELLED)',
+  })
+  @IsOptional()
+  @IsEnum(MerchantOrderStatus)
+  merchantStatus?: MerchantOrderStatus;
 
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()

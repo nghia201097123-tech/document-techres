@@ -4,7 +4,7 @@ import { Repository, In } from 'typeorm';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { WorkerManagerService, RawFoodOrder, AccountData } from '../workers/worker-manager.service';
-import { FoodOrder, FoodOrderStatus } from '../../database/entities/food-order.entity';
+import { FoodOrder, FoodOrderStatus, MerchantOrderStatus } from '../../database/entities/food-order.entity';
 import { FoodPlatformAccount, AccountStatus } from '../../database/entities/food-platform-account.entity';
 
 @Injectable()
@@ -176,9 +176,9 @@ export class OrdersService {
         await this.publishNewOrders(branchId, newOrderIds);
       }
 
-      // 8. Get total orders count
+      // 8. Get total orders count (đơn mới + đơn đã xác nhận)
       const totalOrders = await this.orderRepo.count({
-        where: { branchId, status: In([FoodOrderStatus.NEW, FoodOrderStatus.PREPARING]) },
+        where: { branchId, status: In([FoodOrderStatus.NEW, FoodOrderStatus.CONFIRMED]) },
       });
 
       return {
@@ -194,10 +194,47 @@ export class OrdersService {
   }
 
   /**
+   * Map platform status string to MerchantOrderStatus enum
+   */
+  private mapToMerchantStatus(platformStatus: string): MerchantOrderStatus {
+    const statusLower = platformStatus.toLowerCase();
+    const statusMap: Record<string, MerchantOrderStatus> = {
+      new: MerchantOrderStatus.PENDING,
+      pending: MerchantOrderStatus.PENDING,
+      order_new: MerchantOrderStatus.PENDING,
+      accepted: MerchantOrderStatus.ACCEPTED,
+      order_accepted: MerchantOrderStatus.ACCEPTED,
+      preparing: MerchantOrderStatus.PREPARING,
+      order_in_prepare: MerchantOrderStatus.PREPARING,
+      order_executing: MerchantOrderStatus.PREPARING,
+      ready: MerchantOrderStatus.READY,
+      order_ready: MerchantOrderStatus.READY,
+      delivering: MerchantOrderStatus.DELIVERING,
+      order_in_delivery: MerchantOrderStatus.DELIVERING,
+      completed: MerchantOrderStatus.COMPLETED,
+      order_delivered: MerchantOrderStatus.COMPLETED,
+      cancelled: MerchantOrderStatus.CANCELLED,
+      order_cancelled: MerchantOrderStatus.CANCELLED,
+      cancelled_max: MerchantOrderStatus.CANCELLED,
+      cancelled_passenger: MerchantOrderStatus.CANCELLED,
+      cancelled_operator: MerchantOrderStatus.CANCELLED,
+      cancelled_merchant: MerchantOrderStatus.CANCELLED,
+      failed: MerchantOrderStatus.CANCELLED,
+    };
+    return statusMap[statusLower] || MerchantOrderStatus.PENDING;
+  }
+
+  /**
    * Lưu orders vào DB
-   * TechRes Flow:
-   * - Đơn mới luôn bắt đầu với status = NEW
-   * - Chỉ sync COMPLETED/CANCELLED từ platform
+   *
+   * CCB Flow:
+   * - Bước 1: CCB poll API -> api-app-food gửi signal -> api-order-worker poll từ merchant
+   * - Bước 2: Worker lưu đơn vào DB với:
+   *   + TechRes Status (status): NEW - chờ CCB xác nhận
+   *   + Merchant Status (merchantStatus): Trạng thái từ platform (Grab/Shopee/BeFood)
+   * - Bước 3: CCB hiển thị đơn, nhân viên xác nhận/huỷ -> cập nhật TechRes status
+   * - Bước 4: Khi TechRes status = CONFIRMED và merchantStatus = COMPLETED/CANCELLED
+   *           -> Tự động sync TechRes status theo merchantStatus
    */
   private async saveOrders(
     orders: RawFoodOrder[],
@@ -215,27 +252,51 @@ export class OrdersService {
         },
       });
 
+      // Map platform status to MerchantOrderStatus
+      const newMerchantStatus = this.mapToMerchantStatus(rawOrder.status);
+
       if (existing) {
         // Update existing order
-        const platformStatus = rawOrder.status;
+        const oldMerchantStatus = existing.merchantStatus;
 
-        // TechRes flow: Chỉ sync completed/cancelled từ platform
-        const normalizedStatus = platformStatus.toLowerCase();
-        if (normalizedStatus === 'completed' || normalizedStatus === 'cancelled') {
-          if (existing.status !== normalizedStatus) {
+        // Always update merchantStatus from platform
+        if (oldMerchantStatus !== newMerchantStatus) {
+          existing.previousMerchantStatus = oldMerchantStatus;
+          existing.merchantStatus = newMerchantStatus;
+
+          this.logger.log(
+            `[saveOrders] Merchant status changed for ${existing.orderCode}: ` +
+              `${oldMerchantStatus} -> ${newMerchantStatus}`,
+          );
+        }
+
+        // Auto-sync TechRes status when:
+        // 1. Đơn đã được xác nhận (CONFIRMED) bởi CCB
+        // 2. Merchant status = COMPLETED hoặc CANCELLED
+        if (existing.status === FoodOrderStatus.CONFIRMED) {
+          if (
+            newMerchantStatus === MerchantOrderStatus.COMPLETED &&
+            existing.status !== FoodOrderStatus.COMPLETED
+          ) {
             existing.previousStatus = existing.status;
-            existing.status = normalizedStatus as FoodOrderStatus;
-            existing.lastSyncAt = new Date();
-
-            if (normalizedStatus === 'completed') {
-              existing.completedAt = new Date();
-            } else {
-              existing.cancelledAt = new Date();
-            }
+            existing.status = FoodOrderStatus.COMPLETED;
+            existing.completedAt = new Date();
 
             this.logger.log(
-              `[saveOrders] Auto-sync status for ${existing.orderCode}: ` +
-                `${existing.previousStatus} -> ${platformStatus}`,
+              `[saveOrders] Auto-complete TechRes order ${existing.orderCode} ` +
+                `(merchant status: ${newMerchantStatus})`,
+            );
+          } else if (
+            newMerchantStatus === MerchantOrderStatus.CANCELLED &&
+            existing.status !== FoodOrderStatus.CANCELLED
+          ) {
+            existing.previousStatus = existing.status;
+            existing.status = FoodOrderStatus.CANCELLED;
+            existing.cancelledAt = new Date();
+
+            this.logger.log(
+              `[saveOrders] Auto-cancel TechRes order ${existing.orderCode} ` +
+                `(merchant status: ${newMerchantStatus})`,
             );
           }
         }
@@ -260,15 +321,21 @@ export class OrdersService {
         await this.orderRepo.save(existing);
         savedOrders.push(existing);
       } else {
-        // Create new order - TechRes flow: luôn bắt đầu với NEW
-        const platformStatus = rawOrder.status.toLowerCase();
-        let initialStatus = FoodOrderStatus.NEW;
+        // Create new order
+        // TechRes status: luôn bắt đầu với NEW (chờ CCB xác nhận)
+        // Merchant status: lấy từ platform
+        let initialTechResStatus = FoodOrderStatus.NEW;
 
-        // Ngoại lệ: nếu platform đã completed/cancelled
-        if (platformStatus === 'completed' || platformStatus === 'cancelled') {
-          initialStatus = platformStatus as FoodOrderStatus;
+        // Ngoại lệ: nếu platform đã completed/cancelled thì TechRes cũng set luôn
+        if (newMerchantStatus === MerchantOrderStatus.COMPLETED) {
+          initialTechResStatus = FoodOrderStatus.COMPLETED;
           this.logger.log(
-            `[saveOrders] New order ${rawOrder.orderCode} already ${platformStatus} on platform`,
+            `[saveOrders] New order ${rawOrder.orderCode} already COMPLETED on platform`,
+          );
+        } else if (newMerchantStatus === MerchantOrderStatus.CANCELLED) {
+          initialTechResStatus = FoodOrderStatus.CANCELLED;
+          this.logger.log(
+            `[saveOrders] New order ${rawOrder.orderCode} already CANCELLED on platform`,
           );
         }
 
@@ -278,7 +345,8 @@ export class OrdersService {
           externalOrderId: rawOrder.externalOrderId,
           orderCode: rawOrder.orderCode,
           platform: rawOrder.platform as any,
-          status: initialStatus,
+          status: initialTechResStatus,
+          merchantStatus: newMerchantStatus,
           customerName: rawOrder.customerName,
           customerPhone: rawOrder.customerPhone || '',
           customerAddress: rawOrder.customerAddress || '',
@@ -302,7 +370,10 @@ export class OrdersService {
         savedOrders.push(saved);
         newOrderIds.push(saved.id);
 
-        this.logger.log(`[saveOrders] Created new order: ${saved.orderCode}`);
+        this.logger.log(
+          `[saveOrders] Created new order: ${saved.orderCode} ` +
+            `(TechRes: ${initialTechResStatus}, Merchant: ${newMerchantStatus})`,
+        );
       }
     }
 
@@ -318,7 +389,10 @@ export class OrdersService {
       externalOrderId: order.externalOrderId,
       orderCode: order.orderCode,
       platform: order.platform,
-      status: order.status.toLowerCase(),
+      // TechRes status (NEW, CONFIRMED, COMPLETED, CANCELLED)
+      status: order.status?.toLowerCase() || 'new',
+      // Merchant status from platform (pending, accepted, preparing, ready, delivering, completed, cancelled)
+      merchantStatus: order.merchantStatus?.toLowerCase() || 'pending',
       customerId: null,
       customerName: order.customerName,
       customerPhone: order.customerPhone,
@@ -386,7 +460,7 @@ export class OrdersService {
   }
 
   /**
-   * Get order counts by status
+   * Get order counts by TechRes status
    */
   async getOrderCounts(branchId: string) {
     const counts = await this.orderRepo
@@ -399,10 +473,10 @@ export class OrdersService {
 
     const result = {
       total: 0,
-      new: 0,
-      preparing: 0,
-      completed: 0,
-      cancelled: 0,
+      new: 0, // Đơn mới, chờ xác nhận
+      confirmed: 0, // Đã xác nhận bởi CCB
+      completed: 0, // Hoàn tất
+      cancelled: 0, // Đã huỷ
     };
 
     for (const row of counts) {
@@ -413,8 +487,8 @@ export class OrdersService {
         case FoodOrderStatus.NEW:
           result.new = count;
           break;
-        case FoodOrderStatus.PREPARING:
-          result.preparing = count;
+        case FoodOrderStatus.CONFIRMED:
+          result.confirmed = count;
           break;
         case FoodOrderStatus.COMPLETED:
           result.completed = count;

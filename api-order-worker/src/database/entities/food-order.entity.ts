@@ -7,14 +7,28 @@ import {
   Index,
 } from 'typeorm';
 
+/**
+ * TechRes Order Status - Trạng thái đơn hàng phía TechRes
+ * Flow: NEW -> CONFIRMED -> COMPLETED/CANCELLED
+ */
 export enum FoodOrderStatus {
-  NEW = 'new',
-  ACCEPTED = 'accepted',
-  PREPARING = 'preparing',
-  READY = 'ready',
-  DELIVERING = 'delivering',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
+  NEW = 'new', // Đơn mới, chờ xác nhận bởi nhân viên CCB
+  CONFIRMED = 'confirmed', // Đã xác nhận bởi nhân viên CCB
+  COMPLETED = 'completed', // Hoàn thành
+  CANCELLED = 'cancelled', // Đã hủy
+}
+
+/**
+ * Merchant Order Status - Trạng thái đơn hàng từ merchant (Grab/Shopee/BeFood)
+ */
+export enum MerchantOrderStatus {
+  PENDING = 'pending', // Đơn mới từ merchant
+  ACCEPTED = 'accepted', // Merchant đã nhận đơn
+  PREPARING = 'preparing', // Đang chuẩn bị
+  READY = 'ready', // Sẵn sàng giao
+  DELIVERING = 'delivering', // Đang giao
+  COMPLETED = 'completed', // Merchant đã hoàn thành
+  CANCELLED = 'cancelled', // Merchant đã huỷ
 }
 
 export enum FoodPlatformType {
@@ -47,11 +61,24 @@ export class FoodOrder {
   @Column({ type: 'enum', enum: FoodPlatformType })
   platform: FoodPlatformType;
 
+  // TechRes Status - Trạng thái do CCB quản lý
   @Column({ type: 'enum', enum: FoodOrderStatus, default: FoodOrderStatus.NEW })
   status: FoodOrderStatus;
 
+  // Merchant Status - Trạng thái từ merchant (Grab/Shopee/BeFood)
+  @Column({
+    type: 'enum',
+    enum: MerchantOrderStatus,
+    default: MerchantOrderStatus.PENDING,
+    name: 'merchant_status',
+  })
+  merchantStatus: MerchantOrderStatus;
+
   @Column({ name: 'previous_status', type: 'varchar', length: 50, nullable: true })
   previousStatus: string;
+
+  @Column({ name: 'previous_merchant_status', type: 'varchar', length: 50, nullable: true })
+  previousMerchantStatus: string;
 
   // Customer info
   @Column({ name: 'customer_name', type: 'varchar', length: 255 })

@@ -73,11 +73,56 @@ export class OrdersController {
   }
 
   /**
-   * Accept/Confirm an order
+   * Xác nhận đơn hàng (CCB)
+   *
+   * CCB Flow - Bước 3:
+   * - Nhân viên CCB nhấn "Xác nhận" để xác nhận đơn hàng
+   * - Cập nhật TechRes status: NEW -> CONFIRMED
+   * - Nếu merchantStatus đã kết thúc (COMPLETED/CANCELLED) -> auto-sync
+   */
+  @Post(':id/confirm')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Xác nhận đơn hàng (CCB)',
+    description: `**CCB Flow - Bước 3**
+
+- Nhân viên CCB nhấn "Xác nhận" để xác nhận đơn hàng
+- Cập nhật TechRes status: NEW → CONFIRMED
+- Nếu merchantStatus đã COMPLETED → auto-complete TechRes
+- Nếu merchantStatus đã CANCELLED → auto-cancel TechRes
+- Nếu merchantStatus chưa kết thúc → chờ worker auto-sync sau
+
+**Lưu ý:** Endpoint này KHÔNG gọi platform API`,
+  })
+  @ApiParam({ name: 'id', description: 'Order ID' })
+  @ApiResponse({ status: 200, description: 'Xác nhận thành công' })
+  async confirmOrder(@Param('id') id: string) {
+    const order = await this.ordersService.confirmOrder(id);
+    return ApiResponseDto.success(
+      {
+        id: order.id,
+        orderCode: order.orderCode,
+        status: order.status,
+        merchantStatus: order.merchantStatus,
+        confirmedAt: order.confirmedAt,
+      },
+      `Đã xác nhận đơn ${order.orderCode}`,
+    );
+  }
+
+  /**
+   * Accept order on platform (optional)
+   * Gọi platform API để accept đơn và confirm đơn
    */
   @Post(':id/accept')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Xác nhận đơn hàng' })
+  @ApiOperation({
+    summary: 'Accept đơn trên platform',
+    description: `Gọi platform API (Grab/Shopee/BeFood) để accept đơn.
+Sau đó tự động confirm đơn nếu chưa confirm.
+
+**Lưu ý:** Thường không cần gọi endpoint này vì merchant đã auto-accept`,
+  })
   @ApiParam({ name: 'id', description: 'Order ID' })
   @ApiResponse({ status: 200, description: 'Xác nhận thành công' })
   async acceptOrder(@Param('id') id: string) {
@@ -87,6 +132,7 @@ export class OrdersController {
         id: order.id,
         orderCode: order.orderCode,
         status: order.status,
+        merchantStatus: order.merchantStatus,
         acceptedAt: order.acceptedAt,
       },
       `Đã xác nhận đơn ${order.orderCode}`,
@@ -136,11 +182,23 @@ export class OrdersController {
   }
 
   /**
-   * Cancel an order
+   * Huỷ đơn hàng (CCB)
+   *
+   * CCB Flow - Bước 3:
+   * - Nhân viên CCB nhấn "Huỷ" để huỷ đơn hàng
+   * - Cập nhật TechRes status: * -> CANCELLED
+   * - Gọi platform API để cancel đơn trên merchant (nếu có thể)
    */
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Hủy đơn hàng' })
+  @ApiOperation({
+    summary: 'Huỷ đơn hàng (CCB)',
+    description: `**CCB Flow - Bước 3**
+
+- Nhân viên CCB nhấn "Huỷ" để huỷ đơn hàng
+- Cập nhật TechRes status: * → CANCELLED
+- Gọi platform API để cancel đơn trên merchant (nếu có thể)`,
+  })
   @ApiParam({ name: 'id', description: 'Order ID' })
   @ApiResponse({ status: 200, description: 'Hủy thành công' })
   async cancelOrder(@Param('id') id: string, @Body() dto: CancelOrderDto) {
@@ -150,6 +208,7 @@ export class OrdersController {
         id: order.id,
         orderCode: order.orderCode,
         status: order.status,
+        merchantStatus: order.merchantStatus,
         cancelledAt: order.cancelledAt,
         cancelReason: order.cancelReason,
       },
