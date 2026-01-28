@@ -26,17 +26,23 @@ export enum FoodOrderStatus {
 }
 
 /**
- * Merchant Order Status - Trạng thái đơn hàng từ merchant (Grab/Shopee/BeFood)
- * Được cập nhật tự động từ việc poll API của merchant
+ * Merchant Order Status - Trạng thái đơn hàng từ Grab
+ * Lưu trực tiếp giá trị enum từ Grab API
  */
 export enum MerchantOrderStatus {
-  PENDING = 'pending', // Đơn mới từ merchant
-  ACCEPTED = 'accepted', // Merchant đã nhận đơn
-  PREPARING = 'preparing', // Đang chuẩn bị
-  READY = 'ready', // Sẵn sàng giao
-  DELIVERING = 'delivering', // Đang giao (có tài xế)
-  COMPLETED = 'completed', // Merchant đã hoàn thành
-  CANCELLED = 'cancelled', // Merchant đã huỷ
+  // Trạng thái chưa kết thúc
+  ORDER_IN_PREPARE = 'ORDER_IN_PREPARE', // Đang xử lý
+  ORDER_EXECUTING = 'ORDER_EXECUTING', // Đang giao
+
+  // Trạng thái đã kết thúc
+  COMPLETED = 'COMPLETED', // Hoàn tất
+
+  // Trạng thái huỷ (đã kết thúc)
+  CANCELLED = 'CANCELLED', // Huỷ chung
+  CANCELLED_MAX = 'CANCELLED_MAX', // Huỷ do quá thời gian
+  CANCELLED_PASSENGER = 'CANCELLED_PASSENGER', // Khách huỷ
+  CANCELLED_OPERATOR = 'CANCELLED_OPERATOR', // Operator huỷ
+  FAILED = 'FAILED', // Thất bại
 }
 
 /**
@@ -94,11 +100,11 @@ export class FoodOrder {
   })
   status: FoodOrderStatus;
 
-  // Merchant Status - Trạng thái từ merchant (Grab/Shopee/BeFood)
+  // Merchant Status - Trạng thái từ Grab
   @Column({
     type: 'enum',
     enum: MerchantOrderStatus,
-    default: MerchantOrderStatus.PENDING,
+    default: MerchantOrderStatus.ORDER_IN_PREPARE,
     name: 'merchant_status',
   })
   merchantStatus: MerchantOrderStatus;

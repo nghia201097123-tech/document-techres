@@ -4,16 +4,17 @@ export class AddMerchantStatusColumn1706800000000 implements MigrationInterface 
   name = 'AddMerchantStatusColumn1706800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Create merchant_order_status_enum type
+    // Create merchant_order_status_enum type với các giá trị từ Grab API
     await queryRunner.query(`
       CREATE TYPE "merchant_order_status_enum" AS ENUM (
-        'pending',
-        'accepted',
-        'preparing',
-        'ready',
-        'delivering',
-        'completed',
-        'cancelled'
+        'ORDER_IN_PREPARE',
+        'ORDER_EXECUTING',
+        'COMPLETED',
+        'CANCELLED',
+        'CANCELLED_MAX',
+        'CANCELLED_PASSENGER',
+        'CANCELLED_OPERATOR',
+        'FAILED'
       )
     `);
 
@@ -22,10 +23,10 @@ export class AddMerchantStatusColumn1706800000000 implements MigrationInterface 
       ALTER TYPE "food_order_status_enum" ADD VALUE IF NOT EXISTS 'confirmed' AFTER 'new'
     `);
 
-    // Add merchant_status column with default value
+    // Add merchant_status column with default value ORDER_IN_PREPARE
     await queryRunner.query(`
       ALTER TABLE "food_orders"
-      ADD COLUMN IF NOT EXISTS "merchant_status" "merchant_order_status_enum" DEFAULT 'pending'
+      ADD COLUMN IF NOT EXISTS "merchant_status" "merchant_order_status_enum" DEFAULT 'ORDER_IN_PREPARE'
     `);
 
     // Add previous_merchant_status column
@@ -34,22 +35,20 @@ export class AddMerchantStatusColumn1706800000000 implements MigrationInterface 
       ADD COLUMN IF NOT EXISTS "previous_merchant_status" varchar(50)
     `);
 
-    // Migrate existing data: Map old TechRes statuses to merchant statuses
-    // Orders that were 'accepted', 'preparing', 'ready', 'delivering' should have those as merchant status
-    // and TechRes status should be 'confirmed' if they were accepted by user
+    // Migrate existing data: Map old TechRes statuses to Grab merchant statuses
     await queryRunner.query(`
       UPDATE "food_orders"
       SET "merchant_status" = CASE
-        WHEN "status" = 'new' THEN 'pending'::merchant_order_status_enum
-        WHEN "status" = 'accepted' THEN 'accepted'::merchant_order_status_enum
-        WHEN "status" = 'preparing' THEN 'preparing'::merchant_order_status_enum
-        WHEN "status" = 'ready' THEN 'ready'::merchant_order_status_enum
-        WHEN "status" = 'delivering' THEN 'delivering'::merchant_order_status_enum
-        WHEN "status" = 'completed' THEN 'completed'::merchant_order_status_enum
-        WHEN "status" = 'cancelled' THEN 'cancelled'::merchant_order_status_enum
-        ELSE 'pending'::merchant_order_status_enum
+        WHEN "status" = 'new' THEN 'ORDER_IN_PREPARE'::merchant_order_status_enum
+        WHEN "status" = 'accepted' THEN 'ORDER_IN_PREPARE'::merchant_order_status_enum
+        WHEN "status" = 'preparing' THEN 'ORDER_IN_PREPARE'::merchant_order_status_enum
+        WHEN "status" = 'ready' THEN 'ORDER_IN_PREPARE'::merchant_order_status_enum
+        WHEN "status" = 'delivering' THEN 'ORDER_EXECUTING'::merchant_order_status_enum
+        WHEN "status" = 'completed' THEN 'COMPLETED'::merchant_order_status_enum
+        WHEN "status" = 'cancelled' THEN 'CANCELLED'::merchant_order_status_enum
+        ELSE 'ORDER_IN_PREPARE'::merchant_order_status_enum
       END
-      WHERE "merchant_status" IS NULL OR "merchant_status" = 'pending'
+      WHERE "merchant_status" IS NULL OR "merchant_status" = 'ORDER_IN_PREPARE'
     `);
 
     // Update TechRes status for orders that were in progress

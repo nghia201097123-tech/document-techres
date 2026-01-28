@@ -27,6 +27,26 @@ import { PollOrdersQueryDto, GetOrdersQueryDto, PollResponseDto } from './dto/or
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
 
+  /**
+   * Kiểm tra merchantStatus có phải trạng thái hoàn tất không
+   */
+  private isMerchantCompleted(status: MerchantOrderStatus): boolean {
+    return status === MerchantOrderStatus.COMPLETED;
+  }
+
+  /**
+   * Kiểm tra merchantStatus có phải trạng thái huỷ không
+   */
+  private isMerchantCancelled(status: MerchantOrderStatus): boolean {
+    return [
+      MerchantOrderStatus.CANCELLED,
+      MerchantOrderStatus.CANCELLED_MAX,
+      MerchantOrderStatus.CANCELLED_PASSENGER,
+      MerchantOrderStatus.CANCELLED_OPERATOR,
+      MerchantOrderStatus.FAILED,
+    ].includes(status);
+  }
+
   constructor(
     @InjectRepository(FoodOrder)
     private readonly orderRepo: Repository<FoodOrder>,
@@ -276,17 +296,17 @@ export class OrdersService {
     );
 
     // Auto-sync nếu merchantStatus đã kết thúc
-    if (order.merchantStatus === MerchantOrderStatus.COMPLETED) {
+    if (this.isMerchantCompleted(order.merchantStatus)) {
       order.status = FoodOrderStatus.COMPLETED;
       order.completedAt = new Date();
       this.logger.log(
         `[ConfirmOrder] ${order.orderCode}: Auto-complete vì merchantStatus = COMPLETED`,
       );
-    } else if (order.merchantStatus === MerchantOrderStatus.CANCELLED) {
+    } else if (this.isMerchantCancelled(order.merchantStatus)) {
       order.status = FoodOrderStatus.CANCELLED;
       order.cancelledAt = new Date();
       this.logger.log(
-        `[ConfirmOrder] ${order.orderCode}: Auto-cancel vì merchantStatus = CANCELLED`,
+        `[ConfirmOrder] ${order.orderCode}: Auto-cancel vì merchantStatus = ${order.merchantStatus}`,
       );
     }
 
@@ -459,11 +479,11 @@ export class OrdersService {
       where: { id: order.accountId },
     });
 
-    // Gọi platform API để cancel nếu merchant chưa cancel
+    // Gọi platform API để cancel nếu merchant chưa kết thúc (chưa completed/cancelled)
     if (
       account &&
-      order.merchantStatus !== MerchantOrderStatus.CANCELLED &&
-      order.merchantStatus !== MerchantOrderStatus.COMPLETED
+      !this.isMerchantCancelled(order.merchantStatus) &&
+      !this.isMerchantCompleted(order.merchantStatus)
     ) {
       try {
         const connector = this.connectorFactory.getConnector(order.platform);

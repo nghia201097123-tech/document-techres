@@ -194,34 +194,52 @@ export class OrdersService {
   }
 
   /**
-   * Map platform status string to MerchantOrderStatus enum
+   * Map Grab status string to MerchantOrderStatus enum
+   * Lưu trực tiếp giá trị từ Grab API
    */
   private mapToMerchantStatus(platformStatus: string): MerchantOrderStatus {
-    const statusLower = platformStatus.toLowerCase();
+    const statusUpper = platformStatus.toUpperCase();
+
+    // Map trực tiếp các giá trị từ Grab API
     const statusMap: Record<string, MerchantOrderStatus> = {
-      new: MerchantOrderStatus.PENDING,
-      pending: MerchantOrderStatus.PENDING,
-      order_new: MerchantOrderStatus.PENDING,
-      accepted: MerchantOrderStatus.ACCEPTED,
-      order_accepted: MerchantOrderStatus.ACCEPTED,
-      preparing: MerchantOrderStatus.PREPARING,
-      order_in_prepare: MerchantOrderStatus.PREPARING,
-      order_executing: MerchantOrderStatus.PREPARING,
-      ready: MerchantOrderStatus.READY,
-      order_ready: MerchantOrderStatus.READY,
-      delivering: MerchantOrderStatus.DELIVERING,
-      order_in_delivery: MerchantOrderStatus.DELIVERING,
-      completed: MerchantOrderStatus.COMPLETED,
-      order_delivered: MerchantOrderStatus.COMPLETED,
-      cancelled: MerchantOrderStatus.CANCELLED,
-      order_cancelled: MerchantOrderStatus.CANCELLED,
-      cancelled_max: MerchantOrderStatus.CANCELLED,
-      cancelled_passenger: MerchantOrderStatus.CANCELLED,
-      cancelled_operator: MerchantOrderStatus.CANCELLED,
-      cancelled_merchant: MerchantOrderStatus.CANCELLED,
-      failed: MerchantOrderStatus.CANCELLED,
+      // Trạng thái đang xử lý
+      ORDER_IN_PREPARE: MerchantOrderStatus.ORDER_IN_PREPARE,
+
+      // Trạng thái đang giao
+      ORDER_EXECUTING: MerchantOrderStatus.ORDER_EXECUTING,
+
+      // Trạng thái hoàn tất
+      COMPLETED: MerchantOrderStatus.COMPLETED,
+
+      // Các trạng thái huỷ
+      CANCELLED: MerchantOrderStatus.CANCELLED,
+      CANCELLED_MAX: MerchantOrderStatus.CANCELLED_MAX,
+      CANCELLED_PASSENGER: MerchantOrderStatus.CANCELLED_PASSENGER,
+      CANCELLED_OPERATOR: MerchantOrderStatus.CANCELLED_OPERATOR,
+      FAILED: MerchantOrderStatus.FAILED,
     };
-    return statusMap[statusLower] || MerchantOrderStatus.PENDING;
+
+    return statusMap[statusUpper] || MerchantOrderStatus.ORDER_IN_PREPARE;
+  }
+
+  /**
+   * Kiểm tra merchantStatus có phải trạng thái hoàn tất không
+   */
+  private isMerchantCompleted(status: MerchantOrderStatus): boolean {
+    return status === MerchantOrderStatus.COMPLETED;
+  }
+
+  /**
+   * Kiểm tra merchantStatus có phải trạng thái huỷ không
+   */
+  private isMerchantCancelled(status: MerchantOrderStatus): boolean {
+    return [
+      MerchantOrderStatus.CANCELLED,
+      MerchantOrderStatus.CANCELLED_MAX,
+      MerchantOrderStatus.CANCELLED_PASSENGER,
+      MerchantOrderStatus.CANCELLED_OPERATOR,
+      MerchantOrderStatus.FAILED,
+    ].includes(status);
   }
 
   /**
@@ -272,10 +290,10 @@ export class OrdersService {
 
         // Auto-sync TechRes status when:
         // 1. Đơn đã được xác nhận (CONFIRMED) bởi CCB
-        // 2. Merchant status = COMPLETED hoặc CANCELLED
+        // 2. Merchant status = COMPLETED hoặc một trong các trạng thái huỷ
         if (existing.status === FoodOrderStatus.CONFIRMED) {
           if (
-            newMerchantStatus === MerchantOrderStatus.COMPLETED &&
+            this.isMerchantCompleted(newMerchantStatus) &&
             existing.status !== FoodOrderStatus.COMPLETED
           ) {
             existing.previousStatus = existing.status;
@@ -287,7 +305,7 @@ export class OrdersService {
                 `(merchant status: ${newMerchantStatus})`,
             );
           } else if (
-            newMerchantStatus === MerchantOrderStatus.CANCELLED &&
+            this.isMerchantCancelled(newMerchantStatus) &&
             existing.status !== FoodOrderStatus.CANCELLED
           ) {
             existing.previousStatus = existing.status;
@@ -327,15 +345,15 @@ export class OrdersService {
         let initialTechResStatus = FoodOrderStatus.NEW;
 
         // Ngoại lệ: nếu platform đã completed/cancelled thì TechRes cũng set luôn
-        if (newMerchantStatus === MerchantOrderStatus.COMPLETED) {
+        if (this.isMerchantCompleted(newMerchantStatus)) {
           initialTechResStatus = FoodOrderStatus.COMPLETED;
           this.logger.log(
             `[saveOrders] New order ${rawOrder.orderCode} already COMPLETED on platform`,
           );
-        } else if (newMerchantStatus === MerchantOrderStatus.CANCELLED) {
+        } else if (this.isMerchantCancelled(newMerchantStatus)) {
           initialTechResStatus = FoodOrderStatus.CANCELLED;
           this.logger.log(
-            `[saveOrders] New order ${rawOrder.orderCode} already CANCELLED on platform`,
+            `[saveOrders] New order ${rawOrder.orderCode} already CANCELLED on platform (${newMerchantStatus})`,
           );
         }
 
