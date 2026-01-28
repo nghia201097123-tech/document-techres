@@ -46,9 +46,29 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`
-🚀 Upload Service is running!
-📍 API: http://localhost:${port}/api
-📚 Swagger: http://localhost:${port}/api/docs
+╔════════════════════════════════════════════════════════════════╗
+║                    API-UPLOAD SERVICE                          ║
+║              TechRes File Upload Service (MinIO)               ║
+╠════════════════════════════════════════════════════════════════╣
+║ App Settings:                                                  ║
+║   SERVICE_PORT: ${String(port).padEnd(45)}║
+║   NODE_ENV: ${(process.env.NODE_ENV || 'development').padEnd(49)}║
+╠════════════════════════════════════════════════════════════════╣
+║ MinIO Storage:                                                 ║
+║   ENDPOINT: ${(process.env.CONFIG_MINIO_ENDPOINT || '172.16.10.218').padEnd(49)}║
+║   PORT: ${(process.env.CONFIG_MINIO_PORT || '30900').padEnd(53)}║
+║   BUCKET: ${(process.env.CONFIG_MINIO_BUCKET || 'techres-uploads').padEnd(51)}║
+║   SSL: ${(process.env.CONFIG_MINIO_ENABLE_SSL || 'false').padEnd(54)}║
+╠════════════════════════════════════════════════════════════════╣
+║ Upload Limits:                                                 ║
+║   MAX_IMAGE: ${(process.env.MAX_IMAGE_SIZE || '10')}MB`.padEnd(63) + `║
+║   MAX_VIDEO: ${(process.env.MAX_VIDEO_SIZE || '100')}MB`.padEnd(63) + `║
+║   MAX_DOCUMENT: ${(process.env.MAX_DOCUMENT_SIZE || '50')}MB`.padEnd(63) + `║
+╠════════════════════════════════════════════════════════════════╣
+║ Endpoints:                                                     ║
+║   API: http://localhost:${port}/api`.padEnd(63) + `║
+║   Swagger: http://localhost:${port}/api/docs`.padEnd(63) + `║
+╚════════════════════════════════════════════════════════════════╝
   `);
 }
 

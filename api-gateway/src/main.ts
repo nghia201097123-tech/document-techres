@@ -35,7 +35,31 @@ async function bootstrap() {
   const port = process.env.SERVICE_PORT ?? 4000;
   await app.listen(port);
 
-  console.log(`🚀 API Gateway is running on: http://localhost:${port}`);
-  console.log(`📚 Swagger docs: http://localhost:${port}/docs`);
+  console.log(`
+╔════════════════════════════════════════════════════════════════╗
+║                    API-GATEWAY SERVICE                         ║
+║              TechRes Offline Web Admin Gateway                 ║
+╠════════════════════════════════════════════════════════════════╣
+║ App Settings:                                                  ║
+║   SERVICE_PORT: ${String(port).padEnd(45)}║
+║   NODE_ENV: ${(process.env.NODE_ENV || 'development').padEnd(49)}║
+╠════════════════════════════════════════════════════════════════╣
+║ Backend Services:                                              ║
+║   API_ADMIN: ${(process.env.CONFIG_API_NODEJS_ADMIN_URL || 'http://localhost:1502').padEnd(48)}║
+║   API_MANAGEMENT: ${(process.env.CONFIG_API_NODEJS_MANAGEMENT_URL || 'http://localhost:1503').padEnd(43)}║
+║   API_OAUTH: ${(process.env.CONFIG_API_NODEJS_OAUTH_URL || 'http://localhost:1506').padEnd(48)}║
+║   API_SOCKET: ${(process.env.CONFIG_API_NODEJS_SOCKET_URL || 'http://localhost:1507').padEnd(47)}║
+║   API_WEBHOOK: ${(process.env.CONFIG_API_NODEJS_WEBHOOK_URL || 'http://localhost:1508').padEnd(46)}║
+╠════════════════════════════════════════════════════════════════╣
+║ Web Frontend (CORS):                                           ║
+║   WEB_ADMIN: ${(process.env.CONFIG_WEB_ADMIN_URL || 'http://localhost:1500').padEnd(48)}║
+║   WEB_DASHBOARD: ${(process.env.CONFIG_WEB_DASHBOARD_URL || 'http://localhost:1501').padEnd(44)}║
+╠════════════════════════════════════════════════════════════════╣
+║ Endpoints:                                                     ║
+║   Gateway: http://localhost:${port}`.padEnd(63) + `║
+║   Swagger: http://localhost:${port}/docs`.padEnd(63) + `║
+║   Socket.IO: ws://localhost:${port}/payment`.padEnd(63) + `║
+╚════════════════════════════════════════════════════════════════╝
+  `);
 }
 bootstrap();

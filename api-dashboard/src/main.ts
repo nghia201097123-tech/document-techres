@@ -54,7 +54,29 @@ async function bootstrap() {
 
   const port = process.env.SERVICE_PORT ?? 1503;
   await app.listen(port);
-  console.log(`🚀 Dashboard API is running on: http://localhost:${port}`);
-  console.log(`📚 Swagger docs: http://localhost:${port}/api/docs`);
+
+  console.log(`
+╔════════════════════════════════════════════════════════════════╗
+║                   API-DASHBOARD SERVICE                        ║
+║           TechRes Web Dashboard (Staff/Owner) API              ║
+╠════════════════════════════════════════════════════════════════╣
+║ App Settings:                                                  ║
+║   SERVICE_PORT: ${String(port).padEnd(45)}║
+║   NODE_ENV: ${(process.env.NODE_ENV || 'development').padEnd(49)}║
+╠════════════════════════════════════════════════════════════════╣
+║ Database (TechRes):                                            ║
+║   HOST: ${(process.env.CONFIG_POSTGRESQL_HOST_TECHRES || '172.16.10.146').padEnd(53)}║
+║   PORT: ${(process.env.CONFIG_POSTGRESQL_PORT_TECHRES || '5432').padEnd(53)}║
+║   DATABASE: ${(process.env.CONFIG_POSTGRESQL_DB_NAME_TECHRES || 'techres').padEnd(49)}║
+╠════════════════════════════════════════════════════════════════╣
+║ Internal Services:                                             ║
+║   API_SOCKET: ${(process.env.CONFIG_API_NODEJS_SOCKET_URL || 'http://localhost:1507').padEnd(47)}║
+║   API_WEBHOOK: ${(process.env.CONFIG_API_NODEJS_WEBHOOK_URL || 'http://localhost:1508').padEnd(46)}║
+╠════════════════════════════════════════════════════════════════╣
+║ Endpoints:                                                     ║
+║   API: http://localhost:${port}/api`.padEnd(63) + `║
+║   Swagger: http://localhost:${port}/api/docs`.padEnd(63) + `║
+╚════════════════════════════════════════════════════════════════╝
+  `);
 }
 bootstrap();

@@ -37,9 +37,21 @@ async function bootstrap() {
   const port = process.env.SERVICE_PORT || 1507;
   await app.listen(port);
 
-  logger.log(`🚀 Socket.IO service is running on: http://localhost:${port}`);
-  logger.log(`🔌 Socket.IO server available at: ws://localhost:${port}`);
-  logger.log(`📚 Swagger docs: http://localhost:${port}/api`);
+  console.log(`
+╔════════════════════════════════════════════════════════════════╗
+║                    SOCKET-SERVICE                              ║
+║          Real-time Payment Notifications via Socket.IO         ║
+╠════════════════════════════════════════════════════════════════╣
+║ App Settings:                                                  ║
+║   SERVICE_PORT: ${String(port).padEnd(45)}║
+║   NODE_ENV: ${(process.env.NODE_ENV || 'development').padEnd(49)}║
+╠════════════════════════════════════════════════════════════════╣
+║ Endpoints:                                                     ║
+║   HTTP: http://localhost:${port}`.padEnd(63) + `║
+║   WebSocket: ws://localhost:${port}`.padEnd(63) + `║
+║   Swagger: http://localhost:${port}/api`.padEnd(63) + `║
+╚════════════════════════════════════════════════════════════════╝
+  `);
 }
 
 bootstrap();

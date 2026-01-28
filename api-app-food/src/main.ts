@@ -52,19 +52,34 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`
-╔══════════════════════════════════════════════════════════════╗
-║                   API APP FOOD - TechRes                      ║
-║              Food Platform Integration Service                ║
-╠══════════════════════════════════════════════════════════════╣
-║  Server running on: http://localhost:${port}                    ║
-║  API Docs:          http://localhost:${port}/docs               ║
-║  API Prefix:        /${apiPrefix}                                    ║
-╠══════════════════════════════════════════════════════════════╣
-║  Supported Platforms:                                         ║
-║  • GrabFood                                                   ║
-║  • ShopeeFood                                                 ║
-║  • BeFood                                                     ║
-╚══════════════════════════════════════════════════════════════╝
+╔════════════════════════════════════════════════════════════════╗
+║                    API-APP-FOOD SERVICE                        ║
+║           Food Platform Integration (Grab/Shopee/Be)           ║
+╠════════════════════════════════════════════════════════════════╣
+║ App Settings:                                                  ║
+║   SERVICE_PORT: ${String(port).padEnd(45)}║
+║   NODE_ENV: ${(process.env.NODE_ENV || 'development').padEnd(49)}║
+║   API_PREFIX: /${apiPrefix}`.padEnd(63) + `║
+╠════════════════════════════════════════════════════════════════╣
+║ Database (App Food):                                           ║
+║   HOST: ${(process.env.CONFIG_POSTGRESQL_HOST_APP_FOOD || '172.16.10.146').padEnd(53)}║
+║   PORT: ${(process.env.CONFIG_POSTGRESQL_PORT_APP_FOOD || '5432').padEnd(53)}║
+║   DATABASE: ${(process.env.CONFIG_POSTGRESQL_DB_NAME_APP_FOOD || 'techres_app_food').padEnd(49)}║
+╠════════════════════════════════════════════════════════════════╣
+║ Redis:                                                         ║
+║   HOST: ${(process.env.CONFIG_REDIS_HOST || '172.16.10.71').padEnd(53)}║
+║   PORT: ${(process.env.CONFIG_REDIS_PORT || '6379').padEnd(53)}║
+║   DB: ${(process.env.CONFIG_REDIS_DB || '6').padEnd(55)}║
+╠════════════════════════════════════════════════════════════════╣
+║ Supported Platforms:                                           ║
+║   • GrabFood                                                   ║
+║   • ShopeeFood                                                 ║
+║   • BeFood                                                     ║
+╠════════════════════════════════════════════════════════════════╣
+║ Endpoints:                                                     ║
+║   API: http://localhost:${port}/${apiPrefix}`.padEnd(63) + `║
+║   Swagger: http://localhost:${port}/docs`.padEnd(63) + `║
+╚════════════════════════════════════════════════════════════════╝
   `);
 }
 

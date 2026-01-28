@@ -36,8 +36,23 @@ async function bootstrap() {
   const port = process.env.SERVICE_PORT || 1508;
   await app.listen(port);
 
-  logger.log(`🚀 Webhook service is running on: http://localhost:${port}`);
-  logger.log(`📚 Swagger docs: http://localhost:${port}/api`);
+  console.log(`
+╔════════════════════════════════════════════════════════════════╗
+║                    WEBHOOK-SERVICE                             ║
+║            PayOS Payment Webhook Handler                       ║
+╠════════════════════════════════════════════════════════════════╣
+║ App Settings:                                                  ║
+║   SERVICE_PORT: ${String(port).padEnd(45)}║
+║   NODE_ENV: ${(process.env.NODE_ENV || 'development').padEnd(49)}║
+╠════════════════════════════════════════════════════════════════╣
+║ Internal Services:                                             ║
+║   API_SOCKET: ${(process.env.CONFIG_API_NODEJS_SOCKET_URL || 'http://localhost:1507').padEnd(47)}║
+╠════════════════════════════════════════════════════════════════╣
+║ Endpoints:                                                     ║
+║   Webhook: http://localhost:${port}/webhook`.padEnd(63) + `║
+║   Swagger: http://localhost:${port}/api`.padEnd(63) + `║
+╚════════════════════════════════════════════════════════════════╝
+  `);
 }
 
 bootstrap();
