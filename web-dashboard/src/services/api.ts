@@ -2,20 +2,18 @@ import axios, { AxiosInstance } from "axios";
 
 // APISIX Gateway Configuration
 // Gateway sẽ điều hướng request dựa trên header x-svc-id (port của microservice)
-export const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || "http://172.16.10.118:7080";
+export const GATEWAY_URL = process.env.NEXT_PUBLIC_API_URL || "http://172.16.10.118:7080";
 
-// Service Port IDs (dùng làm x-svc-id header khi gọi qua gateway)
-export const SERVICE_PORTS = {
-  API_ADMIN: process.env.NEXT_PUBLIC_API_ADMIN_PORT || "1502",
-  API_DASHBOARD: process.env.NEXT_PUBLIC_API_DASHBOARD_PORT || "1503",
-  API_MASTER_DATA: process.env.NEXT_PUBLIC_API_MASTER_DATA_PORT || "1504",
-  API_UPLOAD: process.env.NEXT_PUBLIC_API_UPLOAD_PORT || "1505",
-  API_OAUTH: process.env.NEXT_PUBLIC_API_OAUTH_PORT || "1506",
-  SOCKET: process.env.NEXT_PUBLIC_SOCKET_PORT || "1507",
+// Service IDs (dùng làm x-svc-id header khi gọi qua gateway)
+export const SERVICE_IDS = {
+  API_ADMIN: process.env.CONFIG_NODEJS_ADMIN_SERVICE_ID || "1502",
+  API_DASHBOARD: process.env.CONFIG_NODEJS_MANAGEMENT_SERVICE_ID || "1503",
+  API_UPLOAD: process.env.CONFIG_NODEJS_MEDIA_SERVICE_ID || "1505",
+  API_OAUTH: process.env.CONFIG_NODEJS_OAUTH_SERVICE_ID || "1506",
 };
 
 console.log("[Dashboard API] Gateway URL:", GATEWAY_URL);
-console.log("[Dashboard API] Service Ports:", SERVICE_PORTS);
+console.log("[Dashboard API] Service IDs:", SERVICE_IDS);
 
 // Factory function to create API client for specific service via APISIX Gateway
 export const createServiceApi = (serviceId: string): AxiosInstance => {
@@ -70,11 +68,10 @@ export const createServiceApi = (serviceId: string): AxiosInstance => {
 };
 
 // Pre-configured API clients for each service (gọi qua APISIX Gateway)
-export const apiAdmin = createServiceApi(SERVICE_PORTS.API_ADMIN);
-export const apiDashboard = createServiceApi(SERVICE_PORTS.API_DASHBOARD);
-export const apiMasterData = createServiceApi(SERVICE_PORTS.API_MASTER_DATA);
-export const apiUpload = createServiceApi(SERVICE_PORTS.API_UPLOAD);
-export const apiOAuth = createServiceApi(SERVICE_PORTS.API_OAUTH);
+export const apiAdmin = createServiceApi(SERVICE_IDS.API_ADMIN);
+export const apiDashboard = createServiceApi(SERVICE_IDS.API_DASHBOARD);
+export const apiUpload = createServiceApi(SERVICE_IDS.API_UPLOAD);
+export const apiOAuth = createServiceApi(SERVICE_IDS.API_OAUTH);
 
 // Default API client - sử dụng apiDashboard cho web-dashboard
 export const api = apiDashboard;
