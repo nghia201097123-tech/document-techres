@@ -4,185 +4,194 @@ export class AddMerchantStatusColumn1706800000000 implements MigrationInterface 
   name = 'AddMerchantStatusColumn1706800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Create merchant_order_status_enum type if not exists
+    // Drop food_orders table and related constraints (user allowed since test data)
+    await queryRunner.query(`DROP TABLE IF EXISTS "food_orders" CASCADE`);
+
+    // Drop old enum and create new simplified one
+    await queryRunner.query(`DROP TYPE IF EXISTS "food_order_status_enum" CASCADE`);
     await queryRunner.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'merchant_order_status_enum') THEN
-          CREATE TYPE "merchant_order_status_enum" AS ENUM (
-            'ORDER_IN_PREPARE',
-            'ORDER_EXECUTING',
-            'COMPLETED',
-            'CANCELLED',
-            'CANCELLED_MAX',
-            'CANCELLED_PASSENGER',
-            'CANCELLED_OPERATOR',
-            'FAILED'
-          );
-        END IF;
-      END
-      $$;
+      CREATE TYPE "food_order_status_enum" AS ENUM (
+        'new',
+        'confirmed',
+        'completed',
+        'cancelled'
+      )
     `);
 
-    // Create food_order_status_enum if not exists (for fresh databases)
+    // Create merchant_order_status_enum type with Grab API values
+    await queryRunner.query(`DROP TYPE IF EXISTS "merchant_order_status_enum" CASCADE`);
     await queryRunner.query(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'food_order_status_enum') THEN
-          CREATE TYPE "food_order_status_enum" AS ENUM (
-            'new',
-            'confirmed',
-            'completed',
-            'cancelled'
-          );
-        END IF;
-      END
-      $$;
+      CREATE TYPE "merchant_order_status_enum" AS ENUM (
+        'ORDER_IN_PREPARE',
+        'ORDER_EXECUTING',
+        'COMPLETED',
+        'CANCELLED',
+        'CANCELLED_MAX',
+        'CANCELLED_PASSENGER',
+        'CANCELLED_OPERATOR',
+        'FAILED'
+      )
     `);
 
-    // Add 'confirmed' value to food_order_status_enum if it exists but doesn't have 'confirmed'
-    // Note: ALTER TYPE ADD VALUE cannot run inside a transaction block in PostgreSQL
-    // We use a workaround by checking first and only adding if needed
+    // Recreate food_orders table with new schema
     await queryRunner.query(`
-      DO $$
-      BEGIN
-        -- Check if 'confirmed' value exists in the enum
-        IF NOT EXISTS (
-          SELECT 1 FROM pg_enum
-          WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'food_order_status_enum')
-          AND enumlabel = 'confirmed'
-        ) THEN
-          -- We need to commit current transaction and add the value
-          -- Since we can't do ALTER TYPE ADD VALUE in a transaction, we'll recreate the enum
-          -- by creating a new type and migrating
-
-          -- Create a temporary enum with all values including 'confirmed'
-          CREATE TYPE "food_order_status_enum_new" AS ENUM (
-            'new',
-            'accepted',
-            'preparing',
-            'ready',
-            'delivering',
-            'confirmed',
-            'completed',
-            'cancelled'
-          );
-
-          -- Alter the column to use the new type
-          ALTER TABLE "food_orders"
-            ALTER COLUMN "status" TYPE "food_order_status_enum_new"
-            USING ("status"::text::"food_order_status_enum_new");
-
-          -- Drop the old type and rename the new one
-          DROP TYPE "food_order_status_enum";
-          ALTER TYPE "food_order_status_enum_new" RENAME TO "food_order_status_enum";
-        END IF;
-      EXCEPTION
-        WHEN others THEN
-          -- If anything fails, just continue (the type might already be correct)
-          NULL;
-      END
-      $$;
+      CREATE TABLE "food_orders" (
+        "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+        "tenant_id" varchar(50) NOT NULL,
+        "branch_id" varchar(50) NOT NULL,
+        "account_id" uuid,
+        "store_mapping_id" uuid,
+        "external_order_id" varchar(100) NOT NULL,
+        "order_code" varchar(50) NOT NULL,
+        "platform" "food_platform_type_enum" NOT NULL,
+        "status" "food_order_status_enum" NOT NULL DEFAULT 'new',
+        "merchant_status" "merchant_order_status_enum" NOT NULL DEFAULT 'ORDER_IN_PREPARE',
+        "previous_status" varchar(50),
+        "previous_merchant_status" varchar(50),
+        "customer_name" varchar(255) NOT NULL,
+        "customer_phone" varchar(20) NOT NULL,
+        "customer_address" text,
+        "customer_note" text,
+        "items" jsonb NOT NULL DEFAULT '[]',
+        "subtotal" bigint NOT NULL DEFAULT 0,
+        "delivery_fee" bigint NOT NULL DEFAULT 0,
+        "platform_fee" bigint NOT NULL DEFAULT 0,
+        "discount" bigint NOT NULL DEFAULT 0,
+        "total_amount" bigint NOT NULL DEFAULT 0,
+        "is_paid" boolean NOT NULL DEFAULT false,
+        "payment_method" varchar(50),
+        "driver_name" varchar(255),
+        "driver_phone" varchar(20),
+        "driver_avatar" text,
+        "driver_license_plate" varchar(100),
+        "estimated_delivery_time" varchar(255),
+        "is_auto_confirmed" boolean NOT NULL DEFAULT false,
+        "is_printed" boolean NOT NULL DEFAULT false,
+        "confirmed_at" TIMESTAMPTZ,
+        "printed_at" TIMESTAMPTZ,
+        "created_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
+        "updated_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
+        "accepted_at" TIMESTAMPTZ,
+        "prepared_at" TIMESTAMPTZ,
+        "completed_at" TIMESTAMPTZ,
+        "cancelled_at" TIMESTAMPTZ,
+        "cancel_reason" varchar(255),
+        "platform_created_at" TIMESTAMPTZ,
+        "platform_updated_at" TIMESTAMPTZ,
+        "last_sync_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
+        "raw_data" jsonb,
+        CONSTRAINT "PK_food_orders" PRIMARY KEY ("id"),
+        CONSTRAINT "UQ_food_orders_external_platform" UNIQUE ("external_order_id", "platform"),
+        CONSTRAINT "FK_food_orders_account" FOREIGN KEY ("account_id") REFERENCES "food_platform_accounts"("id") ON DELETE SET NULL,
+        CONSTRAINT "FK_food_orders_store_mapping" FOREIGN KEY ("store_mapping_id") REFERENCES "food_platform_store_mappings"("id") ON DELETE SET NULL
+      )
     `);
 
-    // Add merchant_status column with default value ORDER_IN_PREPARE
+    // Create indexes
     await queryRunner.query(`
-      ALTER TABLE "food_orders"
-      ADD COLUMN IF NOT EXISTS "merchant_status" "merchant_order_status_enum" DEFAULT 'ORDER_IN_PREPARE'
+      CREATE INDEX "IDX_food_orders_tenant_branch" ON "food_orders" ("tenant_id", "branch_id")
     `);
-
-    // Add previous_merchant_status column
     await queryRunner.query(`
-      ALTER TABLE "food_orders"
-      ADD COLUMN IF NOT EXISTS "previous_merchant_status" varchar(50)
+      CREATE INDEX "IDX_food_orders_platform_status" ON "food_orders" ("platform", "status")
     `);
-
-    // Migrate existing data: Map old TechRes statuses to Grab merchant statuses
     await queryRunner.query(`
-      UPDATE "food_orders"
-      SET "merchant_status" = CASE
-        WHEN "status"::text = 'new' THEN 'ORDER_IN_PREPARE'::merchant_order_status_enum
-        WHEN "status"::text = 'accepted' THEN 'ORDER_IN_PREPARE'::merchant_order_status_enum
-        WHEN "status"::text = 'preparing' THEN 'ORDER_IN_PREPARE'::merchant_order_status_enum
-        WHEN "status"::text = 'ready' THEN 'ORDER_IN_PREPARE'::merchant_order_status_enum
-        WHEN "status"::text = 'delivering' THEN 'ORDER_EXECUTING'::merchant_order_status_enum
-        WHEN "status"::text = 'completed' THEN 'COMPLETED'::merchant_order_status_enum
-        WHEN "status"::text = 'cancelled' THEN 'CANCELLED'::merchant_order_status_enum
-        ELSE 'ORDER_IN_PREPARE'::merchant_order_status_enum
-      END
-      WHERE "merchant_status" IS NULL OR "merchant_status" = 'ORDER_IN_PREPARE'
+      CREATE INDEX "IDX_food_orders_created_at" ON "food_orders" ("created_at")
     `);
-
-    // Update TechRes status for orders that were in progress
-    // If order was accepted/preparing/ready/delivering, set TechRes status to 'confirmed'
     await queryRunner.query(`
-      UPDATE "food_orders"
-      SET "status" = 'confirmed'::"food_order_status_enum"
-      WHERE "status"::text IN ('accepted', 'preparing', 'ready', 'delivering')
+      CREATE INDEX "IDX_food_orders_last_sync_at" ON "food_orders" ("last_sync_at")
     `);
-
-    // Create index on merchant_status for better query performance
     await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS "IDX_food_orders_merchant_status" ON "food_orders" ("merchant_status")
+      CREATE INDEX "IDX_food_orders_merchant_status" ON "food_orders" ("merchant_status")
     `);
-
-    // Create composite index for TechRes + Merchant status filtering
     await queryRunner.query(`
-      CREATE INDEX IF NOT EXISTS "IDX_food_orders_status_merchant_status" ON "food_orders" ("status", "merchant_status")
+      CREATE INDEX "IDX_food_orders_status_merchant_status" ON "food_orders" ("status", "merchant_status")
     `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // Drop indexes
+    // Drop new table
+    await queryRunner.query(`DROP TABLE IF EXISTS "food_orders" CASCADE`);
+
+    // Drop new enums
+    await queryRunner.query(`DROP TYPE IF EXISTS "merchant_order_status_enum" CASCADE`);
+    await queryRunner.query(`DROP TYPE IF EXISTS "food_order_status_enum" CASCADE`);
+
+    // Recreate original enum
     await queryRunner.query(`
-      DROP INDEX IF EXISTS "IDX_food_orders_status_merchant_status"
-    `);
-    await queryRunner.query(`
-      DROP INDEX IF EXISTS "IDX_food_orders_merchant_status"
+      CREATE TYPE "food_order_status_enum" AS ENUM (
+        'new',
+        'accepted',
+        'preparing',
+        'ready',
+        'delivering',
+        'completed',
+        'cancelled'
+      )
     `);
 
-    // Revert TechRes status - convert 'confirmed' back to 'new' (safest option)
-    // Check if 'accepted' exists in enum, otherwise use 'new'
+    // Recreate original table
     await queryRunner.query(`
-      DO $$
-      BEGIN
-        IF EXISTS (
-          SELECT 1 FROM pg_enum
-          WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'food_order_status_enum')
-          AND enumlabel = 'accepted'
-        ) THEN
-          UPDATE "food_orders"
-          SET "status" = 'accepted'::"food_order_status_enum"
-          WHERE "status"::text = 'confirmed';
-        ELSE
-          UPDATE "food_orders"
-          SET "status" = 'new'::"food_order_status_enum"
-          WHERE "status"::text = 'confirmed';
-        END IF;
-      EXCEPTION
-        WHEN others THEN
-          NULL;
-      END
-      $$;
+      CREATE TABLE "food_orders" (
+        "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+        "tenant_id" varchar(50) NOT NULL,
+        "branch_id" int NOT NULL,
+        "account_id" uuid,
+        "store_mapping_id" uuid,
+        "external_order_id" varchar(100) NOT NULL,
+        "order_code" varchar(50) NOT NULL,
+        "platform" "food_platform_type_enum" NOT NULL,
+        "status" "food_order_status_enum" NOT NULL DEFAULT 'new',
+        "previous_status" varchar(50),
+        "customer_name" varchar(255) NOT NULL,
+        "customer_phone" varchar(20) NOT NULL,
+        "customer_address" text,
+        "customer_note" text,
+        "items" jsonb NOT NULL DEFAULT '[]',
+        "subtotal" bigint NOT NULL DEFAULT 0,
+        "delivery_fee" bigint NOT NULL DEFAULT 0,
+        "platform_fee" bigint NOT NULL DEFAULT 0,
+        "discount" bigint NOT NULL DEFAULT 0,
+        "total_amount" bigint NOT NULL DEFAULT 0,
+        "is_paid" boolean NOT NULL DEFAULT false,
+        "payment_method" varchar(50),
+        "driver_name" varchar(255),
+        "driver_phone" varchar(20),
+        "driver_license_plate" varchar(100),
+        "estimated_delivery_time" varchar(255),
+        "is_auto_confirmed" boolean NOT NULL DEFAULT false,
+        "is_printed" boolean NOT NULL DEFAULT false,
+        "confirmed_at" TIMESTAMP,
+        "printed_at" TIMESTAMP,
+        "created_at" TIMESTAMP NOT NULL DEFAULT now(),
+        "updated_at" TIMESTAMP NOT NULL DEFAULT now(),
+        "accepted_at" TIMESTAMP,
+        "prepared_at" TIMESTAMP,
+        "completed_at" TIMESTAMP,
+        "cancelled_at" TIMESTAMP,
+        "cancel_reason" varchar(255),
+        "platform_created_at" TIMESTAMP,
+        "platform_updated_at" TIMESTAMP,
+        "last_sync_at" TIMESTAMP NOT NULL DEFAULT now(),
+        "raw_data" jsonb,
+        CONSTRAINT "PK_food_orders" PRIMARY KEY ("id"),
+        CONSTRAINT "UQ_food_orders_external_platform" UNIQUE ("external_order_id", "platform"),
+        CONSTRAINT "FK_food_orders_account" FOREIGN KEY ("account_id") REFERENCES "food_platform_accounts"("id") ON DELETE SET NULL,
+        CONSTRAINT "FK_food_orders_store_mapping" FOREIGN KEY ("store_mapping_id") REFERENCES "food_platform_store_mappings"("id") ON DELETE SET NULL
+      )
     `);
 
-    // Drop columns
+    // Recreate original indexes
     await queryRunner.query(`
-      ALTER TABLE "food_orders"
-      DROP COLUMN IF EXISTS "previous_merchant_status"
+      CREATE INDEX "IDX_food_orders_tenant_branch" ON "food_orders" ("tenant_id", "branch_id")
     `);
-
     await queryRunner.query(`
-      ALTER TABLE "food_orders"
-      DROP COLUMN IF EXISTS "merchant_status"
+      CREATE INDEX "IDX_food_orders_platform_status" ON "food_orders" ("platform", "status")
     `);
-
-    // Drop enum type
     await queryRunner.query(`
-      DROP TYPE IF EXISTS "merchant_order_status_enum"
+      CREATE INDEX "IDX_food_orders_created_at" ON "food_orders" ("created_at")
     `);
-
-    // Note: Cannot remove 'confirmed' from food_order_status_enum easily in PostgreSQL
-    // The value will remain but won't be used
+    await queryRunner.query(`
+      CREATE INDEX "IDX_food_orders_last_sync_at" ON "food_orders" ("last_sync_at")
+    `);
   }
 }
