@@ -26,10 +26,9 @@ interface DashboardLoginResponse {
 export const authService = {
   /**
    * Đăng nhập với tenant_id + username + password
-   * APISIX: /auth/login -> /api/tenant/auth/login -> strip to /api/auth/login
    */
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
-    const response = await apiOAuth.post<DashboardLoginResponse>("/auth/login", {
+    const response = await apiOAuth.post<DashboardLoginResponse>("/api/auth/login", {
       tenantId: credentials.tenantId,
       username: credentials.username,
       password: credentials.password,
@@ -71,7 +70,7 @@ export const authService = {
    * Đổi mật khẩu
    */
   changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
-    await apiOAuth.post("/auth/change-password", {
+    await apiOAuth.post("/api/auth/change-password", {
       currentPassword,
       newPassword,
     });
@@ -81,7 +80,7 @@ export const authService = {
    * Lấy thông tin user hiện tại
    */
   getMe: async (): Promise<LoginResponse> => {
-    const response = await apiOAuth.get<{ user: DashboardLoginResponse["user"] }>("/auth/profile");
+    const response = await apiOAuth.get<{ user: DashboardLoginResponse["user"] }>("/api/auth/profile");
     const user = response.data.user || response.data;
 
     // Get stored auth info for tenantId
@@ -130,7 +129,7 @@ export const authService = {
    * Quên mật khẩu - gửi email reset
    */
   forgotPassword: async (tenantId: string, email: string): Promise<void> => {
-    await apiOAuth.post("/auth/forgot-password", { tenantId, email });
+    await apiOAuth.post("/api/auth/forgot-password", { tenantId, email });
   },
 
   /**
@@ -138,7 +137,7 @@ export const authService = {
    */
   logout: async (): Promise<void> => {
     try {
-      await apiOAuth.post("/auth/logout");
+      await apiOAuth.post("/api/auth/logout");
     } catch (error) {
       console.error("Logout API error:", error);
     }
