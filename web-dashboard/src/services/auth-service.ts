@@ -1,4 +1,4 @@
-import { apiOAuth } from "./api";
+import { api } from "./api";
 import type { LoginResponse, Staff, Company } from "@/types";
 
 export interface LoginCredentials {
@@ -27,9 +27,10 @@ export const authService = {
   /**
    * Đăng nhập với tenant_id + username + password
    * api-dashboard endpoint: /api/auth/login
+   * APISIX routing: /auth/login -> api-dashboard /api/auth/login
    */
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
-    const response = await apiOAuth.post<DashboardLoginResponse>("/auth/login", {
+    const response = await api.post<DashboardLoginResponse>("/auth/login", {
       tenantId: credentials.tenantId,
       username: credentials.username,
       password: credentials.password,
@@ -72,7 +73,7 @@ export const authService = {
    * api-dashboard endpoint: /api/auth/change-password
    */
   changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
-    await apiOAuth.post("/auth/change-password", {
+    await api.post("/auth/change-password", {
       currentPassword,
       newPassword,
     });
@@ -83,7 +84,7 @@ export const authService = {
    * api-dashboard endpoint: /api/auth/me
    */
   getMe: async (): Promise<LoginResponse> => {
-    const response = await apiOAuth.get<{ user: DashboardLoginResponse["user"] }>("/auth/me");
+    const response = await api.get<{ user: DashboardLoginResponse["user"] }>("/auth/me");
     const user = response.data.user || response.data;
 
     // Get stored auth info for tenantId
@@ -133,7 +134,7 @@ export const authService = {
    * api-dashboard endpoint: /api/auth/forgot-password
    */
   forgotPassword: async (tenantId: string, email: string): Promise<void> => {
-    await apiOAuth.post("/auth/forgot-password", { tenantId, email });
+    await api.post("/auth/forgot-password", { tenantId, email });
   },
 
   /**
@@ -142,7 +143,7 @@ export const authService = {
    */
   logout: async (): Promise<void> => {
     try {
-      await apiOAuth.post("/auth/logout");
+      await api.post("/auth/logout");
     } catch (error) {
       console.error("Logout API error:", error);
     }
