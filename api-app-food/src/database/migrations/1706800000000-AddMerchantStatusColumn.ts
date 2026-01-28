@@ -4,11 +4,12 @@ export class AddMerchantStatusColumn1706800000000 implements MigrationInterface 
   name = 'AddMerchantStatusColumn1706800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Drop food_orders table and related constraints (user allowed since test data)
-    await queryRunner.query(`DROP TABLE IF EXISTS "food_orders" CASCADE`);
+    // Drop food_orders table (user allowed since test data)
+    // Use plain DROP without CASCADE to preserve other enums
+    await queryRunner.query(`DROP TABLE IF EXISTS "food_orders"`);
 
-    // Drop old enum and create new simplified one
-    await queryRunner.query(`DROP TYPE IF EXISTS "food_order_status_enum" CASCADE`);
+    // Drop and recreate food_order_status_enum with new simplified values
+    await queryRunner.query(`DROP TYPE IF EXISTS "food_order_status_enum"`);
     await queryRunner.query(`
       CREATE TYPE "food_order_status_enum" AS ENUM (
         'new',
@@ -19,7 +20,7 @@ export class AddMerchantStatusColumn1706800000000 implements MigrationInterface 
     `);
 
     // Create merchant_order_status_enum type with Grab API values
-    await queryRunner.query(`DROP TYPE IF EXISTS "merchant_order_status_enum" CASCADE`);
+    await queryRunner.query(`DROP TYPE IF EXISTS "merchant_order_status_enum"`);
     await queryRunner.query(`
       CREATE TYPE "merchant_order_status_enum" AS ENUM (
         'ORDER_IN_PREPARE',
@@ -31,6 +32,17 @@ export class AddMerchantStatusColumn1706800000000 implements MigrationInterface 
         'CANCELLED_OPERATOR',
         'FAILED'
       )
+    `);
+
+    // Ensure food_platform_type_enum exists (may have been dropped by previous failed migration)
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'food_platform_type_enum') THEN
+          CREATE TYPE "food_platform_type_enum" AS ENUM ('grab', 'shopee_food', 'befood');
+        END IF;
+      END
+      $$;
     `);
 
     // Recreate food_orders table with new schema
