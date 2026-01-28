@@ -362,30 +362,78 @@ class FoodOrderViewModel @Inject constructor(
     }
 
     // ===== ORDER STATUS ACTIONS =====
-    // TechRes simplified flow: NEW -> PREPARING -> COMPLETED/CANCELLED
+    // TechRes simplified flow: NEW -> CONFIRMED -> COMPLETED/CANCELLED
 
     /**
-     * Accept/Confirm order - moves from NEW to PREPARING
+     * Accept/Confirm order - moves from NEW to CONFIRMED
+     * Gọi API để cập nhật trạng thái trên server
      */
     fun acceptOrder(orderId: String) {
-        updateOrderStatus(orderId, FoodOrderStatus.PREPARING)
-        showSuccess("Đã xác nhận đơn hàng")
+        Log.d(TAG, "acceptOrder: Calling API to confirm order $orderId")
+        viewModelScope.launch {
+            try {
+                val result = foodPlatformRepository.confirmOrder(orderId)
+                if (result.success) {
+                    Log.d(TAG, "acceptOrder: API success, updating local state")
+                    updateOrderStatus(orderId, FoodOrderStatus.PREPARING)
+                    showSuccess("Đã xác nhận đơn hàng")
+                } else {
+                    Log.e(TAG, "acceptOrder: API failed - ${result.message}")
+                    showError(result.message ?: "Xác nhận đơn hàng thất bại")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "acceptOrder: Exception - ${e.message}", e)
+                showError("Có lỗi xảy ra khi xác nhận đơn hàng")
+            }
+        }
     }
 
     /**
-     * Complete order - moves from PREPARING to COMPLETED
+     * Complete order - moves from CONFIRMED to COMPLETED
+     * Gọi API để cập nhật trạng thái trên server
      */
     fun completeOrder(orderId: String) {
-        updateOrderStatus(orderId, FoodOrderStatus.COMPLETED)
-        showSuccess("Đơn hàng hoàn tất")
+        Log.d(TAG, "completeOrder: Calling API to complete order $orderId")
+        viewModelScope.launch {
+            try {
+                val result = foodPlatformRepository.completeOrder(orderId)
+                if (result.success) {
+                    Log.d(TAG, "completeOrder: API success, updating local state")
+                    updateOrderStatus(orderId, FoodOrderStatus.COMPLETED)
+                    showSuccess("Đơn hàng hoàn tất")
+                } else {
+                    Log.e(TAG, "completeOrder: API failed - ${result.message}")
+                    showError(result.message ?: "Hoàn tất đơn hàng thất bại")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "completeOrder: Exception - ${e.message}", e)
+                showError("Có lỗi xảy ra khi hoàn tất đơn hàng")
+            }
+        }
     }
 
     /**
      * Cancel order - moves to CANCELLED
+     * Gọi API để cập nhật trạng thái trên server
      */
-    fun cancelOrder(orderId: String) {
-        updateOrderStatus(orderId, FoodOrderStatus.CANCELLED)
-        showSuccess("Đã huỷ đơn hàng")
+    fun cancelOrder(orderId: String, reason: String? = null) {
+        Log.d(TAG, "cancelOrder: Calling API to cancel order $orderId")
+        viewModelScope.launch {
+            try {
+                val result = foodPlatformRepository.cancelOrder(orderId, reason ?: "Huỷ bởi nhân viên")
+                if (result.success) {
+                    Log.d(TAG, "cancelOrder: API success, updating local state")
+                    updateOrderStatus(orderId, FoodOrderStatus.CANCELLED)
+                    showSuccess("Đã huỷ đơn hàng")
+                } else {
+                    Log.e(TAG, "cancelOrder: API failed - ${result.message}")
+                    showError(result.message ?: "Huỷ đơn hàng thất bại")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "cancelOrder: Exception - ${e.message}", e)
+                showError("Có lỗi xảy ra khi huỷ đơn hàng")
+            }
+        }
     }
 
     private fun updateOrderStatus(orderId: String, newStatus: FoodOrderStatus) {
@@ -415,6 +463,12 @@ class FoodOrderViewModel @Inject constructor(
     private fun showSuccess(message: String) {
         _uiState.update { state ->
             state.copy(successMessage = message)
+        }
+    }
+
+    private fun showError(message: String) {
+        _uiState.update { state ->
+            state.copy(errorMessage = message)
         }
     }
 

@@ -106,4 +106,32 @@ interface FoodPlatformApi {
     suspend fun disconnectAccount(
         @Path("accountId") accountId: String
     ): Response<DisconnectResponse>
+
+    // ==================== Order Actions ====================
+
+    /**
+     * Xác nhận đơn hàng (Confirm order)
+     * Chuyển trạng thái từ NEW -> CONFIRMED
+     */
+    @POST("api/public/confirm-order/{orderId}")
+    suspend fun confirmOrder(
+        @Path("orderId") orderId: String
+    ): Response<OrderActionResponse>
+
+    /**
+     * Huỷ đơn hàng (Cancel order)
+     */
+    @POST("api/public/cancel-order/{orderId}")
+    suspend fun cancelOrder(
+        @Path("orderId") orderId: String,
+        @Body request: CancelOrderRequest
+    ): Response<OrderActionResponse>
+
+    /**
+     * Hoàn tất đơn hàng (Complete order)
+     */
+    @POST("api/public/complete-order/{orderId}")
+    suspend fun completeOrder(
+        @Path("orderId") orderId: String
+    ): Response<OrderActionResponse>
 }

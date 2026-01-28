@@ -312,3 +312,32 @@ data class PollOrderItemDto(
     val options: String?,
     val externalProductId: String?
 )
+
+// ==================== Order Actions ====================
+
+/**
+ * Request to cancel an order
+ */
+data class CancelOrderRequest(
+    val reason: String? = null
+)
+
+/**
+ * Response for order actions (confirm, cancel, complete)
+ */
+data class OrderActionResponse(
+    val status: Int,
+    val message: String?,
+    val data: OrderActionData?
+)
+
+data class OrderActionData(
+    val id: String?,
+    val orderCode: String?,
+    val status: String?,
+    val merchantStatus: String?,
+    val confirmedAt: String?,
+    val cancelledAt: String?,
+    val completedAt: String?,
+    val cancelReason: String?
+)

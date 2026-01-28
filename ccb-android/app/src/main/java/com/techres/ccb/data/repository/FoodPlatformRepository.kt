@@ -2,6 +2,7 @@ package com.techres.ccb.data.repository
 
 import android.util.Log
 import com.techres.ccb.data.remote.api.FoodPlatformApi
+import com.techres.ccb.data.remote.dto.CancelOrderRequest
 import com.techres.ccb.data.remote.dto.*
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -303,6 +304,133 @@ class FoodPlatformRepository @Inject constructor(
             emptyList()
         }
     }
+
+    // ==================== Order Actions ====================
+
+    /**
+     * Xác nhận đơn hàng (Confirm order)
+     * Chuyển trạng thái từ NEW -> CONFIRMED
+     */
+    suspend fun confirmOrder(orderId: String): OrderActionResult {
+        return try {
+            Log.d(TAG, "Confirming order $orderId")
+            val response = foodPlatformApi.confirmOrder(orderId)
+
+            if (response.isSuccessful && response.body()?.status == 200) {
+                val data = response.body()?.data
+                Log.d(TAG, "Confirm order successful: ${data?.orderCode} -> ${data?.status}")
+                OrderActionResult(
+                    success = true,
+                    orderId = data?.id,
+                    orderCode = data?.orderCode,
+                    status = data?.status,
+                    message = response.body()?.message
+                )
+            } else {
+                val errorMsg = response.body()?.message ?: "Xác nhận đơn hàng thất bại"
+                Log.e(TAG, "Confirm order failed: $errorMsg")
+                OrderActionResult(
+                    success = false,
+                    orderId = orderId,
+                    orderCode = null,
+                    status = null,
+                    message = errorMsg
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Confirm order error: ${e.message}", e)
+            OrderActionResult(
+                success = false,
+                orderId = orderId,
+                orderCode = null,
+                status = null,
+                message = e.message ?: "Có lỗi xảy ra"
+            )
+        }
+    }
+
+    /**
+     * Huỷ đơn hàng (Cancel order)
+     */
+    suspend fun cancelOrder(orderId: String, reason: String? = null): OrderActionResult {
+        return try {
+            Log.d(TAG, "Cancelling order $orderId with reason: $reason")
+            val request = CancelOrderRequest(reason)
+            val response = foodPlatformApi.cancelOrder(orderId, request)
+
+            if (response.isSuccessful && response.body()?.status == 200) {
+                val data = response.body()?.data
+                Log.d(TAG, "Cancel order successful: ${data?.orderCode} -> ${data?.status}")
+                OrderActionResult(
+                    success = true,
+                    orderId = data?.id,
+                    orderCode = data?.orderCode,
+                    status = data?.status,
+                    message = response.body()?.message
+                )
+            } else {
+                val errorMsg = response.body()?.message ?: "Huỷ đơn hàng thất bại"
+                Log.e(TAG, "Cancel order failed: $errorMsg")
+                OrderActionResult(
+                    success = false,
+                    orderId = orderId,
+                    orderCode = null,
+                    status = null,
+                    message = errorMsg
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Cancel order error: ${e.message}", e)
+            OrderActionResult(
+                success = false,
+                orderId = orderId,
+                orderCode = null,
+                status = null,
+                message = e.message ?: "Có lỗi xảy ra"
+            )
+        }
+    }
+
+    /**
+     * Hoàn tất đơn hàng (Complete order)
+     */
+    suspend fun completeOrder(orderId: String): OrderActionResult {
+        return try {
+            Log.d(TAG, "Completing order $orderId")
+            val response = foodPlatformApi.completeOrder(orderId)
+
+            if (response.isSuccessful && response.body()?.status == 200) {
+                val data = response.body()?.data
+                Log.d(TAG, "Complete order successful: ${data?.orderCode} -> ${data?.status}")
+                OrderActionResult(
+                    success = true,
+                    orderId = data?.id,
+                    orderCode = data?.orderCode,
+                    status = data?.status,
+                    message = response.body()?.message
+                )
+            } else {
+                val errorMsg = response.body()?.message ?: "Hoàn tất đơn hàng thất bại"
+                Log.e(TAG, "Complete order failed: $errorMsg")
+                OrderActionResult(
+                    success = false,
+                    orderId = orderId,
+                    orderCode = null,
+                    status = null,
+                    message = errorMsg
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Complete order error: ${e.message}", e)
+            OrderActionResult(
+                success = false,
+                orderId = orderId,
+                orderCode = null,
+                status = null,
+                message = e.message ?: "Có lỗi xảy ra"
+            )
+        }
+    }
 }
 
 data class DisconnectedAccount(
@@ -313,4 +441,17 @@ data class DisconnectedAccount(
     val status: String,
     val lastError: String?,
     val errorCount: Int
+)
+
+// ==================== Order Actions ====================
+
+/**
+ * Result of order action (confirm, cancel, complete)
+ */
+data class OrderActionResult(
+    val success: Boolean,
+    val orderId: String?,
+    val orderCode: String?,
+    val status: String?,
+    val message: String?
 )
