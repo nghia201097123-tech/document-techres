@@ -508,65 +508,115 @@ export class PublicController {
 
   /**
    * Transform order entity to response format for CCB
+   *
+   * Response structure for CCB Android App:
+   * - Order info: id, orderCode, displayId, platform, status
+   * - Customer: name, phone, address, note
+   * - Driver: name, phone, avatar, licensePlate
+   * - Items: array with full details (name, qty, price, note, options, modifiers)
+   * - Pricing: subtotal, deliveryFee, smallOrderFee, discount, promotion, total
+   * - Timestamps: createdAt, acceptedAt, preparedAt, completedAt
    */
   private transformOrderForResponse(order: any) {
     const raw = order.rawData as any;
+
+    // Transform items for CCB display
+    const transformedItems = this.transformItemsForCCB(order);
+
     return {
+      // === Order identification ===
       id: order.id,
       externalOrderId: order.externalOrderId,
       orderCode: order.orderCode,
+      displayId: raw?.displayID || order.orderCode, // "GF-495"
       platform: order.platform,
-      status: order.status?.toLowerCase() || 'new',
-      merchantStatus: order.merchantStatus?.toLowerCase() || 'pending',
-      // Customer info
+
+      // === Status ===
+      status: order.status?.toLowerCase() || 'new', // TechRes status: new, confirmed, completed, cancelled
+      merchantStatus: order.merchantStatus?.toLowerCase() || 'pending', // Platform status
+
+      // === Customer info ===
+      customer: {
+        id: raw?.eater?.ID?.toString() || null,
+        name: order.customerName || 'Khách hàng',
+        phone: order.customerPhone || null,
+        address: order.customerAddress || null,
+        note: order.customerNote || null, // Ghi chú đơn hàng
+      },
+      // Legacy fields for backward compatibility
       customerId: raw?.eater?.ID?.toString() || null,
       customerName: order.customerName,
       customerPhone: order.customerPhone || null,
       customerAddress: order.customerAddress || null,
       customerNote: order.customerNote || null,
-      // Items - use orderItems if available (normalized), else use items (JSONB)
-      items: order.orderItems?.length > 0
-        ? order.orderItems.map((item: any) => ({
-            productName: item.productName,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            totalPrice: item.totalPrice,
-            discountAmount: item.discountAmount || 0,
-            note: item.note,
-            options: item.options,
-            modifiers: item.modifiers,
-            externalProductId: item.externalProductId,
-          }))
-        : order.items,
-      itemsCount: order.orderItems?.length || order.items?.length || 0,
-      // Payment
-      subtotal: order.subtotal,
-      deliveryFee: order.deliveryFee,
-      platformFee: order.platformFee,
-      discount: order.discount,
-      totalAmount: order.totalAmount,
-      // Additional fee fields
-      smallOrderFee: order.smallOrderFee || 0,
-      itemDiscountAmount: order.itemDiscountAmount || 0,
-      promotionAmount: order.promotionAmount || 0,
-      isPaid: order.isPaid,
-      paymentMethod: order.paymentMethod,
-      // Driver info
+
+      // === Driver info ===
+      driver: {
+        id: raw?.driver?.ID?.toString() || null,
+        name: order.driverName || raw?.driver?.name || null,
+        phone: order.driverPhone || null,
+        avatar: order.driverAvatar || raw?.driver?.avatar || null,
+        licensePlate: order.driverLicensePlate || null,
+      },
+      // Legacy fields
       driverId: raw?.driver?.ID?.toString() || null,
       driverName: order.driverName || raw?.driver?.name || null,
       driverPhone: order.driverPhone || null,
       driverAvatar: order.driverAvatar || raw?.driver?.avatar || null,
       driverLicensePlate: order.driverLicensePlate || null,
+
+      // === Items ===
+      items: transformedItems,
+      itemsCount: transformedItems.length,
+
+      // === Pricing summary ===
+      pricing: {
+        subtotal: order.subtotal || 0, // Tổng tiền món
+        deliveryFee: order.deliveryFee || 0, // Phí giao hàng
+        smallOrderFee: order.smallOrderFee || 0, // Phí đơn nhỏ
+        platformFee: order.platformFee || 0, // Phí nền tảng
+        itemDiscountAmount: order.itemDiscountAmount || 0, // Giảm giá món (nhà hàng)
+        promotionAmount: order.promotionAmount || 0, // Giảm giá từ Grab
+        discount: order.discount || 0, // Tổng giảm giá
+        totalAmount: order.totalAmount || 0, // Tổng tiền khách trả
+      },
+      // Legacy fields
+      subtotal: order.subtotal || 0,
+      deliveryFee: order.deliveryFee || 0,
+      platformFee: order.platformFee || 0,
+      discount: order.discount || 0,
+      totalAmount: order.totalAmount || 0,
+      smallOrderFee: order.smallOrderFee || 0,
+      itemDiscountAmount: order.itemDiscountAmount || 0,
+      promotionAmount: order.promotionAmount || 0,
+
+      // === Payment ===
+      isPaid: order.isPaid ?? true,
+      paymentMethod: order.paymentMethod || 'GrabPay',
+
+      // === Delivery ===
       estimatedDeliveryTime: order.estimatedDeliveryTime || raw?.times?.deliveredAt || null,
-      // Scheduled order
+
+      // === Special order flags ===
       isScheduledOrder: order.isScheduledOrder || false,
       scheduledDeliveryTime: order.scheduledDeliveryTime || null,
-      // Combined order
       isCombinedOrder: order.isCombinedOrder || false,
       parentOrderId: order.parentOrderId || null,
-      // Order status message
+
+      // === Additional info ===
+      cutlery: raw?.cutlery || 0, // Số bộ đồ ăn
       orderContentMessage: raw?.orderContentMessage || null,
-      // Timestamps
+
+      // === Timestamps ===
+      timestamps: {
+        createdAt: order.createdAt,
+        platformCreatedAt: order.platformCreatedAt,
+        acceptedAt: order.acceptedAt,
+        preparedAt: order.preparedAt,
+        completedAt: order.completedAt,
+        cancelledAt: order.cancelledAt,
+      },
+      // Legacy fields
       createdAt: order.createdAt,
       platformCreatedAt: order.platformCreatedAt,
       acceptedAt: order.acceptedAt,
@@ -574,6 +624,59 @@ export class PublicController {
       completedAt: order.completedAt,
       cancelledAt: order.cancelledAt,
     };
+  }
+
+  /**
+   * Transform items for CCB display
+   * Ensures consistent structure with full details
+   */
+  private transformItemsForCCB(order: any): any[] {
+    // Prefer orderItems (normalized table) over items (JSONB)
+    const items = order.orderItems?.length > 0 ? order.orderItems : (order.items || []);
+
+    return items.map((item: any, index: number) => ({
+      // === Item identification ===
+      id: item.id || null,
+      externalProductId: item.externalProductId || item.itemID || null,
+      sortOrder: item.sortOrder ?? index,
+
+      // === Product info ===
+      productName: item.productName || item.name || 'Unknown',
+      quantity: item.quantity || 1,
+
+      // === Pricing ===
+      unitPrice: item.unitPrice || 0, // Giá bán
+      totalPrice: item.totalPrice || 0, // Tổng thành tiền
+      discountAmount: item.discountAmount || 0, // Giảm giá món
+
+      // === Note (ghi chú món) ===
+      note: item.note || item.comment || '',
+
+      // === Options/Toppings ===
+      // options: String format for simple display "Giảm Trà, Ngọt 70%, Đá chung"
+      options: item.options || '',
+
+      // modifiers: Structured array for detailed display
+      // [{ groupName: "Độ ngọt", modifierName: "Ngọt 70%", price: 0 }]
+      modifiers: item.modifiers || [],
+
+      // modifierGroups: Full structure from API
+      // [{ groupId, groupName, modifiers: [{ modifierId, modifierName, price }] }]
+      modifierGroups: item.modifierGroups || [],
+
+      // === Formatted display strings for CCB ===
+      priceDisplay: this.formatCurrency(item.unitPrice || 0),
+      totalPriceDisplay: this.formatCurrency(item.totalPrice || 0),
+      discountDisplay: item.discountAmount > 0 ? `-${this.formatCurrency(item.discountAmount)}` : null,
+    }));
+  }
+
+  /**
+   * Format number to Vietnamese currency string
+   */
+  private formatCurrency(amount: number): string {
+    if (!amount) return '0đ';
+    return amount.toLocaleString('vi-VN') + 'đ';
   }
 
   /**
