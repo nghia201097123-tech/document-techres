@@ -12,6 +12,17 @@ export enum BackendService {
   APP_FOOD = 'app-food',
 }
 
+// Service ID mapping (same as APISIX x-svc-id)
+export const SERVICE_ID_MAP: Record<string, BackendService> = {
+  '1502': BackendService.ADMIN,
+  '1503': BackendService.DASHBOARD,
+  '1504': BackendService.MASTER_DATA,
+  '1505': BackendService.ADMIN, // media/upload -> admin
+  '1506': BackendService.OAUTH,
+  '1507': BackendService.SOCKET,
+  '1509': BackendService.APP_FOOD,
+};
+
 @Injectable()
 export class ProxyService {
   private readonly apiAdminClient: AxiosInstance;
@@ -158,6 +169,15 @@ export class ProxyService {
   getApiAppFoodUrl(): string {
     const serviceId = this.configService.get<string>('CONFIG_NODEJS_APP_FOOD_SERVICE_ID') || '3010';
     return `http://localhost:${serviceId}`;
+  }
+
+  /**
+   * Get service from x-svc-id header (APISIX-style routing)
+   * Returns null if svcId is not provided or invalid
+   */
+  getServiceFromSvcId(svcId: string | undefined): BackendService | null {
+    if (!svcId) return null;
+    return SERVICE_ID_MAP[svcId] || null;
   }
 
   determineService(path: string): { service: BackendService; adjustedPath: string } {

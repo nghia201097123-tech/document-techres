@@ -5,9 +5,9 @@ import {
   Res,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
-import { ProxyService } from './proxy.service';
+import { ProxyService, BackendService } from './proxy.service';
 
 @ApiTags('proxy')
 @Controller()
@@ -17,12 +17,17 @@ export class ProxyController {
   @All('*')
   @ApiOperation({ summary: 'Proxy all requests to backend services' })
   @ApiBearerAuth()
+  @ApiHeader({
+    name: 'x-svc-id',
+    description: 'Service ID for routing (1502=admin, 1503=dashboard, 1504=master-data, 1506=oauth, 1507=socket, 1509=app-food)',
+    required: false,
+  })
   async proxyRequest(@Req() req: Request, @Res() res: Response) {
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
       res.header('Access-Control-Allow-Origin', '*');
       res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, Origin, X-Requested-With, x-svc-id');
       return res.status(204).send();
     }
 
@@ -31,11 +36,32 @@ export class ProxyController {
       const fullPath = req.originalUrl;
       const path = fullPath.split('?')[0]; // Remove query string from path
 
-      // Determine which backend service to use based on path
-      // /api/tenant/* -> api-dashboard
-      // /api/admin/* or other -> api-admin
-      const { service, adjustedPath } = this.proxyService.determineService(path);
-      console.log(`[Gateway] ${req.method} ${req.originalUrl} -> ${service} ${adjustedPath}`);
+      // Check for x-svc-id header (APISIX-style routing)
+      const svcId = req.headers['x-svc-id'] as string | undefined;
+      let service: BackendService;
+      let adjustedPath: string;
+
+      if (svcId) {
+        // Use x-svc-id header for routing (like APISIX)
+        const svcService = this.proxyService.getServiceFromSvcId(svcId);
+        if (svcService) {
+          service = svcService;
+          adjustedPath = path; // Keep original path when using x-svc-id
+          console.log(`[Gateway] ${req.method} ${req.originalUrl} -> ${service} ${adjustedPath} (x-svc-id: ${svcId})`);
+        } else {
+          console.warn(`[Gateway] Invalid x-svc-id: ${svcId}, falling back to path-based routing`);
+          const result = this.proxyService.determineService(path);
+          service = result.service;
+          adjustedPath = result.adjustedPath;
+          console.log(`[Gateway] ${req.method} ${req.originalUrl} -> ${service} ${adjustedPath}`);
+        }
+      } else {
+        // Fall back to path-based routing
+        const result = this.proxyService.determineService(path);
+        service = result.service;
+        adjustedPath = result.adjustedPath;
+        console.log(`[Gateway] ${req.method} ${req.originalUrl} -> ${service} ${adjustedPath}`);
+      }
 
       // Forward authorization header if present
       const headers: Record<string, string> = {};
