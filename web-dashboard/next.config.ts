@@ -1,4 +1,8 @@
 import type { NextConfig } from "next";
+import { config } from "dotenv";
+
+// Load .env file explicitly for Turbopack compatibility
+config();
 
 const nextConfig: NextConfig = {
   // Enable standalone output for Docker deployment

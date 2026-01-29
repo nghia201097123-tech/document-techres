@@ -57,7 +57,7 @@ export const createServiceApi = (serviceId: string): AxiosInstance => {
     (config) => {
       // Validate that env is configured before making requests
       if (!GATEWAY_URL) {
-        return Promise.reject(new Error("API not configured: CONFIG_API_GATEWAY_URL is missing"));
+        return Promise.reject(new Error("API not configured: Check CONFIG_API_GATEWAY_URL in .env and restart dev server"));
       }
 
       if (typeof window !== "undefined") {
