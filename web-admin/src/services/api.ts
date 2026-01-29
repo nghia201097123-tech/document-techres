@@ -1,17 +1,26 @@
 import axios, { AxiosInstance } from "axios";
 
+// Helper function to get required environment variable
+function getRequiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
 // APISIX Gateway Configuration
 // Gateway sẽ điều hướng request dựa trên header x-svc-id (port của microservice)
 // Using CONFIG_API_GATEWAY_URL instead of NEXT_PUBLIC_* to allow runtime ENV changes in Docker
-const GATEWAY_URL = process.env.CONFIG_API_GATEWAY_URL || "https://beta.api.gateway.overate-vntech.com";
+const GATEWAY_URL = getRequiredEnv("CONFIG_API_GATEWAY_URL");
 
 // Service IDs (dùng làm x-svc-id header khi gọi qua gateway)
 export const SERVICE_IDS = {
-  API_ADMIN: process.env.CONFIG_NODEJS_ADMIN_SERVICE_ID || "1502",
-  API_DASHBOARD: process.env.CONFIG_NODEJS_MANAGEMENT_SERVICE_ID || "1503",
-  API_UPLOAD: process.env.CONFIG_NODEJS_MEDIA_SERVICE_ID || "1505",
-  API_OAUTH: process.env.CONFIG_NODEJS_OAUTH_SERVICE_ID || "1506",
-  API_APP_FOOD: process.env.CONFIG_NODEJS_APP_FOOD_SERVICE_ID || "1509",
+  API_ADMIN: getRequiredEnv("CONFIG_NODEJS_ADMIN_SERVICE_ID"),
+  API_DASHBOARD: getRequiredEnv("CONFIG_NODEJS_MANAGEMENT_SERVICE_ID"),
+  API_UPLOAD: getRequiredEnv("CONFIG_NODEJS_MEDIA_SERVICE_ID"),
+  API_OAUTH: getRequiredEnv("CONFIG_NODEJS_OAUTH_SERVICE_ID"),
+  API_APP_FOOD: getRequiredEnv("CONFIG_NODEJS_APP_FOOD_SERVICE_ID"),
 };
 
 console.log("[API] Gateway URL:", GATEWAY_URL);
