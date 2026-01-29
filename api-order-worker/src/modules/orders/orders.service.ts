@@ -369,38 +369,24 @@ export class OrdersService {
           existing.customerNote = rawOrder.customerNote;
         }
 
-        // Update items with full details from detail API
-        // Update if items have: prices, options, modifiers, or notes
+        // Update items - luôn cập nhật nếu rawOrder có items
+        // Ưu tiên data mới từ detail API (có giá, note, modifiers)
         if (rawOrder.items && rawOrder.items.length > 0) {
-          // Check each condition
           const firstItem = rawOrder.items[0];
           this.logger.log(
-            `[saveOrders]   Checking hasItemDetails for ${existing.orderCode}:` +
+            `[saveOrders]   Updating items for ${existing.orderCode}:` +
               ` unitPrice=${firstItem?.unitPrice}, totalPrice=${firstItem?.totalPrice},` +
               ` note="${firstItem?.note}", options="${firstItem?.options}",` +
               ` modifierGroups=${firstItem?.modifierGroups?.length || 0}`,
           );
 
-          const hasItemDetails = rawOrder.items.some(
-            (item: any) =>
-              item.unitPrice > 0 ||
-              item.totalPrice > 0 ||
-              item.note ||
-              item.options ||
-              item.modifierGroups?.length > 0,
-          );
+          // Luôn update items trong order entity
+          existing.items = rawOrder.items;
 
-          this.logger.log(`[saveOrders]   hasItemDetails: ${hasItemDetails}`);
-
-          if (hasItemDetails) {
-            existing.items = rawOrder.items;
-            // Re-save order items to food_order_items table
-            this.logger.log(`[saveOrders] 💾 Saving ${rawOrder.items.length} items for existing order ${existing.orderCode}...`);
-            await this.saveOrderItems(existing.id, rawOrder.items);
-            this.logger.log(`[saveOrders] ✅ Updated items for order ${existing.orderCode}`);
-          } else {
-            this.logger.log(`[saveOrders] ⚠️ hasItemDetails=false, NOT updating items for ${existing.orderCode}`);
-          }
+          // Re-save order items to food_order_items table
+          this.logger.log(`[saveOrders] 💾 Saving ${rawOrder.items.length} items for existing order ${existing.orderCode}...`);
+          await this.saveOrderItems(existing.id, rawOrder.items);
+          this.logger.log(`[saveOrders] ✅ Updated items for order ${existing.orderCode}`);
         } else {
           this.logger.log(`[saveOrders] ⚠️ No items in rawOrder for ${existing.orderCode}`);
         }
@@ -472,24 +458,11 @@ export class OrdersService {
         this.logger.log(`[saveOrders] ✅ Created new order in DB: ${saved.orderCode}, ID: ${saved.id}`);
 
         // Save order items to food_order_items table
-        // Only save if items have actual details (from detail API, not pagination)
+        // Luôn lưu items để đảm bảo có data, sẽ update thêm khi có chi tiết từ detail API
         if (rawOrder.items && rawOrder.items.length > 0) {
-          const hasItemDetails = rawOrder.items.some(
-            (item: any) =>
-              item.unitPrice > 0 ||
-              item.totalPrice > 0 ||
-              item.note ||
-              item.options ||
-              item.modifierGroups?.length > 0,
-          );
-
-          if (hasItemDetails) {
-            this.logger.log(`[saveOrders] 💾 Saving ${rawOrder.items.length} items for new order ${saved.orderCode}...`);
-            await this.saveOrderItems(saved.id, rawOrder.items);
-            this.logger.log(`[saveOrders] ✅ Saved items for new order ${saved.orderCode}`);
-          } else {
-            this.logger.log(`[saveOrders] ⚠️ Items without details (from pagination?), NOT saving to food_order_items for ${saved.orderCode}`);
-          }
+          this.logger.log(`[saveOrders] 💾 Saving ${rawOrder.items.length} items for new order ${saved.orderCode}...`);
+          await this.saveOrderItems(saved.id, rawOrder.items);
+          this.logger.log(`[saveOrders] ✅ Saved items for new order ${saved.orderCode}`);
         } else {
           this.logger.log(`[saveOrders] ⚠️ No items to save for new order ${saved.orderCode}`);
         }
