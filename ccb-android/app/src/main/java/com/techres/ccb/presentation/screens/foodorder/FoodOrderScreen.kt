@@ -341,215 +341,152 @@ fun KanbanOrderCard(
     onComplete: (() -> Unit)?
 ) {
     val hasNote = !order.customerNote.isNullOrEmpty()
+    val hasDriver = order.driverName != null
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = RoundedCornerShape(10.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            // Header: Platform + Note indicator
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Left: Order info (expandable)
+            Column(modifier = Modifier.weight(1f)) {
+                // Row 1: Platform icon + Order code + Total + Time
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // Platform badge
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                Color(order.platform.color).copy(alpha = 0.15f),
-                                RoundedCornerShape(4.dp)
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            Text(order.platform.icon, fontSize = 10.sp)
-                            Text(
-                                order.platform.shortName,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(order.platform.color),
-                                fontSize = 10.sp
-                            )
-                        }
-                    }
+                    // Platform icon only (compact)
+                    Text(order.platform.icon, fontSize = 12.sp)
 
-                    // Note indicator
+                    // Order code
+                    Text(
+                        order.orderCode,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+
+                    // Indicators: Note, Driver
                     if (hasNote) {
                         Icon(
                             Icons.Default.Edit,
-                            contentDescription = "Có ghi chú",
-                            modifier = Modifier.size(12.dp),
+                            contentDescription = "Ghi chú",
+                            modifier = Modifier.size(10.dp),
                             tint = Color(0xFFFF8F00)
                         )
                     }
-                }
-
-                // Time ago
-                Text(
-                    formatTimeAgo(order.createdAt),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    fontSize = 10.sp
-                )
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Order code + Total
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    order.orderCode,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    formatCurrency(order.totalAmount),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            // Customer info
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = null,
-                    modifier = Modifier.size(12.dp),
-                    tint = MaterialTheme.colorScheme.outline
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    order.customerName,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontSize = 11.sp
-                )
-            }
-
-            // Phone
-            if (order.customerPhone.isNotEmpty()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Phone,
-                        contentDescription = null,
-                        modifier = Modifier.size(10.dp),
-                        tint = MaterialTheme.colorScheme.outline
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        order.customerPhone,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 10.sp
-                    )
-                }
-            }
-
-            // Driver info (if assigned)
-            if (order.driverName != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            Color(0xFF4CAF50).copy(alpha = 0.1f),
-                            RoundedCornerShape(4.dp)
+                    if (hasDriver) {
+                        Icon(
+                            Icons.Default.DeliveryDining,
+                            contentDescription = "Có tài xế",
+                            modifier = Modifier.size(10.dp),
+                            tint = Color(0xFF4CAF50)
                         )
-                        .padding(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.DeliveryDining,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = Color(0xFF4CAF50)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Total amount
                     Text(
-                        order.driverName ?: "",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF2E7D32),
+                        formatCurrencyShort(order.totalAmount),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFE65100),
+                        fontSize = 11.sp
+                    )
+                }
+
+                // Row 2: Customer name + Items count + Time
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 2.dp)
+                ) {
+                    Text(
+                        order.customerName,
+                        style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        fontSize = 10.sp
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Text(
+                        " • ${order.items.size} món",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        fontSize = 9.sp
+                    )
+                    Text(
+                        " • ${formatTimeAgoShort(order.createdAt)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        fontSize = 9.sp
                     )
                 }
             }
 
-            // Items count
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                "${order.items.size} món",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.outline,
-                fontSize = 10.sp
-            )
-
-            // Action buttons
-            Spacer(modifier = Modifier.height(8.dp))
+            // Right: Action buttons (icon only)
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.padding(start = 8.dp)
             ) {
-                // Cancel button (always show if callback provided)
+                // Cancel button
                 onCancel?.let {
-                    OutlinedButton(
+                    IconButton(
                         onClick = it,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        ),
-                        contentPadding = PaddingValues(vertical = 4.dp),
-                        shape = RoundedCornerShape(6.dp)
+                        modifier = Modifier.size(32.dp)
                     ) {
-                        Text("Huỷ", fontSize = 11.sp)
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Huỷ",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
 
                 // Accept button (for NEW orders)
                 onAccept?.let {
-                    Button(
+                    IconButton(
                         onClick = it,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                        contentPadding = PaddingValues(vertical = 4.dp),
-                        shape = RoundedCornerShape(6.dp)
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(Color(0xFF4CAF50), RoundedCornerShape(6.dp))
                     ) {
-                        Text("Xác nhận", fontSize = 11.sp)
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = "Xác nhận",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
 
                 // Complete button (for PROCESSING orders)
                 onComplete?.let {
-                    Button(
+                    IconButton(
                         onClick = it,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                        contentPadding = PaddingValues(vertical = 4.dp),
-                        shape = RoundedCornerShape(6.dp)
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(Color(0xFF4CAF50), RoundedCornerShape(6.dp))
                     ) {
-                        Text("Hoàn tất", fontSize = 11.sp)
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = "Hoàn tất",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }
@@ -1712,6 +1649,15 @@ fun formatCurrency(amount: Long): String {
     return String.format("%,d đ", amount).replace(",", ".")
 }
 
+// Short format for compact cards: 61k, 146k, 1.2M
+fun formatCurrencyShort(amount: Long): String {
+    return when {
+        amount >= 1_000_000 -> String.format("%.1fM", amount / 1_000_000.0).replace(".0M", "M")
+        amount >= 1_000 -> "${amount / 1000}k"
+        else -> "${amount}đ"
+    }
+}
+
 fun formatTimeAgo(timestamp: Long): String {
     val diff = System.currentTimeMillis() - timestamp
     val minutes = diff / (1000 * 60)
@@ -1725,6 +1671,20 @@ fun formatTimeAgo(timestamp: Long): String {
             val days = hours / 24
             "$days ngày trước"
         }
+    }
+}
+
+// Short format for compact cards: 2m, 7h, 1d
+fun formatTimeAgoShort(timestamp: Long): String {
+    val diff = System.currentTimeMillis() - timestamp
+    val minutes = diff / (1000 * 60)
+    val hours = minutes / 60
+
+    return when {
+        minutes < 1 -> "now"
+        minutes < 60 -> "${minutes}m"
+        hours < 24 -> "${hours}h"
+        else -> "${hours / 24}d"
     }
 }
 
