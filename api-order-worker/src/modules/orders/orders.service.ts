@@ -3,10 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
+import axios from 'axios';
 import { WorkerManagerService, RawFoodOrder, AccountData } from '../workers/worker-manager.service';
 import { FoodOrder, FoodOrderStatus, MerchantOrderStatus } from '../../database/entities/food-order.entity';
 import { FoodOrderItem } from '../../database/entities/food-order-item.entity';
 import { FoodPlatformAccount, AccountStatus } from '../../database/entities/food-platform-account.entity';
+
+const GRAB_API_URL = process.env.GRAB_API_BASE_URL || 'https://api.grab.com/food/merchant/v3';
 
 @Injectable()
 export class OrdersService {
@@ -131,24 +134,29 @@ export class OrdersService {
         );
 
         if (result.success) {
-          // Log first order's items for debugging
-          if (result.orders && result.orders.length > 0) {
-            const firstOrder = result.orders[0];
-            this.logger.log(
-              `[triggerPoll]   First order: ${firstOrder.orderCode}, items: ${firstOrder.items?.length || 0}`,
-            );
-            if (firstOrder.items && firstOrder.items.length > 0) {
-              const firstItem = firstOrder.items[0];
-              this.logger.log(
-                `[triggerPoll]   First item: "${firstItem.productName}", price: ${firstItem.unitPrice}, ` +
-                  `options: "${firstItem.options || 'none'}", modifierGroups: ${firstItem.modifierGroups?.length || 0}`,
-              );
-            }
-          }
+          // Log orders from pagination
+          this.logger.log(
+            `[triggerPoll]   📦 Received ${result.orders?.length || 0} orders from pagination API`,
+          );
 
-          // Save orders and get new ones
+          // ============================================
+          // BƯỚC 1: Lưu orders cơ bản từ pagination API
+          // ============================================
+          this.logger.log(`[triggerPoll] 📝 STEP 1: Saving basic orders to DB...`);
           const saved = await this.saveOrders(result.orders, branchId, account?.tenantId || '');
           newOrderIds.push(...saved.newOrderIds);
+          this.logger.log(
+            `[triggerPoll] ✅ STEP 1 DONE: Saved ${saved.savedOrders.length} orders, ${saved.newOrderIds.length} new`,
+          );
+
+          // ============================================
+          // BƯỚC 2: Gọi detail API và lưu items
+          // ============================================
+          if (saved.savedOrders.length > 0 && account) {
+            this.logger.log(`[triggerPoll] 📝 STEP 2: Fetching order details and saving items...`);
+            await this.fetchAndSaveOrderDetails(saved.savedOrders, account);
+            this.logger.log(`[triggerPoll] ✅ STEP 2 DONE: Items saved for ${saved.savedOrders.length} orders`);
+          }
 
           // Update account metadata
           await this.accountRepo.update(result.accountId, {
@@ -369,26 +377,12 @@ export class OrdersService {
           existing.customerNote = rawOrder.customerNote;
         }
 
-        // Update items - luôn cập nhật nếu rawOrder có items
-        // Ưu tiên data mới từ detail API (có giá, note, modifiers)
+        // NOTE: Items sẽ được lưu ở Step 2 (fetchAndSaveOrderDetails)
+        // Ở đây chỉ update basic info cho order
         if (rawOrder.items && rawOrder.items.length > 0) {
-          const firstItem = rawOrder.items[0];
-          this.logger.log(
-            `[saveOrders]   Updating items for ${existing.orderCode}:` +
-              ` unitPrice=${firstItem?.unitPrice}, totalPrice=${firstItem?.totalPrice},` +
-              ` note="${firstItem?.note}", options="${firstItem?.options}",` +
-              ` modifierGroups=${firstItem?.modifierGroups?.length || 0}`,
-          );
-
-          // Luôn update items trong order entity
+          // Chỉ update items trong order entity (không lưu vào food_order_items ở đây)
           existing.items = rawOrder.items;
-
-          // Re-save order items to food_order_items table
-          this.logger.log(`[saveOrders] 💾 Saving ${rawOrder.items.length} items for existing order ${existing.orderCode}...`);
-          await this.saveOrderItems(existing.id, rawOrder.items);
-          this.logger.log(`[saveOrders] ✅ Updated items for order ${existing.orderCode}`);
-        } else {
-          this.logger.log(`[saveOrders] ⚠️ No items in rawOrder for ${existing.orderCode}`);
+          this.logger.log(`[saveOrders]   Basic items count: ${rawOrder.items.length} (will be updated in Step 2)`);
         }
 
         existing.lastSyncAt = new Date();
@@ -457,20 +451,13 @@ export class OrdersService {
         newOrderIds.push(saved.id);
         this.logger.log(`[saveOrders] ✅ Created new order in DB: ${saved.orderCode}, ID: ${saved.id}`);
 
-        // Save order items to food_order_items table
-        // Luôn lưu items để đảm bảo có data, sẽ update thêm khi có chi tiết từ detail API
-        if (rawOrder.items && rawOrder.items.length > 0) {
-          this.logger.log(`[saveOrders] 💾 Saving ${rawOrder.items.length} items for new order ${saved.orderCode}...`);
-          await this.saveOrderItems(saved.id, rawOrder.items);
-          this.logger.log(`[saveOrders] ✅ Saved items for new order ${saved.orderCode}`);
-        } else {
-          this.logger.log(`[saveOrders] ⚠️ No items to save for new order ${saved.orderCode}`);
-        }
-
+        // NOTE: Items sẽ được lưu ở Step 2 (fetchAndSaveOrderDetails)
+        // Ở đây chỉ log basic items count
         this.logger.log(
-          `[saveOrders] 🎉 NEW ORDER COMPLETE: ${saved.orderCode} ` +
-            `(TechRes: ${initialTechResStatus}, Merchant: ${newMerchantStatus}, Items: ${rawOrder.items?.length || 0})`,
+          `[saveOrders] 🎉 NEW ORDER CREATED: ${saved.orderCode} ` +
+            `(TechRes: ${initialTechResStatus}, Merchant: ${newMerchantStatus}, Basic items: ${rawOrder.items?.length || 0})`,
         );
+        this.logger.log(`[saveOrders]   Items will be saved in Step 2 from detail API`);
       }
     }
 
@@ -478,6 +465,155 @@ export class OrdersService {
     this.logger.log('═══════════════════════════════════════════════════════════');
 
     return { savedOrders, newOrderIds };
+  }
+
+  /**
+   * STEP 2: Gọi detail API và lưu items vào food_order_items
+   *
+   * Xử lý tuần tự từng đơn hàng để tránh rate limit
+   * Có retry logic khi gọi API thất bại
+   */
+  private async fetchAndSaveOrderDetails(
+    orders: FoodOrder[],
+    account: FoodPlatformAccount,
+  ): Promise<void> {
+    this.logger.log('═══════════════════════════════════════════════════════════');
+    this.logger.log(`[fetchAndSaveOrderDetails] 🚀 START fetching details for ${orders.length} orders`);
+
+    for (const order of orders) {
+      try {
+        this.logger.log(`[fetchAndSaveOrderDetails] 📡 Fetching detail for order ${order.orderCode} (${order.externalOrderId})...`);
+
+        // Gọi detail API với retry
+        const detailResponse = await this.callGrabDetailApi(order.externalOrderId, account.accessToken);
+
+        if (!detailResponse) {
+          this.logger.warn(`[fetchAndSaveOrderDetails] ⚠️ No detail data for order ${order.orderCode}`);
+          continue;
+        }
+
+        // Parse items từ detail response
+        const items = this.parseDetailItems(detailResponse);
+        this.logger.log(`[fetchAndSaveOrderDetails] 📦 Parsed ${items.length} items from detail API`);
+
+        if (items.length > 0) {
+          // Log first item for debugging
+          const firstItem = items[0];
+          this.logger.log(
+            `[fetchAndSaveOrderDetails]   First item: "${firstItem.productName}", ` +
+              `price: ${firstItem.unitPrice}, note: "${firstItem.note || ''}", ` +
+              `modifiers: ${firstItem.modifierGroups?.length || 0}`,
+          );
+
+          // Lưu items vào food_order_items
+          await this.saveOrderItems(order.id, items);
+          this.logger.log(`[fetchAndSaveOrderDetails] ✅ Saved ${items.length} items for order ${order.orderCode}`);
+
+          // Update items trong order entity
+          order.items = items;
+          await this.orderRepo.save(order);
+        } else {
+          this.logger.warn(`[fetchAndSaveOrderDetails] ⚠️ No items parsed from detail for order ${order.orderCode}`);
+        }
+      } catch (error: any) {
+        this.logger.error(
+          `[fetchAndSaveOrderDetails] ❌ Error processing order ${order.orderCode}: ${error.message}`,
+        );
+        // Continue with next order
+      }
+    }
+
+    this.logger.log(`[fetchAndSaveOrderDetails] 🏁 DONE fetching details for ${orders.length} orders`);
+    this.logger.log('═══════════════════════════════════════════════════════════');
+  }
+
+  /**
+   * Gọi Grab detail API với retry logic
+   */
+  private async callGrabDetailApi(orderId: string, accessToken: string, maxRetries = 3): Promise<any> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await axios.get(`${GRAB_API_URL}/orders/${orderId}`, {
+          headers: {
+            Authorization: accessToken,
+            Accept: '*/*',
+            'Accept-Encoding': 'gzip, deflate, br',
+            Connection: 'keep-alive',
+          },
+          timeout: 30000,
+        });
+
+        return response.data;
+      } catch (error: any) {
+        this.logger.warn(
+          `[callGrabDetailApi] Attempt ${attempt}/${maxRetries} failed for order ${orderId}: ${error.message}`,
+        );
+
+        if (attempt < maxRetries) {
+          // Exponential backoff: 1s, 2s, 4s
+          const delay = Math.pow(2, attempt - 1) * 1000;
+          this.logger.log(`[callGrabDetailApi] Waiting ${delay}ms before retry...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        } else {
+          this.logger.error(`[callGrabDetailApi] ❌ All ${maxRetries} attempts failed for order ${orderId}`);
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Parse items từ Grab detail API response
+   */
+  private parseDetailItems(detailData: any): any[] {
+    // Grab order detail có thể có structure khác nhau
+    // Thường là: detailData.order.items hoặc detailData.items
+    const orderData = detailData.order || detailData;
+    const rawItems = orderData.items || orderData.itemInfo?.items || [];
+
+    return rawItems.map((item: any) => {
+      // Parse modifiers/toppings
+      const modifierGroups = item.modifierGroups || item.modifiers || [];
+
+      // Tính total price bao gồm modifiers
+      let basePrice = this.parseCurrency(item.price) || this.parseCurrency(item.unitPrice) || 0;
+      let modifiersTotal = 0;
+
+      if (Array.isArray(modifierGroups)) {
+        for (const group of modifierGroups) {
+          for (const mod of group.modifiers || []) {
+            modifiersTotal += this.parseCurrency(mod.price) || 0;
+          }
+        }
+      }
+
+      const quantity = item.quantity || 1;
+      const unitPrice = basePrice + modifiersTotal;
+      const totalPrice = unitPrice * quantity;
+
+      return {
+        externalProductId: item.id || item.itemID || item.productId || null,
+        productName: item.name || item.itemName || 'Unknown',
+        quantity,
+        unitPrice,
+        totalPrice,
+        discountAmount: this.parseCurrency(item.discountAmount) || 0,
+        note: item.note || item.specialInstruction || item.comment || null,
+        options: item.options || null,
+        modifierGroups,
+      };
+    });
+  }
+
+  /**
+   * Parse Vietnamese currency string to number
+   * "246.500" -> 246500
+   */
+  private parseCurrency(value?: string | number): number {
+    if (!value) return 0;
+    if (typeof value === 'number') return value;
+    return parseInt(String(value).replace(/\D/g, ''), 10) || 0;
   }
 
   /**
