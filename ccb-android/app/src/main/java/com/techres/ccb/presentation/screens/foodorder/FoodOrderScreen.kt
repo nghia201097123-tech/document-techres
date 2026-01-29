@@ -341,152 +341,277 @@ fun KanbanOrderCard(
     onComplete: (() -> Unit)?
 ) {
     val hasNote = !order.customerNote.isNullOrEmpty()
-    val hasDriver = order.driverName != null
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
-        shape = RoundedCornerShape(8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(10.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Left: Order info (expandable)
-            Column(modifier = Modifier.weight(1f)) {
-                // Row 1: Platform icon + Order code + Total + Time
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+        Column(modifier = Modifier.padding(10.dp)) {
+            // Header: Platform + Time
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Platform badge
+                Box(
+                    modifier = Modifier
+                        .background(
+                            Color(order.platform.color).copy(alpha = 0.15f),
+                            RoundedCornerShape(4.dp)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
-                    // Platform icon only (compact)
-                    Text(order.platform.icon, fontSize = 12.sp)
-
-                    // Order code
-                    Text(
-                        order.orderCode,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-
-                    // Indicators: Note, Driver
-                    if (hasNote) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "Ghi chú",
-                            modifier = Modifier.size(10.dp),
-                            tint = Color(0xFFFF8F00)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(order.platform.icon, fontSize = 10.sp)
+                        Text(
+                            order.platform.shortName,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(order.platform.color),
+                            fontSize = 10.sp
                         )
                     }
-                    if (hasDriver) {
-                        Icon(
-                            Icons.Default.DeliveryDining,
-                            contentDescription = "Có tài xế",
-                            modifier = Modifier.size(10.dp),
-                            tint = Color(0xFF4CAF50)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    // Total amount
-                    Text(
-                        formatCurrencyShort(order.totalAmount),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFE65100),
-                        fontSize = 11.sp
-                    )
                 }
 
-                // Row 2: Customer name + Items count + Time
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 2.dp)
-                ) {
-                    Text(
-                        order.customerName,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f, fill = false)
+                // Time ago
+                Text(
+                    formatTimeAgo(order.createdAt),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    fontSize = 10.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Order code + Total
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    order.orderCode,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    formatCurrency(order.totalAmount),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            // Customer info
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = MaterialTheme.colorScheme.outline
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    order.customerName,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 11.sp
+                )
+            }
+
+            // Phone
+            if (order.customerPhone.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Phone,
+                        contentDescription = null,
+                        modifier = Modifier.size(10.dp),
+                        tint = MaterialTheme.colorScheme.outline
                     )
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        " • ${order.items.size} món",
+                        order.customerPhone,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        fontSize = 9.sp
-                    )
-                    Text(
-                        " • ${formatTimeAgoShort(order.createdAt)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        fontSize = 9.sp
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 10.sp
                     )
                 }
             }
 
-            // Right: Action buttons (icon only)
+            // Customer Note - PROMINENT DISPLAY
+            if (hasNote) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Color(0xFFFFE0B2),
+                            RoundedCornerShape(6.dp)
+                        )
+                        .border(
+                            1.dp,
+                            Color(0xFFFF6F00),
+                            RoundedCornerShape(6.dp)
+                        )
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        Icons.Default.Warning,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = Color(0xFFE65100)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
+                        Text(
+                            "GHI CHÚ",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFE65100),
+                            fontSize = 9.sp
+                        )
+                        Text(
+                            order.customerNote ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFBF360C),
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+
+            // Driver info with Avatar
+            if (order.driverName != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Color(0xFF4CAF50).copy(alpha = 0.1f),
+                            RoundedCornerShape(6.dp)
+                        )
+                        .padding(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Driver avatar
+                    if (order.driverAvatar != null) {
+                        AsyncImage(
+                            model = order.driverAvatar,
+                            contentDescription = "Driver avatar",
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, Color(0xFF4CAF50), CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .background(Color(0xFF4CAF50).copy(alpha = 0.2f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.DeliveryDining,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = Color(0xFF4CAF50)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            order.driverName ?: "",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF2E7D32),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 11.sp
+                        )
+                        order.driverPhone?.let { phone ->
+                            Text(
+                                phone,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF4CAF50),
+                                fontSize = 9.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Items count
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "${order.items.size} món",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+                fontSize = 10.sp
+            )
+
+            // Action buttons
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(start = 8.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 // Cancel button
                 onCancel?.let {
-                    IconButton(
+                    OutlinedButton(
                         onClick = it,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                        shape = RoundedCornerShape(6.dp)
                     ) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = "Huỷ",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        Text("Huỷ", fontSize = 11.sp)
                     }
                 }
 
                 // Accept button (for NEW orders)
                 onAccept?.let {
-                    IconButton(
+                    Button(
                         onClick = it,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(Color(0xFF4CAF50), RoundedCornerShape(6.dp))
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                        shape = RoundedCornerShape(6.dp)
                     ) {
-                        Icon(
-                            Icons.Default.Check,
-                            contentDescription = "Xác nhận",
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        Text("Xác nhận", fontSize = 11.sp)
                     }
                 }
 
                 // Complete button (for PROCESSING orders)
                 onComplete?.let {
-                    IconButton(
+                    Button(
                         onClick = it,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .background(Color(0xFF4CAF50), RoundedCornerShape(6.dp))
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                        shape = RoundedCornerShape(6.dp)
                     ) {
-                        Icon(
-                            Icons.Default.CheckCircle,
-                            contentDescription = "Hoàn tất",
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        Text("Hoàn tất", fontSize = 11.sp)
                     }
                 }
             }
