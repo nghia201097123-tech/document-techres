@@ -11,6 +11,7 @@ export const SERVICE_IDS = {
   API_DASHBOARD: process.env.CONFIG_NODEJS_MANAGEMENT_SERVICE_ID || "1503",
   API_UPLOAD: process.env.CONFIG_NODEJS_MEDIA_SERVICE_ID || "1505",
   API_OAUTH: process.env.CONFIG_NODEJS_OAUTH_SERVICE_ID || "1506",
+  API_APP_FOOD: process.env.CONFIG_NODEJS_APP_FOOD_SERVICE_ID || "1509",
 };
 
 console.log("[Dashboard API] Gateway URL:", GATEWAY_URL);
@@ -73,6 +74,7 @@ export const apiAdmin = createServiceApi(SERVICE_IDS.API_ADMIN);
 export const apiDashboard = createServiceApi(SERVICE_IDS.API_DASHBOARD);
 export const apiUpload = createServiceApi(SERVICE_IDS.API_UPLOAD);
 export const apiOAuth = createServiceApi(SERVICE_IDS.API_OAUTH);
+export const apiAppFood = createServiceApi(SERVICE_IDS.API_APP_FOOD);
 
 // Default API client - sử dụng apiDashboard cho web-dashboard
 export const api = apiDashboard;

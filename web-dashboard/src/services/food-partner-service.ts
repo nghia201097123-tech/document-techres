@@ -1,39 +1,4 @@
-import axios from "axios";
-
-// API App Food URL - connects directly to api-app-food service
-const API_APP_FOOD_URL =
-  process.env.NEXT_PUBLIC_API_APP_FOOD_URL || "http://localhost:3010/api";
-
-const foodApi = axios.create({
-  baseURL: API_APP_FOOD_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-// Request interceptor to add auth token and tenant ID
-foodApi.interceptors.request.use(
-  (config) => {
-    if (typeof window !== "undefined") {
-      const authStorage = localStorage.getItem("auth-storage");
-      if (authStorage) {
-        try {
-          const { state } = JSON.parse(authStorage);
-          if (state?.token) {
-            config.headers.Authorization = `Bearer ${state.token}`;
-          }
-          if (state?.tenantId) {
-            config.headers["X-Tenant-ID"] = state.tenantId;
-          }
-        } catch (e) {
-          console.error("Error parsing auth storage:", e);
-        }
-      }
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+import { apiAppFood } from "./api";
 
 // Partner types - match backend FoodPlatformType
 export enum FoodPartnerType {
@@ -373,7 +338,7 @@ export const foodPartnerService = {
    * Create a new food platform account
    */
   async createAccount(dto: CreateAccountDto): Promise<FoodPlatformAccount> {
-    const response = await foodApi.post<ApiResponse<FoodPlatformAccount>>('/accounts', dto);
+    const response = await apiAppFood.post<ApiResponse<FoodPlatformAccount>>('/api/accounts', dto);
     return response.data.data;
   },
 
@@ -381,7 +346,7 @@ export const foodPartnerService = {
    * Get all available connection ports for a branch
    */
   async getAvailablePorts(branchId: string): Promise<PartnerConnectionPort[]> {
-    const response = await foodApi.get<ApiResponse<FoodPlatformAccount[]>>(`/accounts/branch/${branchId}`);
+    const response = await apiAppFood.get<ApiResponse<FoodPlatformAccount[]>>(`/api/accounts/branch/${branchId}`);
     const accounts = response.data.data || [];
     return accounts.map((account, index) => ({
       id: account.id,
@@ -398,7 +363,7 @@ export const foodPartnerService = {
    * Get all account connections for a branch
    */
   async getConnections(branchId: string): Promise<PartnerAccountConnection[]> {
-    const response = await foodApi.get<ApiResponse<FoodPlatformAccount[]>>(`/accounts/branch/${branchId}`);
+    const response = await apiAppFood.get<ApiResponse<FoodPlatformAccount[]>>(`/api/accounts/branch/${branchId}`);
     const accounts = response.data.data || [];
     return accounts
       .filter((account) => account.status !== ConnectionStatus.PENDING || account.username)
@@ -420,7 +385,7 @@ export const foodPartnerService = {
    * Get combined view of ports and connections
    */
   async getConnectionsView(branchId: string): Promise<PartnerConnectionView[]> {
-    const response = await foodApi.get<ApiResponse<FoodPlatformAccount[]>>(`/accounts/branch/${branchId}`);
+    const response = await apiAppFood.get<ApiResponse<FoodPlatformAccount[]>>(`/api/accounts/branch/${branchId}`);
     const accounts = response.data.data || [];
     return accounts.map(transformToConnectionView);
   },
@@ -429,7 +394,7 @@ export const foodPartnerService = {
    * Link an account to a connection port (login)
    */
   async linkAccount(dto: LinkPartnerAccountDto): Promise<PartnerAccountConnection> {
-    const response = await foodApi.post<ApiResponse<any>>(`/accounts/${dto.portId}/login`, {
+    const response = await apiAppFood.post<ApiResponse<any>>(`/api/accounts/${dto.portId}/login`, {
       username: dto.username,
       password: dto.password,
       branchId: dto.branchId,
@@ -441,7 +406,7 @@ export const foodPartnerService = {
    * Update connection credentials
    */
   async updateConnection(connectionId: string, dto: UpdatePartnerConnectionDto): Promise<PartnerAccountConnection> {
-    const response = await foodApi.post<ApiResponse<any>>(`/accounts/${connectionId}/login`, {
+    const response = await apiAppFood.post<ApiResponse<any>>(`/api/accounts/${connectionId}/login`, {
       username: dto.username,
       password: dto.password,
     });
@@ -452,7 +417,7 @@ export const foodPartnerService = {
    * Disconnect/unlink an account
    */
   async unlinkAccount(connectionId: string): Promise<void> {
-    await foodApi.post(`/accounts/${connectionId}/disconnect`);
+    await apiAppFood.post(`/api/accounts/${connectionId}/disconnect`);
   },
 
   /**
@@ -460,7 +425,7 @@ export const foodPartnerService = {
    * Used when token expires and needs to re-authenticate
    */
   async reconnectAccount(accountId: string): Promise<FoodPlatformAccount> {
-    const response = await foodApi.post<ApiResponse<FoodPlatformAccount>>(`/accounts/${accountId}/reconnect`);
+    const response = await apiAppFood.post<ApiResponse<FoodPlatformAccount>>(`/api/accounts/${accountId}/reconnect`);
     return response.data.data;
   },
 
@@ -468,7 +433,7 @@ export const foodPartnerService = {
    * Test connection by calling platform API (with auto-reconnect)
    */
   async testConnection(connectionId: string): Promise<{ status: ConnectionStatus; message?: string; success?: boolean }> {
-    const response = await foodApi.post<ApiResponse<{ success: boolean; status: ConnectionStatus; message: string }>>(`/accounts/${connectionId}/test`);
+    const response = await apiAppFood.post<ApiResponse<{ success: boolean; status: ConnectionStatus; message: string }>>(`/api/accounts/${connectionId}/test`);
     return response.data.data;
   },
 
@@ -476,7 +441,7 @@ export const foodPartnerService = {
    * Get menu from platform (GrabFood, etc.)
    */
   async getMenu(accountId: string): Promise<ExternalMenu> {
-    const response = await foodApi.get<ApiResponse<ExternalMenu>>(`/accounts/${accountId}/menu`);
+    const response = await apiAppFood.get<ApiResponse<ExternalMenu>>(`/api/accounts/${accountId}/menu`);
     return response.data.data;
   },
 
@@ -492,7 +457,7 @@ export const foodPartnerService = {
    * Get all accounts by tenant
    */
   async getAccountsByTenant(tenantId: string): Promise<FoodPlatformAccount[]> {
-    const response = await foodApi.get<ApiResponse<FoodPlatformAccount[]>>(`/accounts`, {
+    const response = await apiAppFood.get<ApiResponse<FoodPlatformAccount[]>>(`/api/accounts`, {
       params: { tenantId }
     });
     return response.data.data || [];
@@ -502,7 +467,7 @@ export const foodPartnerService = {
    * Update account branch assignment
    */
   async updateAccountBranch(accountId: string, branchId: string): Promise<FoodPlatformAccount> {
-    const response = await foodApi.patch<ApiResponse<FoodPlatformAccount>>(`/accounts/${accountId}/branch`, {
+    const response = await apiAppFood.patch<ApiResponse<FoodPlatformAccount>>(`/api/accounts/${accountId}/branch`, {
       branchId,
     });
     return response.data.data;
@@ -513,7 +478,7 @@ export const foodPartnerService = {
    * Fetches stores from GrabFood unified-profile API
    */
   async getStores(accountId: string): Promise<ExternalStore[]> {
-    const response = await foodApi.get<ApiResponse<ExternalStore[]>>(`/accounts/${accountId}/stores`);
+    const response = await apiAppFood.get<ApiResponse<ExternalStore[]>>(`/api/accounts/${accountId}/stores`);
     return response.data.data || response.data || [];
   },
 
@@ -521,7 +486,7 @@ export const foodPartnerService = {
    * Get store mappings for an account (from DB)
    */
   async getStoreMappings(accountId: string): Promise<StoreMapping[]> {
-    const response = await foodApi.get<ApiResponse<StoreMapping[]>>(`/food-platforms/accounts/${accountId}/store-mappings`);
+    const response = await apiAppFood.get<ApiResponse<StoreMapping[]>>(`/api/food-platforms/accounts/${accountId}/store-mappings`);
     return response.data.data || [];
   },
 
@@ -529,7 +494,7 @@ export const foodPartnerService = {
    * Create store mappings for an account
    */
   async createStoreMappings(accountId: string, mappings: CreateStoreMappingDto[]): Promise<StoreMapping[]> {
-    const response = await foodApi.post<ApiResponse<StoreMapping[]>>(`/food-platforms/accounts/${accountId}/store-mappings`, {
+    const response = await apiAppFood.post<ApiResponse<StoreMapping[]>>(`/api/food-platforms/accounts/${accountId}/store-mappings`, {
       mappings,
     });
     return response.data.data || [];
@@ -539,7 +504,7 @@ export const foodPartnerService = {
    * Update a store mapping (e.g., change branch assignment)
    */
   async updateStoreMapping(mappingId: string, data: { branchId?: string; branchName?: string; isActive?: boolean }): Promise<StoreMapping> {
-    const response = await foodApi.put<ApiResponse<StoreMapping>>(`/food-platforms/store-mappings/${mappingId}`, data);
+    const response = await apiAppFood.put<ApiResponse<StoreMapping>>(`/api/food-platforms/store-mappings/${mappingId}`, data);
     return response.data.data;
   },
 
@@ -547,14 +512,14 @@ export const foodPartnerService = {
    * Delete a store mapping
    */
   async deleteStoreMapping(mappingId: string): Promise<void> {
-    await foodApi.delete(`/food-platforms/store-mappings/${mappingId}`);
+    await apiAppFood.delete(`/api/food-platforms/store-mappings/${mappingId}`);
   },
 
   /**
    * Sync store info from platform (update store details)
    */
   async syncStoreMapping(mappingId: string): Promise<StoreMapping> {
-    const response = await foodApi.post<ApiResponse<StoreMapping>>(`/food-platforms/store-mappings/${mappingId}/sync`);
+    const response = await apiAppFood.post<ApiResponse<StoreMapping>>(`/api/food-platforms/store-mappings/${mappingId}/sync`);
     return response.data.data;
   },
 
@@ -565,7 +530,7 @@ export const foodPartnerService = {
    * Calls GrabFood API and saves items to DB
    */
   async syncMenuItems(accountId: string): Promise<MenuSyncResult> {
-    const response = await foodApi.post<ApiResponse<MenuSyncResult>>(`/menu/${accountId}/sync`);
+    const response = await apiAppFood.post<ApiResponse<MenuSyncResult>>(`/api/menu/${accountId}/sync`);
     return response.data.data;
   },
 
@@ -573,7 +538,7 @@ export const foodPartnerService = {
    * Get menu sync status for an account
    */
   async getMenuSyncStatus(accountId: string): Promise<MenuSyncStatus> {
-    const response = await foodApi.get<ApiResponse<MenuSyncStatus>>(`/menu/${accountId}/sync-status`);
+    const response = await apiAppFood.get<ApiResponse<MenuSyncStatus>>(`/api/menu/${accountId}/sync-status`);
     return response.data.data;
   },
 
@@ -585,7 +550,7 @@ export const foodPartnerService = {
     if (categoryId) {
       params.categoryId = categoryId;
     }
-    const response = await foodApi.get<ApiResponse<SyncedExternalItem[]>>(`/menu/${accountId}/items`, { params });
+    const response = await apiAppFood.get<ApiResponse<SyncedExternalItem[]>>(`/api/menu/${accountId}/items`, { params });
     return response.data.data || [];
   },
 
@@ -593,7 +558,7 @@ export const foodPartnerService = {
    * Get synced external items grouped by category
    */
   async getSyncedItemsByCategory(accountId: string): Promise<SyncedItemsByCategory[]> {
-    const response = await foodApi.get<ApiResponse<SyncedItemsByCategory[]>>(`/menu/${accountId}/items/by-category`);
+    const response = await apiAppFood.get<ApiResponse<SyncedItemsByCategory[]>>(`/api/menu/${accountId}/items/by-category`);
     return response.data.data || [];
   },
 
@@ -601,7 +566,7 @@ export const foodPartnerService = {
    * Get item mappings for an account
    */
   async getItemMappings(accountId: string): Promise<ItemMapping[]> {
-    const response = await foodApi.get<ApiResponse<ItemMapping[]>>(`/menu/${accountId}/mappings`);
+    const response = await apiAppFood.get<ApiResponse<ItemMapping[]>>(`/api/menu/${accountId}/mappings`);
     return response.data.data || [];
   },
 
@@ -609,7 +574,7 @@ export const foodPartnerService = {
    * Create item mapping
    */
   async createItemMapping(accountId: string, dto: CreateItemMappingDto): Promise<ItemMapping> {
-    const response = await foodApi.post<ApiResponse<ItemMapping>>(`/menu/${accountId}/mappings`, dto);
+    const response = await apiAppFood.post<ApiResponse<ItemMapping>>(`/api/menu/${accountId}/mappings`, dto);
     return response.data.data;
   },
 
@@ -622,12 +587,12 @@ export const foodPartnerService = {
     updatedCount: number;
     message: string;
   }> {
-    const response = await foodApi.post<ApiResponse<{
+    const response = await apiAppFood.post<ApiResponse<{
       success: boolean;
       createdCount: number;
       updatedCount: number;
       message: string;
-    }>>(`/menu/${accountId}/mappings/batch`, { mappings });
+    }>>(`/api/menu/${accountId}/mappings/batch`, { mappings });
     return response.data.data;
   },
 
@@ -635,7 +600,7 @@ export const foodPartnerService = {
    * Update item mapping
    */
   async updateItemMapping(mappingId: string, dto: Partial<CreateItemMappingDto>): Promise<ItemMapping> {
-    const response = await foodApi.put<ApiResponse<ItemMapping>>(`/menu/mappings/${mappingId}`, dto);
+    const response = await apiAppFood.put<ApiResponse<ItemMapping>>(`/api/menu/mappings/${mappingId}`, dto);
     return response.data.data;
   },
 
@@ -643,6 +608,6 @@ export const foodPartnerService = {
    * Delete item mapping
    */
   async deleteItemMapping(mappingId: string): Promise<void> {
-    await foodApi.delete(`/menu/mappings/${mappingId}`);
+    await apiAppFood.delete(`/api/menu/mappings/${mappingId}`);
   },
 };
