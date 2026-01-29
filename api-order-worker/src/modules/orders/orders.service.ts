@@ -565,43 +565,80 @@ export class OrdersService {
 
   /**
    * Parse items từ Grab detail API response
+   *
+   * Grab API item structure:
+   * - fare.originalItemPriceDisplay: Giá bán gốc (unit price) - VD: "59.000"
+   * - fare.priceDisplay: Tổng thành tiền (total price = unit price * quantity + options) - VD: "64.000"
+   * - comment: Ghi chú của khách
+   * - modifierGroups[].modifiers[].priceDisplay: Giá option - VD: "5.000"
+   * - discountInfo[].itemDiscountPriceDisplay: Tiền giảm giá
    */
   private parseDetailItems(detailData: any): any[] {
     // Grab order detail có thể có structure khác nhau
-    // Thường là: detailData.order.items hoặc detailData.items
+    // Thường là: detailData.order.items hoặc detailData.itemInfo.items
     const orderData = detailData.order || detailData;
-    const rawItems = orderData.items || orderData.itemInfo?.items || [];
+    const rawItems = orderData.itemInfo?.items || orderData.items || [];
 
-    return rawItems.map((item: any) => {
-      // Parse modifiers/toppings
-      const modifierGroups = item.modifierGroups || item.modifiers || [];
+    this.logger.log(`[parseDetailItems] Parsing ${rawItems.length} items from detail API`);
 
-      // Tính total price bao gồm modifiers
-      let basePrice = this.parseCurrency(item.price) || this.parseCurrency(item.unitPrice) || 0;
-      let modifiersTotal = 0;
-
-      if (Array.isArray(modifierGroups)) {
-        for (const group of modifierGroups) {
-          for (const mod of group.modifiers || []) {
-            modifiersTotal += this.parseCurrency(mod.price) || 0;
-          }
-        }
-      }
-
+    return rawItems.map((item: any, index: number) => {
       const quantity = item.quantity || 1;
-      const unitPrice = basePrice + modifiersTotal;
-      const totalPrice = unitPrice * quantity;
+
+      // Unit price từ fare.originalItemPriceDisplay (giá bán gốc)
+      const unitPrice = this.parseCurrency(item.fare?.originalItemPriceDisplay);
+      // Total price từ fare.priceDisplay (tổng thành tiền bao gồm options)
+      const totalPrice = this.parseCurrency(item.fare?.priceDisplay);
+
+      // Parse discounts
+      const discounts = (item.discountInfo || []).map((d: any) => ({
+        discountName: d.discountName,
+        discountFunding: d.discountFunding,
+        discountAmount: this.parseCurrency(d.itemDiscountPriceDisplay),
+      }));
+      const discountAmount = discounts.reduce((sum: number, d: any) => sum + d.discountAmount, 0);
+
+      // Parse modifier groups - Grab API sử dụng modifierGroupID và modifierGroupName
+      const modifierGroups = (item.modifierGroups || []).map((group: any) => ({
+        groupId: group.modifierGroupID,
+        groupName: group.modifierGroupName,
+        modifiers: (group.modifiers || []).map((mod: any) => ({
+          modifierId: mod.modifierID,
+          modifierName: mod.modifierName,
+          price: this.parseCurrency(mod.priceDisplay),
+        })),
+      }));
+
+      // Build options string with prices (e.g., "Trứng ốp la (+5.000đ), Pate thêm (+7.000đ)")
+      const optionsString = modifierGroups
+        .flatMap((g: any) =>
+          g.modifiers.map((m: any) => {
+            if (m.price > 0) {
+              return `${m.modifierName} (+${m.price.toLocaleString('vi-VN')}đ)`;
+            }
+            return m.modifierName;
+          }),
+        )
+        .join(', ');
+
+      // Log item for debugging
+      this.logger.log(
+        `[parseDetailItems] Item ${index + 1}: "${item.name}", qty=${quantity}, ` +
+          `unitPrice=${unitPrice}, totalPrice=${totalPrice}, ` +
+          `note="${item.comment || ''}", options="${optionsString}", ` +
+          `modifierGroups=${modifierGroups.length}, discountAmount=${discountAmount}`,
+      );
 
       return {
-        externalProductId: item.id || item.itemID || item.productId || null,
-        productName: item.name || item.itemName || 'Unknown',
+        externalProductId: item.itemID || item.id || null,
+        productName: item.name || 'Unknown',
         quantity,
         unitPrice,
         totalPrice,
-        discountAmount: this.parseCurrency(item.discountAmount) || 0,
-        note: item.note || item.specialInstruction || item.comment || null,
-        options: item.options || null,
+        discountAmount,
+        note: item.comment || null, // Grab dùng 'comment' cho ghi chú
+        options: optionsString || null,
         modifierGroups,
+        discounts,
       };
     });
   }
