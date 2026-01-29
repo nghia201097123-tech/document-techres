@@ -27,7 +27,7 @@ android {
         debug {
             isMinifyEnabled = false
             // APISIX Gateway URL - điều hướng request qua header x-svc-id
-            buildConfigField("String", "APISIX_GATEWAY_URL", "\"http://localhost:4000/\"")
+            buildConfigField("String", "APISIX_GATEWAY_URL", "\"http://172.16.5.103:4000/\"")
             // Service port IDs (dùng làm x-svc-id header)
             buildConfigField("String", "SVC_ID_OAUTH", "\"1506\"")
             buildConfigField("String", "SVC_ID_DASHBOARD", "\"1503\"")

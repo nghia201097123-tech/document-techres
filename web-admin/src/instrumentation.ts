@@ -9,6 +9,7 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const notSet = "NOT SET";
+    console.log("\n");
 
     console.log("\n");
     console.log("╔════════════════════════════════════════════════════════════════╗");
