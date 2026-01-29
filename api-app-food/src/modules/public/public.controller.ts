@@ -944,6 +944,7 @@ export class PublicController {
   /**
    * Process GrabFood orders
    * Uses fetchGrabOrdersPagination and fetchOrderDetail for enrichment
+   * XỬ LÝ ĐỒNG BỘ: Chỉ lưu order khi có detail đầy đủ (giá, note, modifiers)
    */
   private async processGrabOrders(
     account: FoodPlatformAccount,
@@ -996,61 +997,103 @@ export class PublicController {
       };
     }
 
-    // Process and save orders
+    // Process orders ĐỒNG BỘ - từng order một
     const savedOrders: FoodOrder[] = [];
     const newOrderIds: string[] = [];
+    let skippedCount = 0;
 
     for (const grabOrder of result.orders) {
-      let rawOrder = this.grabConnector.transformPaginationOrder(grabOrder);
+      const basicOrder = this.grabConnector.transformPaginationOrder(grabOrder);
+      const orderCode = basicOrder.orderCode;
 
-      // ALWAYS fetch order detail to get full item info (note, modifiers, prices)
-      // Pagination API doesn't include item details
-      try {
-        const detailOrder = await this.grabConnector.fetchOrderDetail(
-          currentAccount,
-          rawOrder.externalOrderId,
-          rawOrder.orderCode,
-        );
-        if (detailOrder) {
-          // Merge detail into rawOrder - detail takes priority for items
-          rawOrder = {
-            ...rawOrder,
-            // Customer info
-            customerPhone: detailOrder.customerPhone || rawOrder.customerPhone,
-            customerAddress: detailOrder.customerAddress || rawOrder.customerAddress,
-            customerNote: detailOrder.customerNote || rawOrder.customerNote,
-            // Driver info
-            driverPhone: detailOrder.driverPhone || rawOrder.driverPhone,
-            driverAvatar: detailOrder.driverAvatar || rawOrder.driverAvatar,
-            driverLicensePlate: detailOrder.driverLicensePlate || rawOrder.driverLicensePlate,
-            // Items with full details (note, modifiers, prices)
-            items: detailOrder.items || rawOrder.items,
-            // Pricing
-            subtotal: detailOrder.subtotal || rawOrder.subtotal,
-            deliveryFee: detailOrder.deliveryFee || rawOrder.deliveryFee,
-            smallOrderFee: detailOrder.smallOrderFee || 0,
-            itemDiscountAmount: detailOrder.itemDiscountAmount || 0,
-            promotionAmount: detailOrder.promotionAmount || 0,
-            discount: detailOrder.discount || rawOrder.discount,
-            totalAmount: detailOrder.totalAmount || rawOrder.totalAmount,
-            // Scheduled order
-            isScheduledOrder: detailOrder.isScheduledOrder || false,
-            scheduledDeliveryTime: detailOrder.scheduledDeliveryTime || undefined,
-            // Combined order
-            isCombinedOrder: detailOrder.isCombinedOrder || false,
-          };
+      this.logger.log(`[processGrabOrders] Processing order ${orderCode}...`);
+
+      // Fetch detail với retry (3 lần)
+      let detailOrder = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          this.logger.log(`[processGrabOrders] ${orderCode}: Attempt ${attempt}/3 fetching detail...`);
+          detailOrder = await this.grabConnector.fetchOrderDetail(
+            currentAccount,
+            basicOrder.externalOrderId,
+            orderCode,
+          );
+          if (detailOrder) break;
+        } catch (error: any) {
+          this.logger.warn(`[processGrabOrders] ${orderCode}: Attempt ${attempt}/3 failed: ${error.message}`);
+          if (attempt < 3) {
+            // Exponential backoff: 500ms, 1000ms
+            await this.sleep(500 * attempt);
+          }
         }
-      } catch (enrichError: any) {
-        this.logger.warn(`[processGrabOrders] Detail fetch failed for ${rawOrder.externalOrderId}: ${enrichError.message}`);
       }
 
-      // Save order
+      // Kiểm tra có detail đầy đủ không
+      if (!detailOrder) {
+        this.logger.warn(`[processGrabOrders] ${orderCode}: Không lấy được detail sau 3 lần, SKIP`);
+        skippedCount++;
+        continue;
+      }
+
+      // Validate items có giá
+      const hasValidItems = detailOrder.items?.some(
+        (item: any) => item.unitPrice > 0 || item.totalPrice > 0,
+      );
+
+      if (!hasValidItems) {
+        this.logger.warn(`[processGrabOrders] ${orderCode}: Items không có giá, SKIP`);
+        skippedCount++;
+        continue;
+      }
+
+      // Merge detail vào order
+      const rawOrder = {
+        ...basicOrder,
+        // Customer info
+        customerPhone: detailOrder.customerPhone || basicOrder.customerPhone,
+        customerAddress: detailOrder.customerAddress || basicOrder.customerAddress,
+        customerNote: detailOrder.customerNote || basicOrder.customerNote,
+        // Driver info
+        driverPhone: detailOrder.driverPhone || basicOrder.driverPhone,
+        driverAvatar: detailOrder.driverAvatar || basicOrder.driverAvatar,
+        driverLicensePlate: detailOrder.driverLicensePlate || basicOrder.driverLicensePlate,
+        // Items với full details (note, modifiers, prices)
+        items: detailOrder.items,
+        // Pricing
+        subtotal: detailOrder.subtotal || basicOrder.subtotal,
+        deliveryFee: detailOrder.deliveryFee || basicOrder.deliveryFee,
+        smallOrderFee: detailOrder.smallOrderFee || 0,
+        itemDiscountAmount: detailOrder.itemDiscountAmount || 0,
+        promotionAmount: detailOrder.promotionAmount || 0,
+        discount: detailOrder.discount || basicOrder.discount,
+        totalAmount: detailOrder.totalAmount || basicOrder.totalAmount,
+        // Scheduled order
+        isScheduledOrder: detailOrder.isScheduledOrder || false,
+        scheduledDeliveryTime: detailOrder.scheduledDeliveryTime || undefined,
+        // Combined order
+        isCombinedOrder: detailOrder.isCombinedOrder || false,
+      };
+
+      // Log item đầu tiên để debug
+      if (rawOrder.items?.length > 0) {
+        const firstItem = rawOrder.items[0];
+        this.logger.log(
+          `[processGrabOrders] ${orderCode}: Item 1: "${firstItem.productName || firstItem.name}", ` +
+            `giá: ${firstItem.unitPrice}đ, note: "${firstItem.note || ''}"`,
+        );
+      }
+
+      // Save order với đầy đủ detail
       const savedOrder = await this.saveOrder(currentAccount, rawOrder, FoodPlatformType.GRAB);
       savedOrders.push(savedOrder.order);
       if (savedOrder.isNew) {
         newOrderIds.push(savedOrder.order.externalOrderId);
       }
+
+      this.logger.log(`[processGrabOrders] ✅ ${orderCode}: Saved với ${rawOrder.items?.length || 0} items`);
     }
+
+    this.logger.log(`[processGrabOrders] DONE: ${savedOrders.length} saved, ${skippedCount} skipped`);
 
     // Sync status for active orders not in pagination
     await this.syncActiveOrdersStatus(currentAccount, result.orders.map((o: any) => o.orderID));
@@ -1068,6 +1111,13 @@ export class PublicController {
       newOrderIds,
       orderStats: result.orderStats,
     };
+  }
+
+  /**
+   * Sleep helper
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -1318,23 +1368,10 @@ export class PublicController {
       const saved = await this.orderRepo.save(newOrder);
 
       // Save order items to food_order_items table
-      // Only save if items have actual details (from detail API, not pagination)
+      // Luôn lưu items nếu có - processGrabOrders đã validate trước khi gọi saveOrder
       if (rawOrder.items && rawOrder.items.length > 0) {
-        const hasItemDetails = rawOrder.items.some(
-          (item: any) =>
-            item.unitPrice > 0 ||
-            item.totalPrice > 0 ||
-            item.note ||
-            item.options ||
-            item.modifierGroups?.length > 0,
-        );
-
-        if (hasItemDetails) {
-          await this.saveOrderItems(saved.id, rawOrder.items);
-          this.logger.log(`[saveOrder] Saved ${rawOrder.items.length} items for new order ${saved.orderCode}`);
-        } else {
-          this.logger.warn(`[saveOrder] Items without details, NOT saving to food_order_items for ${saved.orderCode}`);
-        }
+        await this.saveOrderItems(saved.id, rawOrder.items);
+        this.logger.log(`[saveOrder] Saved ${rawOrder.items.length} items for new order ${saved.orderCode}`);
       }
 
       return { order: saved, isNew: true };
