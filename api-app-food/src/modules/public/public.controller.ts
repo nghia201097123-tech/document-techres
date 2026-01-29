@@ -447,82 +447,207 @@ export class PublicController {
 
   /**
    * Poll orders from food platforms by branch (called by CCB every 5 seconds)
-   * Flow:
+   *
+   * Flow (Correct Architecture):
    * 1. CCB calls with branchId
-   * 2. Get all connected accounts (Grab, Be, Shopee) for that branch
-   * 3. For each Grab account, fetch orders from GrabFood API
-   * 4. Save orders to database
+   * 2. api-app-food sends trigger signal to api-order-worker via Redis Pub/Sub
+   * 3. api-order-worker polls merchant APIs and saves to DB
+   * 4. api-app-food reads orders from cache/DB and returns to CCB
+   *
+   * NOTE: Direct DB save is handled by api-order-worker, NOT here!
    */
   @Get('poll-orders/:branchId')
   @ApiOperation({ summary: 'Poll orders from all food platforms for a branch' })
   @ApiParam({ name: 'branchId', description: 'Branch ID to poll orders for' })
   @ApiQuery({ name: 'pageType', required: false, description: 'Page type: New, Preparing, Ready, Delivering' })
-  @ApiResponse({ status: 200, description: 'Orders polled and saved' })
+  @ApiQuery({ name: 'lastPollAt', required: false, description: 'Last poll timestamp for incremental updates' })
+  @ApiResponse({ status: 200, description: 'Orders polled and returned' })
   async pollOrders(
     @Param('branchId') branchId: string,
     @Query('pageType') pageType: string = 'Preparing',
+    @Query('lastPollAt') lastPollAt?: string,
   ) {
     this.logger.log(`[pollOrders] branchId=${branchId}, pageType=${pageType}`);
 
     try {
-      // Get all connected accounts for this branch
-      const accounts = await this.accountRepo.find({
-        where: {
-          branchId: branchId,
-          status: AccountStatus.CONNECTED,
-          isActive: true,
-        },
+      // Delegate to OrdersService which has correct flow:
+      // 1. Trigger api-order-worker via Redis Pub/Sub
+      // 2. Read from cache or DB
+      // 3. Return orders
+      const pollResult = await this.ordersService.pollOrders({
+        branchId,
+        lastPollAt,
       });
 
-      if (accounts.length === 0) {
-        return {
-          status: 200,
-          message: 'Không có cổng kết nối nào cho chi nhánh này',
-          data: {
-            branchId,
-            accounts: [],
-            totalOrders: 0,
-            newOrders: 0,
-          },
-        };
+      // Transform response for CCB compatibility
+      const orders = pollResult.newOrders || [];
+
+      return {
+        status: 200,
+        message: 'Ok',
+        data: {
+          branchId,
+          totalOrders: orders.length,
+          newOrders: pollResult.meta?.totalOrdersFetched || 0,
+          newOrderIds: [],
+          accounts: [],
+          orders: orders.map((o: any) => this.transformOrderForResponse(o)),
+          polledAt: new Date().toISOString(),
+          source: pollResult.meta?.source || 'database',
+        },
+      };
+    } catch (error: any) {
+      this.logger.error(`[pollOrders] Error: ${error.message}`);
+      return {
+        status: 500,
+        message: error.message,
+        data: null,
+      };
+    }
+  }
+
+  /**
+   * Transform order entity to response format for CCB
+   */
+  private transformOrderForResponse(order: any) {
+    const raw = order.rawData as any;
+    return {
+      id: order.id,
+      externalOrderId: order.externalOrderId,
+      orderCode: order.orderCode,
+      platform: order.platform,
+      status: order.status?.toLowerCase() || 'new',
+      merchantStatus: order.merchantStatus?.toLowerCase() || 'pending',
+      // Customer info
+      customerId: raw?.eater?.ID?.toString() || null,
+      customerName: order.customerName,
+      customerPhone: order.customerPhone || null,
+      customerAddress: order.customerAddress || null,
+      customerNote: order.customerNote || null,
+      // Items - use orderItems if available (normalized), else use items (JSONB)
+      items: order.orderItems?.length > 0
+        ? order.orderItems.map((item: any) => ({
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+            discountAmount: item.discountAmount || 0,
+            note: item.note,
+            options: item.options,
+            modifiers: item.modifiers,
+            externalProductId: item.externalProductId,
+          }))
+        : order.items,
+      itemsCount: order.orderItems?.length || order.items?.length || 0,
+      // Payment
+      subtotal: order.subtotal,
+      deliveryFee: order.deliveryFee,
+      platformFee: order.platformFee,
+      discount: order.discount,
+      totalAmount: order.totalAmount,
+      // Additional fee fields
+      smallOrderFee: order.smallOrderFee || 0,
+      itemDiscountAmount: order.itemDiscountAmount || 0,
+      promotionAmount: order.promotionAmount || 0,
+      isPaid: order.isPaid,
+      paymentMethod: order.paymentMethod,
+      // Driver info
+      driverId: raw?.driver?.ID?.toString() || null,
+      driverName: order.driverName || raw?.driver?.name || null,
+      driverPhone: order.driverPhone || null,
+      driverAvatar: order.driverAvatar || raw?.driver?.avatar || null,
+      driverLicensePlate: order.driverLicensePlate || null,
+      estimatedDeliveryTime: order.estimatedDeliveryTime || raw?.times?.deliveredAt || null,
+      // Scheduled order
+      isScheduledOrder: order.isScheduledOrder || false,
+      scheduledDeliveryTime: order.scheduledDeliveryTime || null,
+      // Combined order
+      isCombinedOrder: order.isCombinedOrder || false,
+      parentOrderId: order.parentOrderId || null,
+      // Order status message
+      orderContentMessage: raw?.orderContentMessage || null,
+      // Timestamps
+      createdAt: order.createdAt,
+      platformCreatedAt: order.platformCreatedAt,
+      acceptedAt: order.acceptedAt,
+      preparedAt: order.preparedAt,
+      completedAt: order.completedAt,
+      cancelledAt: order.cancelledAt,
+    };
+  }
+
+  /**
+   * Legacy poll endpoint - kept for backward compatibility
+   * Redirects to the new flow via OrdersService
+   *
+   * @deprecated Use GET /poll-orders/:branchId instead
+   */
+  @Get('poll-orders-legacy/:branchId')
+  @ApiOperation({ summary: '[DEPRECATED] Legacy poll - use poll-orders instead' })
+  async pollOrdersLegacy(
+    @Param('branchId') branchId: string,
+    @Query('pageType') pageType: string = 'Preparing',
+  ) {
+    this.logger.warn(`[pollOrdersLegacy] DEPRECATED endpoint called for branch ${branchId}`);
+
+    // Get all connected accounts for this branch
+    const accounts = await this.accountRepo.find({
+      where: {
+        branchId: branchId,
+        status: AccountStatus.CONNECTED,
+        isActive: true,
+      },
+    });
+
+    if (accounts.length === 0) {
+      return {
+        status: 200,
+        message: 'Không có cổng kết nối nào cho chi nhánh này',
+        data: {
+          branchId,
+          accounts: [],
+          totalOrders: 0,
+          newOrders: 0,
+        },
+      };
+    }
+
+    this.logger.log(`[pollOrdersLegacy] Found ${accounts.length} connected accounts for branch ${branchId}`);
+
+    // Results for each platform
+    const platformResults: {
+      platform: string;
+      accountId: string;
+      displayName: string;
+      success: boolean;
+      ordersCount: number;
+      newOrdersCount: number;
+      error?: string;
+      orderStats?: any;
+    }[] = [];
+
+    const allSavedOrders: FoodOrder[] = [];
+    const allNewOrderIds: string[] = [];
+
+    // Process each account - supports all platforms (Grab, Shopee, BeFood)
+    for (const account of accounts) {
+      // Check access token
+      if (!account.accessToken) {
+        platformResults.push({
+          platform: account.platform,
+          accountId: account.id,
+          displayName: account.displayName || account.username || account.platform,
+          success: false,
+          ordersCount: 0,
+          newOrdersCount: 0,
+          error: 'Tài khoản chưa có token',
+        });
+        continue;
       }
 
-      this.logger.log(`[pollOrders] Found ${accounts.length} connected accounts for branch ${branchId}`);
-
-      // Results for each platform
-      const platformResults: {
-        platform: string;
-        accountId: string;
-        displayName: string;
-        success: boolean;
-        ordersCount: number;
-        newOrdersCount: number;
-        error?: string;
-        orderStats?: any;
-      }[] = [];
-
-      const allSavedOrders: FoodOrder[] = [];
-      const allNewOrderIds: string[] = [];
-
-      // Process each account - supports all platforms (Grab, Shopee, BeFood)
-      for (const account of accounts) {
-        // Check access token
-        if (!account.accessToken) {
-          platformResults.push({
-            platform: account.platform,
-            accountId: account.id,
-            displayName: account.displayName || account.username || account.platform,
-            success: false,
-            ordersCount: 0,
-            newOrdersCount: 0,
-            error: 'Tài khoản chưa có token',
-          });
-          continue;
-        }
-
-        try {
-          // Process orders based on platform
-          const result = await this.processAccountOrders(account, pageType);
+      try {
+        // Process orders based on platform
+        const result = await this.processAccountOrders(account, pageType);
 
           if (!result.success) {
             platformResults.push({
