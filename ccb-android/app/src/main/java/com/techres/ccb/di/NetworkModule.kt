@@ -56,7 +56,7 @@ object NetworkModule {
     private const val TAG = "NetworkModule"
 
     // APISIX Gateway URL
-    private val GATEWAY_URL: String by lazy { BuildConfig.API_BASE_URL }
+    private val GATEWAY_URL: String by lazy { BuildConfig.APISIX_GATEWAY_URL }
 
     /**
      * Create OkHttpClient with x-svc-id header for APISIX Gateway routing
