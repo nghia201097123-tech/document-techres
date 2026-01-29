@@ -72,6 +72,16 @@ export class OrdersService {
     totalOrders: number;
     accounts: any[];
   }> {
+    // ======================================================
+    // DEBUG: Verify new code is running
+    // ======================================================
+    console.log('');
+    console.log('🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥');
+    console.log('🔥 [triggerPoll] NEW CODE VERSION - 2024-01-29 v2');
+    console.log('🔥 Branch:', branchId);
+    console.log('🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥');
+    console.log('');
+
     // 1. Lấy tất cả accounts của branch
     const accounts = await this.accountRepo.find({
       where: { branchId, status: AccountStatus.CONNECTED },
@@ -135,27 +145,31 @@ export class OrdersService {
 
         if (result.success) {
           // Log orders from pagination
-          this.logger.log(
-            `[triggerPoll]   📦 Received ${result.orders?.length || 0} orders from pagination API`,
-          );
+          console.log(`📦 [triggerPoll] Received ${result.orders?.length || 0} orders from ${result.platform}`);
 
           // ============================================
           // BƯỚC 1: Lưu orders cơ bản từ pagination API
           // ============================================
-          this.logger.log(`[triggerPoll] 📝 STEP 1: Saving basic orders to DB...`);
+          console.log('');
+          console.log('📝📝📝 STEP 1: Saving basic orders to DB... 📝📝📝');
           const saved = await this.saveOrders(result.orders, branchId, account?.tenantId || '');
           newOrderIds.push(...saved.newOrderIds);
-          this.logger.log(
-            `[triggerPoll] ✅ STEP 1 DONE: Saved ${saved.savedOrders.length} orders, ${saved.newOrderIds.length} new`,
-          );
+          console.log(`✅ STEP 1 DONE: Saved ${saved.savedOrders.length} orders, ${saved.newOrderIds.length} new`);
 
           // ============================================
           // BƯỚC 2: Gọi detail API và lưu items
           // ============================================
           if (saved.savedOrders.length > 0 && account) {
-            this.logger.log(`[triggerPoll] 📝 STEP 2: Fetching order details and saving items...`);
+            console.log('');
+            console.log('📝📝📝 STEP 2: Fetching order details and saving items... 📝📝📝');
+            console.log(`   Orders to process: ${saved.savedOrders.length}`);
+            console.log(`   Account: ${account.id} (${account.platform})`);
             await this.fetchAndSaveOrderDetails(saved.savedOrders, account);
-            this.logger.log(`[triggerPoll] ✅ STEP 2 DONE: Items saved for ${saved.savedOrders.length} orders`);
+            console.log(`✅ STEP 2 DONE: Items saved for ${saved.savedOrders.length} orders`);
+          } else {
+            console.log('⚠️ STEP 2 SKIPPED: No orders to process or no account');
+            console.log(`   savedOrders.length: ${saved.savedOrders.length}`);
+            console.log(`   account: ${account ? 'exists' : 'null'}`);
           }
 
           // Update account metadata
@@ -477,54 +491,57 @@ export class OrdersService {
     orders: FoodOrder[],
     account: FoodPlatformAccount,
   ): Promise<void> {
-    this.logger.log('═══════════════════════════════════════════════════════════');
-    this.logger.log(`[fetchAndSaveOrderDetails] 🚀 START fetching details for ${orders.length} orders`);
+    console.log('');
+    console.log('🚀🚀🚀 [fetchAndSaveOrderDetails] START 🚀🚀🚀');
+    console.log(`   Orders to fetch: ${orders.length}`);
+    console.log(`   Account: ${account.platform} - ${account.id}`);
 
     for (const order of orders) {
       try {
-        this.logger.log(`[fetchAndSaveOrderDetails] 📡 Fetching detail for order ${order.orderCode} (${order.externalOrderId})...`);
+        console.log(`   📡 Fetching detail for ${order.orderCode} (${order.externalOrderId})...`);
 
         // Gọi detail API với retry
         const detailResponse = await this.callGrabDetailApi(order.externalOrderId, account.accessToken);
 
         if (!detailResponse) {
-          this.logger.warn(`[fetchAndSaveOrderDetails] ⚠️ No detail data for order ${order.orderCode}`);
+          console.log(`   ⚠️ No detail data for ${order.orderCode}`);
           continue;
         }
 
+        console.log(`   ✅ Got detail response for ${order.orderCode}`);
+
         // Parse items từ detail response
         const items = this.parseDetailItems(detailResponse);
-        this.logger.log(`[fetchAndSaveOrderDetails] 📦 Parsed ${items.length} items from detail API`);
+        console.log(`   📦 Parsed ${items.length} items from detail API`);
 
         if (items.length > 0) {
           // Log first item for debugging
           const firstItem = items[0];
-          this.logger.log(
-            `[fetchAndSaveOrderDetails]   First item: "${firstItem.productName}", ` +
-              `price: ${firstItem.unitPrice}, note: "${firstItem.note || ''}", ` +
-              `modifiers: ${firstItem.modifierGroups?.length || 0}`,
-          );
+          console.log(`   🍔 First item: "${firstItem.productName}"`);
+          console.log(`      - unitPrice: ${firstItem.unitPrice}`);
+          console.log(`      - totalPrice: ${firstItem.totalPrice}`);
+          console.log(`      - note: "${firstItem.note || ''}"`);
+          console.log(`      - options: "${firstItem.options || ''}"`);
 
           // Lưu items vào food_order_items
           await this.saveOrderItems(order.id, items);
-          this.logger.log(`[fetchAndSaveOrderDetails] ✅ Saved ${items.length} items for order ${order.orderCode}`);
+          console.log(`   💾 Saved ${items.length} items to food_order_items`);
 
           // Update items trong order entity
           order.items = items;
           await this.orderRepo.save(order);
+          console.log(`   ✅ Updated order entity with items`);
         } else {
-          this.logger.warn(`[fetchAndSaveOrderDetails] ⚠️ No items parsed from detail for order ${order.orderCode}`);
+          console.log(`   ⚠️ No items parsed for ${order.orderCode}`);
         }
       } catch (error: any) {
-        this.logger.error(
-          `[fetchAndSaveOrderDetails] ❌ Error processing order ${order.orderCode}: ${error.message}`,
-        );
+        console.log(`   ❌ Error processing ${order.orderCode}: ${error.message}`);
         // Continue with next order
       }
     }
 
-    this.logger.log(`[fetchAndSaveOrderDetails] 🏁 DONE fetching details for ${orders.length} orders`);
-    this.logger.log('═══════════════════════════════════════════════════════════');
+    console.log('🏁🏁🏁 [fetchAndSaveOrderDetails] DONE 🏁🏁🏁');
+    console.log('');
   }
 
   /**
