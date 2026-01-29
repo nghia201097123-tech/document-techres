@@ -6,9 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,6 +42,9 @@ fun FoodOrderScreen(
     // Snackbar for messages
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Bottom sheet state for history (completed + cancelled)
+    var showHistorySheet by remember { mutableStateOf(false) }
+
     LaunchedEffect(uiState.successMessage) {
         uiState.successMessage?.let {
             snackbarHostState.showSnackbar(it)
@@ -59,6 +59,13 @@ fun FoodOrderScreen(
         }
     }
 
+    // Filter orders by status for Kanban columns
+    val newOrders = uiState.orders.filter { it.status == FoodOrderStatus.NEW }
+    val processingOrders = uiState.orders.filter { it.status == FoodOrderStatus.PREPARING }
+    val historyOrders = uiState.orders.filter {
+        it.status == FoodOrderStatus.COMPLETED || it.status == FoodOrderStatus.CANCELLED
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -70,7 +77,7 @@ fun FoodOrderScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "${uiState.orders.size} đơn hàng",
+                            "${newOrders.size + processingOrders.size} đơn đang xử lý",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -79,12 +86,26 @@ fun FoodOrderScreen(
                 onBack = onBack,
                 actions = {
                     // New orders badge
-                    if (uiState.newOrdersCount > 0) {
+                    if (newOrders.isNotEmpty()) {
                         Badge(
                             containerColor = Color(0xFFFF5722),
                             modifier = Modifier.padding(end = 8.dp)
                         ) {
-                            Text("${uiState.newOrdersCount} mới")
+                            Text("${newOrders.size} mới")
+                        }
+                    }
+                    // History button
+                    if (historyOrders.isNotEmpty()) {
+                        IconButton(onClick = { showHistorySheet = true }) {
+                            BadgedBox(
+                                badge = {
+                                    Badge(containerColor = Color.Gray) {
+                                        Text("${historyOrders.size}")
+                                    }
+                                }
+                            ) {
+                                Icon(Icons.Default.History, contentDescription = "Lịch sử")
+                            }
                         }
                     }
                     IconButton(onClick = { viewModel.refresh() }) {
@@ -102,68 +123,13 @@ fun FoodOrderScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Filter Tabs
-            FilterTabRow(
-                selectedFilter = uiState.selectedFilter,
-                allCount = uiState.allOrdersCount,
-                newCount = uiState.newOrdersCount,
-                processingCount = uiState.processingOrdersCount,
-                completedCount = uiState.completedOrdersCount,
-                cancelledCount = uiState.cancelledOrdersCount,
-                onFilterSelected = { viewModel.setFilter(it) }
+            // Platform Filter
+            PlatformFilterRow(
+                selectedPlatform = uiState.selectedPlatform,
+                onPlatformSelected = { viewModel.setPlatformFilter(it) }
             )
 
-            // Platform Filter + Grid Column Selector
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Platform Filter (scrollable)
-                LazyRow(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // All platforms option
-                    item {
-                        FilterChip(
-                            selected = uiState.selectedPlatform == null,
-                            onClick = { viewModel.setPlatformFilter(null) },
-                            label = { Text("Tất cả") },
-                            leadingIcon = if (uiState.selectedPlatform == null) {
-                                { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp)) }
-                            } else null
-                        )
-                    }
-                    // Platform options
-                    items(FoodPlatform.entries.toTypedArray()) { platform ->
-                        FilterChip(
-                            selected = uiState.selectedPlatform == platform,
-                            onClick = { viewModel.setPlatformFilter(platform) },
-                            label = { Text(platform.shortName) },
-                            leadingIcon = {
-                                Text(platform.icon, fontSize = 14.sp)
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(platform.color).copy(alpha = 0.2f),
-                                selectedLabelColor = Color(platform.color)
-                            )
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Grid Column Selector
-                GridColumnSelector(
-                    gridColumns = uiState.gridColumns,
-                    onGridColumnsChanged = { viewModel.setGridColumns(it) }
-                )
-            }
-
-            // Orders Grid
+            // Main Content: Kanban 2-column layout
             if (uiState.isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -171,26 +137,40 @@ fun FoodOrderScreen(
                 ) {
                     CircularProgressIndicator()
                 }
-            } else if (uiState.orders.isEmpty()) {
-                EmptyOrdersView()
             } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(uiState.gridColumns),
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    gridItems(uiState.orders, key = { it.id }) { order ->
-                        FoodOrderCard(
-                            order = order,
-                            onClick = { viewModel.selectOrder(order) },
-                            onAccept = { viewModel.acceptOrder(order.id) },
-                            onComplete = { viewModel.completeOrder(order.id) },
-                            onCancel = { viewModel.cancelOrder(order.id) },
-                            gridColumns = uiState.gridColumns
-                        )
-                    }
+                    // Left Column: NEW orders
+                    OrderColumn(
+                        title = "Đơn mới",
+                        count = newOrders.size,
+                        headerColor = Color(0xFFFF5722),
+                        orders = newOrders,
+                        emptyMessage = "Không có đơn mới",
+                        modifier = Modifier.weight(1f),
+                        onOrderClick = { viewModel.selectOrder(it) },
+                        onAccept = { viewModel.acceptOrder(it.id) },
+                        onCancel = { viewModel.cancelOrder(it.id) },
+                        onComplete = null // Not applicable for new orders
+                    )
+
+                    // Right Column: PROCESSING orders
+                    OrderColumn(
+                        title = "Đang xử lý",
+                        count = processingOrders.size,
+                        headerColor = Color(0xFF2196F3),
+                        orders = processingOrders,
+                        emptyMessage = "Không có đơn đang xử lý",
+                        modifier = Modifier.weight(1f),
+                        onOrderClick = { viewModel.selectOrder(it) },
+                        onAccept = null, // Not applicable for processing orders
+                        onCancel = { viewModel.cancelOrder(it.id) },
+                        onComplete = { viewModel.completeOrder(it.id) }
+                    )
                 }
             }
         }
@@ -203,6 +183,526 @@ fun FoodOrderScreen(
                 onAccept = { viewModel.acceptOrder(it) },
                 onComplete = { viewModel.completeOrder(it) },
                 onCancel = { viewModel.cancelOrder(it) }
+            )
+        }
+
+        // History Bottom Sheet
+        if (showHistorySheet) {
+            HistoryBottomSheet(
+                orders = historyOrders,
+                onDismiss = { showHistorySheet = false },
+                onOrderClick = { viewModel.selectOrder(it) }
+            )
+        }
+    }
+}
+
+@Composable
+fun PlatformFilterRow(
+    selectedPlatform: FoodPlatform?,
+    onPlatformSelected: (FoodPlatform?) -> Unit
+) {
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // All platforms option
+        item {
+            FilterChip(
+                selected = selectedPlatform == null,
+                onClick = { onPlatformSelected(null) },
+                label = { Text("Tất cả") },
+                leadingIcon = if (selectedPlatform == null) {
+                    { Icon(Icons.Default.Check, contentDescription = null, Modifier.size(18.dp)) }
+                } else null
+            )
+        }
+        // Platform options
+        items(FoodPlatform.entries.toTypedArray()) { platform ->
+            FilterChip(
+                selected = selectedPlatform == platform,
+                onClick = { onPlatformSelected(platform) },
+                label = { Text(platform.shortName) },
+                leadingIcon = {
+                    Text(platform.icon, fontSize = 14.sp)
+                },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Color(platform.color).copy(alpha = 0.2f),
+                    selectedLabelColor = Color(platform.color)
+                )
+            )
+        }
+    }
+}
+
+@Composable
+fun OrderColumn(
+    title: String,
+    count: Int,
+    headerColor: Color,
+    orders: List<FoodAppOrder>,
+    emptyMessage: String,
+    modifier: Modifier = Modifier,
+    onOrderClick: (FoodAppOrder) -> Unit,
+    onAccept: ((FoodAppOrder) -> Unit)?,
+    onCancel: ((FoodAppOrder) -> Unit)?,
+    onComplete: ((FoodAppOrder) -> Unit)?
+) {
+    Card(
+        modifier = modifier.fillMaxHeight(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        )
+    ) {
+        Column {
+            // Column Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(headerColor)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Badge(
+                    containerColor = Color.White.copy(alpha = 0.9f)
+                ) {
+                    Text(
+                        count.toString(),
+                        color = headerColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Orders List
+            if (orders.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.Inbox,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            emptyMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(orders, key = { it.id }) { order ->
+                        KanbanOrderCard(
+                            order = order,
+                            onClick = { onOrderClick(order) },
+                            onAccept = onAccept?.let { { it(order) } },
+                            onCancel = onCancel?.let { { it(order) } },
+                            onComplete = onComplete?.let { { it(order) } }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun KanbanOrderCard(
+    order: FoodAppOrder,
+    onClick: () -> Unit,
+    onAccept: (() -> Unit)?,
+    onCancel: (() -> Unit)?,
+    onComplete: (() -> Unit)?
+) {
+    val hasNote = !order.customerNote.isNullOrEmpty()
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(10.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            // Header: Platform + Note indicator
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // Platform badge
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                Color(order.platform.color).copy(alpha = 0.15f),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(order.platform.icon, fontSize = 10.sp)
+                            Text(
+                                order.platform.shortName,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(order.platform.color),
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+
+                    // Note indicator
+                    if (hasNote) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = "Có ghi chú",
+                            modifier = Modifier.size(12.dp),
+                            tint = Color(0xFFFF8F00)
+                        )
+                    }
+                }
+
+                // Time ago
+                Text(
+                    formatTimeAgo(order.createdAt),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    fontSize = 10.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Order code + Total
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    order.orderCode,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    formatCurrency(order.totalAmount),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            // Customer info
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = MaterialTheme.colorScheme.outline
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    order.customerName,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 11.sp
+                )
+            }
+
+            // Phone
+            if (order.customerPhone.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Phone,
+                        contentDescription = null,
+                        modifier = Modifier.size(10.dp),
+                        tint = MaterialTheme.colorScheme.outline
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        order.customerPhone,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+
+            // Driver info (if assigned)
+            if (order.driverName != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Color(0xFF4CAF50).copy(alpha = 0.1f),
+                            RoundedCornerShape(4.dp)
+                        )
+                        .padding(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.DeliveryDining,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = Color(0xFF4CAF50)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        order.driverName ?: "",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF2E7D32),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+
+            // Items count
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "${order.items.size} món",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+                fontSize = 10.sp
+            )
+
+            // Action buttons
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Cancel button (always show if callback provided)
+                onCancel?.let {
+                    OutlinedButton(
+                        onClick = it,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text("Huỷ", fontSize = 11.sp)
+                    }
+                }
+
+                // Accept button (for NEW orders)
+                onAccept?.let {
+                    Button(
+                        onClick = it,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text("Xác nhận", fontSize = 11.sp)
+                    }
+                }
+
+                // Complete button (for PROCESSING orders)
+                onComplete?.let {
+                    Button(
+                        onClick = it,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text("Hoàn tất", fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HistoryBottomSheet(
+    orders: List<FoodAppOrder>,
+    onDismiss: () -> Unit,
+    onOrderClick: (FoodAppOrder) -> Unit
+) {
+    val completedOrders = orders.filter { it.status == FoodOrderStatus.COMPLETED }
+    val cancelledOrders = orders.filter { it.status == FoodOrderStatus.CANCELLED }
+    var selectedTab by remember { mutableIntStateOf(0) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.7f)
+        ) {
+            // Tabs
+            TabRow(selectedTabIndex = selectedTab) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text("Hoàn thành")
+                            if (completedOrders.isNotEmpty()) {
+                                Badge(containerColor = Color(0xFF4CAF50)) {
+                                    Text(completedOrders.size.toString())
+                                }
+                            }
+                        }
+                    }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text("Đã huỷ")
+                            if (cancelledOrders.isNotEmpty()) {
+                                Badge(containerColor = Color(0xFFF44336)) {
+                                    Text(cancelledOrders.size.toString())
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+
+            // Orders list
+            val displayOrders = if (selectedTab == 0) completedOrders else cancelledOrders
+            if (displayOrders.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        if (selectedTab == 0) "Không có đơn hoàn thành" else "Không có đơn đã huỷ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(displayOrders, key = { it.id }) { order ->
+                        HistoryOrderCard(
+                            order = order,
+                            onClick = { onOrderClick(order) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun HistoryOrderCard(
+    order: FoodAppOrder,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Platform
+                    Text(order.platform.icon, fontSize = 14.sp)
+                    Text(
+                        order.orderCode,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    // Status badge
+                    StatusBadge(status = order.status, isCompact = true)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    order.customerName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    formatDateTime(order.createdAt),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+            Text(
+                formatCurrency(order.totalAmount),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }
