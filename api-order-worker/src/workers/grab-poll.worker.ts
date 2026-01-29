@@ -230,14 +230,17 @@ async function fetchOrderDetail(token: string, orderId: string) {
     const unitPrice = parseCurrency(item.fare?.originalItemPriceDisplay);
     const totalPrice = parseCurrency(item.fare?.priceDisplay);
 
-    // Parse modifiers - API uses modifierGroupID and modifierGroupName
+    // Parse modifiers - API can use either:
+    // - modifierGroupID/modifierGroupName (newer format)
+    // - groupID/groupName (older format)
     const modifierGroups = (item.modifierGroups || []).map((group: any) => ({
-      groupId: group.modifierGroupID,
-      groupName: group.modifierGroupName,
+      groupId: group.modifierGroupID || group.groupID || '',
+      groupName: group.modifierGroupName || group.groupName || '',
       modifiers: (group.modifiers || []).map((mod: any) => ({
-        modifierId: mod.modifierID,
-        modifierName: mod.modifierName,
-        price: parseCurrency(mod.priceDisplay),
+        modifierId: mod.modifierID || mod.id || '',
+        modifierName: mod.modifierName || mod.name || '',
+        price: parseCurrency(mod.priceDisplay || mod.price),
+        quantity: mod.quantity || 1,
       })),
     }));
 
@@ -251,7 +254,7 @@ async function fetchOrderDetail(token: string, orderId: string) {
       }))
       .join(', ');
 
-    // Calculate item discount
+    // Calculate item discount from discountInfo array
     const discountAmount = (item.discountInfo || []).reduce(
       (sum: number, d: any) => sum + parseCurrency(d.itemDiscountPriceDisplay),
       0,
@@ -261,7 +264,7 @@ async function fetchOrderDetail(token: string, orderId: string) {
     console.log(
       `[GrabWorker] Detail Item ${index + 1}: "${item.name}", ` +
         `price: ${unitPrice}/${totalPrice}, note: "${item.comment || ''}", ` +
-        `options: "${optionsString}", modifierGroups: ${modifierGroups.length}`,
+        `discount: ${discountAmount}, options: "${optionsString}", modifierGroups: ${modifierGroups.length}`,
     );
 
     return {
@@ -277,25 +280,39 @@ async function fetchOrderDetail(token: string, orderId: string) {
     };
   });
 
+  // Log pricing for debugging
+  console.log(
+    `[GrabWorker] Order pricing: subtotal=${fare.subTotalDisplay}, delivery=${fare.deliveryFeeDisplay}, ` +
+      `smallOrder=${fare.smallOrderFeeDisplay}, itemDiscount=${fare.totalDiscountAmountDisplay}, ` +
+      `promotion=${fare.promotionDisplay}, total=${fare.reducedPriceDisplay || fare.passengerTotalDisplay}`,
+  );
+
   return {
     // Customer info
     customerPhone: formatPhone(eater.mobileNumber),
     customerAddress: eater.address || '',
     customerNote: eater.comment || '',
     // Driver info
-    driverPhone: formatPhone(driver.mobileNumber),
-    driverAvatar: driver.avatar || null,
-    driverLicensePlate: driver.licensePlate || null,
+    driverName: driver?.name || null,
+    driverPhone: formatPhone(driver?.mobileNumber),
+    driverAvatar: driver?.avatar || null,
+    driverLicensePlate: driver?.licensePlate || null,
     // Items with full details
     items,
-    // Pricing
+    // Pricing - according to Grab API:
+    // - subTotalDisplay: tổng tiền món ăn
+    // - deliveryFeeDisplay: phí giao hàng
+    // - smallOrderFeeDisplay: phí đơn hàng nhỏ
+    // - totalDiscountAmountDisplay: giảm giá từ nhà hàng (item_discount_amount)
+    // - promotionDisplay: giảm giá từ Grab (promotion)
+    // - reducedPriceDisplay: tổng tiền khách trả (customer_order_amount)
     subtotal: parseCurrency(fare.subTotalDisplay),
     deliveryFee: parseCurrency(fare.deliveryFeeDisplay),
     smallOrderFee: parseCurrency(fare.smallOrderFeeDisplay),
     itemDiscountAmount: parseCurrency(fare.totalDiscountAmountDisplay),
     promotionAmount: parseCurrency(fare.promotionDisplay),
     discount: parseCurrency(fare.totalDiscountAmountDisplay) + parseCurrency(fare.promotionDisplay),
-    totalAmount: parseCurrency(fare.passengerTotalDisplay) || parseCurrency(fare.reducedPriceDisplay),
+    totalAmount: parseCurrency(fare.reducedPriceDisplay) || parseCurrency(fare.passengerTotalDisplay),
     // Payment
     isPaid: detail?.paymentMethod !== 'COD',
     paymentMethod: detail?.paymentMethod || 'GrabPay',
