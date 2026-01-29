@@ -29,7 +29,8 @@ export class ProxyService {
     const apiMasterDataUrl = this.configService.get<string>('API_MASTER_DATA_URL') || 'http://localhost:3004';
     const webhookServiceUrl = this.configService.get<string>('WEBHOOK_SERVICE_URL') || 'http://localhost:3006';
     const socketServiceUrl = this.configService.get<string>('SOCKET_SERVICE_URL') || 'http://localhost:3007';
-    const apiAppFoodUrl = this.configService.get<string>('API_APP_FOOD_URL') || 'http://localhost:3010';
+    const appFoodServiceId = this.configService.get<string>('CONFIG_NODEJS_APP_FOOD_SERVICE_ID') || '3010';
+    const apiAppFoodUrl = `http://localhost:${appFoodServiceId}`;
 
     this.apiAdminClient = axios.create({
       baseURL: apiAdminUrl,
@@ -155,7 +156,8 @@ export class ProxyService {
   }
 
   getApiAppFoodUrl(): string {
-    return this.configService.get<string>('API_APP_FOOD_URL') || 'http://localhost:3010';
+    const serviceId = this.configService.get<string>('CONFIG_NODEJS_APP_FOOD_SERVICE_ID') || '3010';
+    return `http://localhost:${serviceId}`;
   }
 
   determineService(path: string): { service: BackendService; adjustedPath: string } {
