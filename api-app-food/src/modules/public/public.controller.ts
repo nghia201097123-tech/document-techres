@@ -1078,7 +1078,7 @@ export class PublicController {
       if (rawOrder.items?.length > 0) {
         const firstItem = rawOrder.items[0];
         this.logger.log(
-          `[processGrabOrders] ${orderCode}: Item 1: "${firstItem.productName || firstItem.name}", ` +
+          `[processGrabOrders] ${orderCode}: Item 1: "${firstItem.productName}", ` +
             `giá: ${firstItem.unitPrice}đ, note: "${firstItem.note || ''}"`,
         );
       }
