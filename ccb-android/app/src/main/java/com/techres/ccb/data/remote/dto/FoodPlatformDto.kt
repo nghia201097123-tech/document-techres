@@ -268,6 +268,8 @@ data class PollOrderDto(
     val orderCode: String,
     val platform: String,
     val status: String,
+    @SerializedName("merchantStatus")
+    val merchantStatus: String?,           // Trạng thái từ platform: ORDER_IN_PREPARE, ORDER_EXECUTING, COMPLETED, CANCELLED...
     // Customer info
     val customerId: String?,
     val customerName: String?,
@@ -283,6 +285,13 @@ data class PollOrderDto(
     val platformFee: Double?,
     val discount: Double?,
     val totalAmount: Double,
+    // Additional fee fields (Grab)
+    @SerializedName("smallOrderFee")
+    val smallOrderFee: Double?,            // Phí đơn hàng nhỏ
+    @SerializedName("itemDiscountAmount")
+    val itemDiscountAmount: Double?,       // Giảm giá món
+    @SerializedName("promotionAmount")
+    val promotionAmount: Double?,          // Giảm giá khuyến mãi
     val isPaid: Boolean?,
     val paymentMethod: String?,
     // Driver info
@@ -292,6 +301,16 @@ data class PollOrderDto(
     val driverAvatar: String?,
     val driverLicensePlate: String?,
     val estimatedDeliveryTime: String?,
+    // Scheduled order (đơn đặt trước)
+    @SerializedName("isScheduledOrder")
+    val isScheduledOrder: Boolean?,
+    @SerializedName("scheduledDeliveryTime")
+    val scheduledDeliveryTime: String?,
+    // Combined order (đơn ghép)
+    @SerializedName("isCombinedOrder")
+    val isCombinedOrder: Boolean?,
+    @SerializedName("parentOrderId")
+    val parentOrderId: String?,
     // Order status message
     val orderContentMessage: String?,
     // Timestamps
@@ -308,9 +327,31 @@ data class PollOrderItemDto(
     val quantity: Int,
     val unitPrice: Double?,
     val totalPrice: Double?,
+    @SerializedName("discountAmount")
+    val discountAmount: Double?,           // Giảm giá cho món
     val note: String?,
     val options: String?,
-    val externalProductId: String?
+    val externalProductId: String?,
+    val modifiers: List<PollItemModifierGroupDto>?  // Chi tiết modifier groups
+)
+
+/**
+ * Modifier group từ API
+ */
+data class PollItemModifierGroupDto(
+    val groupId: String?,
+    val groupName: String?,
+    val modifiers: List<PollItemModifierDto>?
+)
+
+/**
+ * Modifier từ API
+ */
+data class PollItemModifierDto(
+    val modifierId: String?,
+    val modifierName: String?,
+    val quantity: Int?,
+    val price: Double?
 )
 
 // ==================== Order Actions ====================

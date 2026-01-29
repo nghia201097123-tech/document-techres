@@ -11,6 +11,7 @@ data class FoodAppOrder(
     val orderCode: String,                    // Mã đơn từ platform: #GR12345, #SF98765
     val platform: FoodPlatform,               // Grab, ShopeeFood, BeFood, WebOrder
     val status: FoodOrderStatus,
+    val merchantStatus: String? = null,       // Trạng thái từ platform: ORDER_IN_PREPARE, ORDER_EXECUTING, COMPLETED, CANCELLED...
 
     // Customer info
     val customerId: String? = null,           // ID khách hàng từ platform
@@ -27,12 +28,26 @@ data class FoodAppOrder(
     val discount: Long = 0,
     val totalAmount: Long,
 
+    // Additional fee fields (Grab)
+    val smallOrderFee: Long = 0,              // Phí đơn hàng nhỏ
+    val itemDiscountAmount: Long = 0,         // Giảm giá món
+    val promotionAmount: Long = 0,            // Giảm giá khuyến mãi
+
     // Driver info
     val driverId: String? = null,             // ID tài xế từ platform
     val driverName: String? = null,
     val driverPhone: String? = null,
     val driverAvatar: String? = null,         // URL avatar tài xế
+    val driverLicensePlate: String? = null,   // Biển số xe tài xế
     val estimatedDeliveryTime: String? = null, // "15-20 phút"
+
+    // Scheduled order (đơn đặt trước)
+    val isScheduledOrder: Boolean = false,
+    val scheduledDeliveryTime: String? = null,
+
+    // Combined order (đơn ghép)
+    val isCombinedOrder: Boolean = false,
+    val parentOrderId: String? = null,
 
     // Order status message
     val orderContentMessage: String? = null,  // "Driver is nearby", etc.
@@ -54,8 +69,29 @@ data class FoodOrderItem(
     val quantity: Int,
     val unitPrice: Long,
     val totalPrice: Long,
+    val discountAmount: Long = 0,             // Giảm giá cho món
     val note: String? = null,                 // "Ít đá, nhiều đường"
-    val options: String? = null               // "Size L, Thêm trân châu"
+    val options: String? = null,              // "Size L, Thêm trân châu (+5.000đ)"
+    val modifiers: List<ItemModifierGroup>? = null  // Chi tiết modifier groups
+)
+
+/**
+ * Nhóm modifier (topping, size, etc.)
+ */
+data class ItemModifierGroup(
+    val groupId: String? = null,
+    val groupName: String,                    // "Size", "Topping"
+    val modifiers: List<ItemModifier>
+)
+
+/**
+ * Chi tiết modifier
+ */
+data class ItemModifier(
+    val modifierId: String? = null,
+    val modifierName: String,                 // "Size L", "Trân châu"
+    val quantity: Int = 1,
+    val price: Long = 0                       // Giá thêm
 )
 
 /**

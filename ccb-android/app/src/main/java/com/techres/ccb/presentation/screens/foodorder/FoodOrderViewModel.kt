@@ -4,6 +4,8 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.techres.ccb.data.remote.dto.PollItemModifierDto
+import com.techres.ccb.data.remote.dto.PollItemModifierGroupDto
 import com.techres.ccb.data.remote.dto.PollOrderDto
 import com.techres.ccb.data.remote.dto.PollOrderItemDto
 import com.techres.ccb.data.repository.AuthRepository
@@ -217,6 +219,7 @@ class FoodOrderViewModel @Inject constructor(
                 orderCode = dto.orderCode,
                 platform = mapPlatformString(dto.platform),
                 status = mapStatusString(dto.status),
+                merchantStatus = dto.merchantStatus,
                 // Customer info
                 customerId = dto.customerId,
                 customerName = dto.customerName ?: "Khách hàng",
@@ -230,12 +233,23 @@ class FoodOrderViewModel @Inject constructor(
                 platformFee = (dto.platformFee ?: 0.0).toLong(),
                 discount = (dto.discount ?: 0.0).toLong(),
                 totalAmount = dto.totalAmount.toLong(),
+                // Additional fee fields (Grab)
+                smallOrderFee = (dto.smallOrderFee ?: 0.0).toLong(),
+                itemDiscountAmount = (dto.itemDiscountAmount ?: 0.0).toLong(),
+                promotionAmount = (dto.promotionAmount ?: 0.0).toLong(),
                 // Driver info
                 driverId = dto.driverId,
                 driverName = dto.driverName,
                 driverPhone = dto.driverPhone,
                 driverAvatar = dto.driverAvatar,
+                driverLicensePlate = dto.driverLicensePlate,
                 estimatedDeliveryTime = dto.estimatedDeliveryTime,
+                // Scheduled order (đơn đặt trước)
+                isScheduledOrder = dto.isScheduledOrder ?: false,
+                scheduledDeliveryTime = dto.scheduledDeliveryTime,
+                // Combined order (đơn ghép)
+                isCombinedOrder = dto.isCombinedOrder ?: false,
+                parentOrderId = dto.parentOrderId,
                 // Order status message
                 orderContentMessage = dto.orderContentMessage,
                 // Timestamps
@@ -259,8 +273,27 @@ class FoodOrderViewModel @Inject constructor(
             quantity = dto.quantity,
             unitPrice = (dto.unitPrice ?: 0.0).toLong(),
             totalPrice = (dto.totalPrice ?: 0.0).toLong(),
+            discountAmount = (dto.discountAmount ?: 0.0).toLong(),
             note = dto.note,
-            options = dto.options
+            options = dto.options,
+            modifiers = dto.modifiers?.map { mapModifierGroupDto(it) }
+        )
+    }
+
+    private fun mapModifierGroupDto(dto: PollItemModifierGroupDto): ItemModifierGroup {
+        return ItemModifierGroup(
+            groupId = dto.groupId,
+            groupName = dto.groupName ?: "",
+            modifiers = dto.modifiers?.map { mapModifierDto(it) } ?: emptyList()
+        )
+    }
+
+    private fun mapModifierDto(dto: PollItemModifierDto): ItemModifier {
+        return ItemModifier(
+            modifierId = dto.modifierId,
+            modifierName = dto.modifierName ?: "",
+            quantity = dto.quantity ?: 1,
+            price = (dto.price ?: 0.0).toLong()
         )
     }
 
