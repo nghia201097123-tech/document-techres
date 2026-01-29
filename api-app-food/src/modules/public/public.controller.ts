@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Param, Query, Logger, UnauthorizedExceptio
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { FoodPlatformAccount, FoodPlatformStoreMapping, FoodPlatformExternalItem, FoodPlatformItemMapping, FoodOrder, FoodOrderItem, FoodOrderStatus, AccountStatus, FoodPlatformType } from '../../database/entities';
+import { FoodPlatformAccount, FoodPlatformStoreMapping, FoodPlatformExternalItem, FoodPlatformItemMapping, FoodOrder, FoodOrderItemEntity, FoodOrderStatus, AccountStatus, FoodPlatformType } from '../../database/entities';
 import { AccountsService } from '../accounts/accounts.service';
 import { OrdersService } from '../orders/orders.service';
 import { ConnectorFactory } from '../connectors/connector.factory';
@@ -27,8 +27,8 @@ export class PublicController {
     private readonly itemMappingRepo: Repository<FoodPlatformItemMapping>,
     @InjectRepository(FoodOrder)
     private readonly orderRepo: Repository<FoodOrder>,
-    @InjectRepository(FoodOrderItem)
-    private readonly orderItemRepo: Repository<FoodOrderItem>,
+    @InjectRepository(FoodOrderItemEntity)
+    private readonly orderItemRepo: Repository<FoodOrderItemEntity>,
     private readonly accountsService: AccountsService,
     private readonly ordersService: OrdersService,
     private readonly connectorFactory: ConnectorFactory,
