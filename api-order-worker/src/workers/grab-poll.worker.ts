@@ -208,10 +208,10 @@ async function fetchOrderDetail(token: string, orderId: string) {
     const unitPrice = parseCurrency(item.fare?.originalItemPriceDisplay);
     const totalPrice = parseCurrency(item.fare?.priceDisplay);
 
-    // Parse modifiers
+    // Parse modifiers - API uses modifierGroupID and modifierGroupName
     const modifierGroups = (item.modifierGroups || []).map((group: any) => ({
-      groupId: group.groupID,
-      groupName: group.groupName,
+      groupId: group.modifierGroupID,
+      groupName: group.modifierGroupName,
       modifiers: (group.modifiers || []).map((mod: any) => ({
         modifierId: mod.modifierID,
         modifierName: mod.modifierName,

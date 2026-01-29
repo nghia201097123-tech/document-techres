@@ -903,10 +903,10 @@ export class GrabConnector extends BasePlatformConnector {
       // Calculate total discount for this item
       const discountAmount = discounts.reduce((sum, d) => sum + d.discountAmount, 0);
 
-      // Parse modifier groups
+      // Parse modifier groups - API uses modifierGroupID and modifierGroupName
       const modifierGroups: RawModifierGroup[] = (item.modifierGroups || []).map((group: any) => ({
-        groupId: group.groupID,
-        groupName: group.groupName,
+        groupId: group.modifierGroupID,
+        groupName: group.modifierGroupName,
         modifiers: (group.modifiers || []).map((mod: any) => ({
           modifierId: mod.modifierID,
           modifierName: mod.modifierName,
