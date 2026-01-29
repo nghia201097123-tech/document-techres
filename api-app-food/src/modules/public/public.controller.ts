@@ -1318,8 +1318,23 @@ export class PublicController {
       const saved = await this.orderRepo.save(newOrder);
 
       // Save order items to food_order_items table
+      // Only save if items have actual details (from detail API, not pagination)
       if (rawOrder.items && rawOrder.items.length > 0) {
-        await this.saveOrderItems(saved.id, rawOrder.items);
+        const hasItemDetails = rawOrder.items.some(
+          (item: any) =>
+            item.unitPrice > 0 ||
+            item.totalPrice > 0 ||
+            item.note ||
+            item.options ||
+            item.modifierGroups?.length > 0,
+        );
+
+        if (hasItemDetails) {
+          await this.saveOrderItems(saved.id, rawOrder.items);
+          this.logger.log(`[saveOrder] Saved ${rawOrder.items.length} items for new order ${saved.orderCode}`);
+        } else {
+          this.logger.warn(`[saveOrder] Items without details, NOT saving to food_order_items for ${saved.orderCode}`);
+        }
       }
 
       return { order: saved, isNew: true };

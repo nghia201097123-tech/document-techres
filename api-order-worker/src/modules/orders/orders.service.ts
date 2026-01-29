@@ -472,10 +472,24 @@ export class OrdersService {
         this.logger.log(`[saveOrders] ✅ Created new order in DB: ${saved.orderCode}, ID: ${saved.id}`);
 
         // Save order items to food_order_items table
+        // Only save if items have actual details (from detail API, not pagination)
         if (rawOrder.items && rawOrder.items.length > 0) {
-          this.logger.log(`[saveOrders] 💾 Saving ${rawOrder.items.length} items for new order ${saved.orderCode}...`);
-          await this.saveOrderItems(saved.id, rawOrder.items);
-          this.logger.log(`[saveOrders] ✅ Saved items for new order ${saved.orderCode}`);
+          const hasItemDetails = rawOrder.items.some(
+            (item: any) =>
+              item.unitPrice > 0 ||
+              item.totalPrice > 0 ||
+              item.note ||
+              item.options ||
+              item.modifierGroups?.length > 0,
+          );
+
+          if (hasItemDetails) {
+            this.logger.log(`[saveOrders] 💾 Saving ${rawOrder.items.length} items for new order ${saved.orderCode}...`);
+            await this.saveOrderItems(saved.id, rawOrder.items);
+            this.logger.log(`[saveOrders] ✅ Saved items for new order ${saved.orderCode}`);
+          } else {
+            this.logger.log(`[saveOrders] ⚠️ Items without details (from pagination?), NOT saving to food_order_items for ${saved.orderCode}`);
+          }
         } else {
           this.logger.log(`[saveOrders] ⚠️ No items to save for new order ${saved.orderCode}`);
         }
