@@ -774,29 +774,45 @@ export class PublicController {
     for (const grabOrder of result.orders) {
       let rawOrder = this.grabConnector.transformPaginationOrder(grabOrder);
 
-      // Enrich order with detail API
-      const needsEnrichment = !rawOrder.customerPhone || !rawOrder.driverPhone;
-      if (needsEnrichment) {
-        try {
-          const detailOrder = await this.grabConnector.fetchOrderDetail(
-            currentAccount,
-            rawOrder.externalOrderId,
-            rawOrder.orderCode,
-          );
-          if (detailOrder) {
-            rawOrder = {
-              ...rawOrder,
-              customerPhone: detailOrder.customerPhone || rawOrder.customerPhone,
-              customerAddress: detailOrder.customerAddress || rawOrder.customerAddress,
-              customerNote: detailOrder.customerNote || rawOrder.customerNote,
-              driverPhone: detailOrder.driverPhone || rawOrder.driverPhone,
-              driverAvatar: detailOrder.driverAvatar || rawOrder.driverAvatar,
-              driverLicensePlate: detailOrder.driverLicensePlate || rawOrder.driverLicensePlate,
-            };
-          }
-        } catch (enrichError: any) {
-          this.logger.warn(`[processGrabOrders] Enrichment failed for ${rawOrder.externalOrderId}: ${enrichError.message}`);
+      // ALWAYS fetch order detail to get full item info (note, modifiers, prices)
+      // Pagination API doesn't include item details
+      try {
+        const detailOrder = await this.grabConnector.fetchOrderDetail(
+          currentAccount,
+          rawOrder.externalOrderId,
+          rawOrder.orderCode,
+        );
+        if (detailOrder) {
+          // Merge detail into rawOrder - detail takes priority for items
+          rawOrder = {
+            ...rawOrder,
+            // Customer info
+            customerPhone: detailOrder.customerPhone || rawOrder.customerPhone,
+            customerAddress: detailOrder.customerAddress || rawOrder.customerAddress,
+            customerNote: detailOrder.customerNote || rawOrder.customerNote,
+            // Driver info
+            driverPhone: detailOrder.driverPhone || rawOrder.driverPhone,
+            driverAvatar: detailOrder.driverAvatar || rawOrder.driverAvatar,
+            driverLicensePlate: detailOrder.driverLicensePlate || rawOrder.driverLicensePlate,
+            // Items with full details (note, modifiers, prices)
+            items: detailOrder.items || rawOrder.items,
+            // Pricing
+            subtotal: detailOrder.subtotal || rawOrder.subtotal,
+            deliveryFee: detailOrder.deliveryFee || rawOrder.deliveryFee,
+            smallOrderFee: detailOrder.smallOrderFee || 0,
+            itemDiscountAmount: detailOrder.itemDiscountAmount || 0,
+            promotionAmount: detailOrder.promotionAmount || 0,
+            discount: detailOrder.discount || rawOrder.discount,
+            totalAmount: detailOrder.totalAmount || rawOrder.totalAmount,
+            // Scheduled order
+            isScheduledOrder: detailOrder.isScheduledOrder || false,
+            scheduledDeliveryTime: detailOrder.scheduledDeliveryTime || null,
+            // Combined order
+            isCombinedOrder: detailOrder.isCombinedOrder || false,
+          };
         }
+      } catch (enrichError: any) {
+        this.logger.warn(`[processGrabOrders] Detail fetch failed for ${rawOrder.externalOrderId}: ${enrichError.message}`);
       }
 
       // Save order
@@ -1083,14 +1099,15 @@ export class PublicController {
 
   /**
    * Save order items to food_order_items table
+   * Includes full item details: note, options, modifiers, discountAmount
    */
   private async saveOrderItems(orderId: string, items: any[]): Promise<void> {
     try {
       // Delete existing items for this order (in case of re-sync)
       await this.orderItemRepo.delete({ orderId });
 
-      // Create new items
-      const orderItems = items.map((item) =>
+      // Create new items with full details
+      const orderItems = items.map((item, index) =>
         this.orderItemRepo.create({
           orderId,
           externalProductId: item.externalProductId || item.grabItemID || item.id || null,
@@ -1098,8 +1115,11 @@ export class PublicController {
           quantity: item.quantity || 1,
           unitPrice: item.unitPrice || item.price || 0,
           totalPrice: item.totalPrice || (item.quantity || 1) * (item.unitPrice || item.price || 0),
-          note: item.note || item.specialInstruction || null,
-          options: item.modifiers ? JSON.stringify(item.modifiers) : (item.options ? JSON.stringify(item.options) : null),
+          discountAmount: item.discountAmount || 0,
+          note: item.note || item.comment || item.specialInstruction || null,
+          options: typeof item.options === 'string' ? item.options : null,
+          modifiers: this.transformModifiersForSave(item.modifierGroups),
+          sortOrder: index,
         }),
       );
 
@@ -1108,6 +1128,26 @@ export class PublicController {
     } catch (error: any) {
       this.logger.error(`[saveOrderItems] Failed to save items for order ${orderId}: ${error.message}`);
     }
+  }
+
+  /**
+   * Transform modifierGroups to ModifierInfo[] for storage
+   */
+  private transformModifiersForSave(modifierGroups: any[] | undefined): any[] | null {
+    if (!modifierGroups || modifierGroups.length === 0) return null;
+
+    const modifiers: any[] = [];
+    for (const group of modifierGroups) {
+      for (const mod of group.modifiers || []) {
+        modifiers.push({
+          groupName: group.groupName,
+          modifierName: mod.modifierName,
+          price: mod.price || 0,
+          quantity: mod.quantity || 1,
+        });
+      }
+    }
+    return modifiers.length > 0 ? modifiers : null;
   }
 
   /**

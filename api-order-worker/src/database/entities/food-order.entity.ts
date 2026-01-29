@@ -91,7 +91,7 @@ export class FoodOrder {
   @Column({ name: 'customer_name', type: 'varchar', length: 255 })
   customerName: string;
 
-  @Column({ name: 'customer_phone', type: 'varchar', length: 20, default: '' })
+  @Column({ name: 'customer_phone', type: 'varchar', length: 50, default: '' })
   customerPhone: string;
 
   @Column({ name: 'customer_address', type: 'text', default: '' })
@@ -141,7 +141,7 @@ export class FoodOrder {
   @Column({ name: 'driver_name', type: 'varchar', length: 255, nullable: true })
   driverName: string;
 
-  @Column({ name: 'driver_phone', type: 'varchar', length: 20, nullable: true })
+  @Column({ name: 'driver_phone', type: 'varchar', length: 50, nullable: true })
   driverPhone: string;
 
   @Column({ name: 'driver_avatar', type: 'text', nullable: true })
