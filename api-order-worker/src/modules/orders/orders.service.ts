@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, DataSource } from 'typeorm';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import axios from 'axios';
@@ -25,6 +25,7 @@ export class OrdersService {
     @InjectRedis()
     private redis: Redis,
     private workerManager: WorkerManagerService,
+    private dataSource: DataSource,
   ) {}
 
   /**
@@ -148,29 +149,22 @@ export class OrdersService {
           console.log(`📦 [triggerPoll] Received ${result.orders?.length || 0} orders from ${result.platform}`);
 
           // ============================================
-          // BƯỚC 1: Lưu orders cơ bản từ pagination API
+          // NEW FLOW: Fetch detail trước, lưu order + items cùng lúc
           // ============================================
           console.log('');
-          console.log('📝📝📝 STEP 1: Saving basic orders to DB... 📝📝📝');
-          const saved = await this.saveOrders(result.orders, branchId, account?.tenantId || '');
-          newOrderIds.push(...saved.newOrderIds);
-          console.log(`✅ STEP 1 DONE: Saved ${saved.savedOrders.length} orders, ${saved.newOrderIds.length} new`);
+          console.log('📝📝📝 Processing orders with detail API... 📝📝📝');
+          console.log(`   Orders to process: ${result.orders?.length || 0}`);
+          console.log(`   Account: ${account?.id} (${account?.platform})`);
 
-          // ============================================
-          // BƯỚC 2: Gọi detail API và lưu items
-          // ============================================
-          if (saved.savedOrders.length > 0 && account) {
-            console.log('');
-            console.log('📝📝📝 STEP 2: Fetching order details and saving items... 📝📝📝');
-            console.log(`   Orders to process: ${saved.savedOrders.length}`);
-            console.log(`   Account: ${account.id} (${account.platform})`);
-            await this.fetchAndSaveOrderDetails(saved.savedOrders, account);
-            console.log(`✅ STEP 2 DONE: Items saved for ${saved.savedOrders.length} orders`);
-          } else {
-            console.log('⚠️ STEP 2 SKIPPED: No orders to process or no account');
-            console.log(`   savedOrders.length: ${saved.savedOrders.length}`);
-            console.log(`   account: ${account ? 'exists' : 'null'}`);
-          }
+          const saved = await this.processOrdersWithDetails(
+            result.orders,
+            branchId,
+            account?.tenantId || '',
+            account,
+          );
+          newOrderIds.push(...saved.newOrderIds);
+
+          console.log(`✅ DONE: Processed ${saved.savedOrders.length} orders, ${saved.newOrderIds.length} new`);
 
           // Update account metadata
           await this.accountRepo.update(result.accountId, {
@@ -285,6 +279,277 @@ export class OrdersService {
       MerchantOrderStatus.CANCELLED_OPERATOR,
       MerchantOrderStatus.FAILED,
     ].includes(status);
+  }
+
+  /**
+   * NEW FLOW: Xử lý orders với detail API
+   *
+   * Flow mới:
+   * 1. Với mỗi order từ pagination API
+   * 2. Gọi detail API để lấy đầy đủ items
+   * 3. Lưu order + items CÙNG LÚC trong 1 transaction
+   *
+   * Đảm bảo: Order và items luôn được lưu đồng thời, không có trường hợp
+   * order có mà items không có hoặc ngược lại.
+   */
+  private async processOrdersWithDetails(
+    orders: RawFoodOrder[],
+    branchId: string,
+    tenantId: string,
+    account: FoodPlatformAccount | undefined,
+  ): Promise<{ savedOrders: FoodOrder[]; newOrderIds: string[] }> {
+    this.logger.log('═══════════════════════════════════════════════════════════');
+    this.logger.log(`[processOrdersWithDetails] 💾 START processing ${orders.length} orders for branch ${branchId}`);
+
+    const savedOrders: FoodOrder[] = [];
+    const newOrderIds: string[] = [];
+
+    for (const rawOrder of orders) {
+      try {
+        this.logger.log(`[processOrdersWithDetails] 📋 Processing order: ${rawOrder.orderCode || rawOrder.externalOrderId}`);
+
+        // STEP 1: Gọi detail API để lấy đầy đủ items trước
+        let detailItems: any[] = [];
+        if (account) {
+          this.logger.log(`[processOrdersWithDetails]   📡 Fetching detail from API...`);
+          const detailResponse = await this.callGrabDetailApi(rawOrder.externalOrderId, account.accessToken);
+          if (detailResponse) {
+            detailItems = this.parseDetailItems(detailResponse);
+            this.logger.log(`[processOrdersWithDetails]   ✅ Got ${detailItems.length} items from detail API`);
+          } else {
+            this.logger.warn(`[processOrdersWithDetails]   ⚠️ No detail data, using basic items from pagination`);
+            detailItems = rawOrder.items || [];
+          }
+        } else {
+          this.logger.warn(`[processOrdersWithDetails]   ⚠️ No account, using basic items from pagination`);
+          detailItems = rawOrder.items || [];
+        }
+
+        // STEP 2: Lưu order + items trong 1 transaction
+        const result = await this.saveOrderWithItemsTransaction(
+          rawOrder,
+          detailItems,
+          branchId,
+          tenantId,
+        );
+
+        if (result.order) {
+          savedOrders.push(result.order);
+          if (result.isNew) {
+            newOrderIds.push(result.order.id);
+          }
+        }
+      } catch (error: any) {
+        this.logger.error(`[processOrdersWithDetails] ❌ Error processing order ${rawOrder.orderCode}: ${error.message}`);
+        // Continue with next order
+      }
+    }
+
+    this.logger.log(`[processOrdersWithDetails] 🏁 DONE. Total: ${savedOrders.length}, New: ${newOrderIds.length}`);
+    this.logger.log('═══════════════════════════════════════════════════════════');
+
+    return { savedOrders, newOrderIds };
+  }
+
+  /**
+   * Lưu order và items trong cùng 1 transaction
+   *
+   * Đảm bảo tính atomic: Nếu lưu items thất bại thì order cũng rollback
+   */
+  private async saveOrderWithItemsTransaction(
+    rawOrder: RawFoodOrder,
+    items: any[],
+    branchId: string,
+    tenantId: string,
+  ): Promise<{ order: FoodOrder | null; isNew: boolean }> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Check existing order
+      const existing = await queryRunner.manager.findOne(FoodOrder, {
+        where: {
+          externalOrderId: rawOrder.externalOrderId,
+          platform: rawOrder.platform as any,
+        },
+      });
+
+      const newMerchantStatus = this.mapToMerchantStatus(rawOrder.status);
+      let order: FoodOrder;
+      let isNew = false;
+
+      if (existing) {
+        // UPDATE existing order
+        order = await this.updateExistingOrder(queryRunner, existing, rawOrder, items, newMerchantStatus);
+        this.logger.log(`[saveOrderWithItemsTransaction] ✅ Updated order ${order.orderCode}`);
+      } else {
+        // CREATE new order
+        order = await this.createNewOrder(queryRunner, rawOrder, items, branchId, tenantId, newMerchantStatus);
+        isNew = true;
+        this.logger.log(`[saveOrderWithItemsTransaction] ✅ Created order ${order.orderCode}`);
+      }
+
+      // Save items trong cùng transaction
+      if (items.length > 0) {
+        await this.saveItemsInTransaction(queryRunner, order.id, items);
+        this.logger.log(`[saveOrderWithItemsTransaction] ✅ Saved ${items.length} items for order ${order.orderCode}`);
+      }
+
+      // Commit transaction
+      await queryRunner.commitTransaction();
+      this.logger.log(`[saveOrderWithItemsTransaction] 🎉 Transaction committed for ${order.orderCode}`);
+
+      return { order, isNew };
+    } catch (error: any) {
+      // Rollback on error
+      await queryRunner.rollbackTransaction();
+      this.logger.error(`[saveOrderWithItemsTransaction] ❌ Transaction rolled back: ${error.message}`);
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Update existing order trong transaction
+   */
+  private async updateExistingOrder(
+    queryRunner: any,
+    existing: FoodOrder,
+    rawOrder: RawFoodOrder,
+    items: any[],
+    newMerchantStatus: MerchantOrderStatus,
+  ): Promise<FoodOrder> {
+    const oldMerchantStatus = existing.merchantStatus;
+
+    // Update merchantStatus
+    if (oldMerchantStatus !== newMerchantStatus) {
+      existing.previousMerchantStatus = oldMerchantStatus;
+      existing.merchantStatus = newMerchantStatus;
+      this.logger.log(`[updateExistingOrder] Merchant status: ${oldMerchantStatus} -> ${newMerchantStatus}`);
+    }
+
+    // Auto-sync TechRes status
+    if (existing.status === FoodOrderStatus.CONFIRMED) {
+      if (this.isMerchantCompleted(newMerchantStatus)) {
+        existing.previousStatus = existing.status;
+        existing.status = FoodOrderStatus.COMPLETED;
+        existing.completedAt = new Date();
+        this.logger.log(`[updateExistingOrder] Auto-complete TechRes order`);
+      } else if (this.isMerchantCancelled(newMerchantStatus)) {
+        existing.previousStatus = existing.status;
+        existing.status = FoodOrderStatus.CANCELLED;
+        existing.cancelledAt = new Date();
+        this.logger.log(`[updateExistingOrder] Auto-cancel TechRes order`);
+      }
+    }
+
+    // Update driver info
+    if (rawOrder.driverName) existing.driverName = rawOrder.driverName;
+    if (rawOrder.driverPhone) existing.driverPhone = rawOrder.driverPhone;
+    if (rawOrder.driverAvatar) existing.driverAvatar = rawOrder.driverAvatar;
+
+    // Update customer info if missing
+    if (rawOrder.customerPhone && !existing.customerPhone) existing.customerPhone = rawOrder.customerPhone;
+    if (rawOrder.customerAddress && !existing.customerAddress) existing.customerAddress = rawOrder.customerAddress;
+    if (rawOrder.customerNote && !existing.customerNote) existing.customerNote = rawOrder.customerNote;
+
+    // Update items in order entity
+    existing.items = items;
+    existing.lastSyncAt = new Date();
+
+    return await queryRunner.manager.save(FoodOrder, existing);
+  }
+
+  /**
+   * Create new order trong transaction
+   */
+  private async createNewOrder(
+    queryRunner: any,
+    rawOrder: RawFoodOrder,
+    items: any[],
+    branchId: string,
+    tenantId: string,
+    newMerchantStatus: MerchantOrderStatus,
+  ): Promise<FoodOrder> {
+    // Determine initial TechRes status
+    let initialTechResStatus = FoodOrderStatus.NEW;
+    if (this.isMerchantCompleted(newMerchantStatus)) {
+      initialTechResStatus = FoodOrderStatus.COMPLETED;
+    } else if (this.isMerchantCancelled(newMerchantStatus)) {
+      initialTechResStatus = FoodOrderStatus.CANCELLED;
+    }
+
+    const newOrder = queryRunner.manager.create(FoodOrder, {
+      tenantId,
+      branchId,
+      externalOrderId: rawOrder.externalOrderId,
+      orderCode: rawOrder.orderCode,
+      platform: rawOrder.platform as any,
+      status: initialTechResStatus,
+      merchantStatus: newMerchantStatus,
+      customerName: rawOrder.customerName,
+      customerPhone: rawOrder.customerPhone || '',
+      customerAddress: rawOrder.customerAddress || '',
+      customerNote: rawOrder.customerNote || '',
+      items: items, // Items đã được enrich từ detail API
+      subtotal: rawOrder.subtotal,
+      deliveryFee: rawOrder.deliveryFee,
+      platformFee: rawOrder.platformFee,
+      discount: rawOrder.discount,
+      totalAmount: rawOrder.totalAmount,
+      smallOrderFee: rawOrder.smallOrderFee || 0,
+      itemDiscountAmount: rawOrder.itemDiscountAmount || 0,
+      promotionAmount: rawOrder.promotionAmount || 0,
+      isPaid: rawOrder.isPaid,
+      paymentMethod: rawOrder.paymentMethod || '',
+      driverName: rawOrder.driverName || null,
+      driverPhone: rawOrder.driverPhone || null,
+      driverAvatar: rawOrder.driverAvatar || null,
+      driverLicensePlate: rawOrder.driverLicensePlate || null,
+      estimatedDeliveryTime: rawOrder.estimatedDeliveryTime || null,
+      isScheduledOrder: rawOrder.isScheduledOrder || false,
+      scheduledDeliveryTime: rawOrder.scheduledDeliveryTime || null,
+      isCombinedOrder: rawOrder.isCombinedOrder || false,
+      parentOrderId: rawOrder.parentOrderId || null,
+      platformCreatedAt: rawOrder.createdAt,
+    });
+
+    return await queryRunner.manager.save(FoodOrder, newOrder);
+  }
+
+  /**
+   * Save items trong transaction
+   */
+  private async saveItemsInTransaction(
+    queryRunner: any,
+    orderId: string,
+    items: any[],
+  ): Promise<void> {
+    // Delete existing items first
+    await queryRunner.manager.delete(FoodOrderItem, { orderId });
+
+    // Create new items
+    const orderItems = items.map((item, index) => {
+      const modifiers = this.transformModifiers(item.modifierGroups);
+
+      return queryRunner.manager.create(FoodOrderItem, {
+        orderId,
+        externalProductId: item.externalProductId || item.id || null,
+        productName: item.productName || item.name || 'Unknown',
+        quantity: item.quantity || 1,
+        unitPrice: item.unitPrice || item.price || 0,
+        totalPrice: item.totalPrice || (item.quantity || 1) * (item.unitPrice || item.price || 0),
+        discountAmount: item.discountAmount || 0,
+        note: item.note || item.specialInstruction || item.comment || null,
+        options: typeof item.options === 'string' ? item.options : null,
+        modifiers,
+        sortOrder: index,
+      });
+    });
+
+    await queryRunner.manager.save(FoodOrderItem, orderItems);
   }
 
   /**
