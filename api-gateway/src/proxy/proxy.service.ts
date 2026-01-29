@@ -34,14 +34,14 @@ export class ProxyService {
   private readonly apiAppFoodClient: AxiosInstance;
 
   constructor(private readonly configService: ConfigService) {
-    const apiAdminUrl = this.configService.get<string>('API_ADMIN_URL') || 'http://localhost:3002';
-    const apiDashboardUrl = this.configService.get<string>('API_DASHBOARD_URL') || 'http://localhost:4002';
-    const apiOAuthUrl = this.configService.get<string>('API_OAUTH_URL') || 'http://localhost:3005';
-    const apiMasterDataUrl = this.configService.get<string>('API_MASTER_DATA_URL') || 'http://localhost:3004';
-    const webhookServiceUrl = this.configService.get<string>('WEBHOOK_SERVICE_URL') || 'http://localhost:3006';
-    const socketServiceUrl = this.configService.get<string>('SOCKET_SERVICE_URL') || 'http://localhost:3007';
-    const appFoodServiceId = this.configService.get<string>('CONFIG_NODEJS_APP_FOOD_SERVICE_ID') || '3010';
-    const apiAppFoodUrl = `http://localhost:${appFoodServiceId}`;
+    // Use CONFIG_* variable names matching .env.example
+    const apiAdminUrl = this.configService.get<string>('CONFIG_API_NODEJS_ADMIN_URL') || 'http://localhost:1502';
+    const apiDashboardUrl = this.configService.get<string>('CONFIG_API_NODEJS_MANAGEMENT_URL') || 'http://localhost:1503';
+    const apiOAuthUrl = this.configService.get<string>('CONFIG_API_NODEJS_OAUTH_URL') || 'http://localhost:1506';
+    const apiMasterDataUrl = this.configService.get<string>('CONFIG_API_NODEJS_MASTER_DATA_URL') || 'http://localhost:1504';
+    const webhookServiceUrl = this.configService.get<string>('CONFIG_API_NODEJS_WEBHOOK_URL') || 'http://localhost:1508';
+    const socketServiceUrl = this.configService.get<string>('CONFIG_API_NODEJS_SOCKET_URL') || 'http://localhost:1507';
+    const apiAppFoodUrl = this.configService.get<string>('CONFIG_API_NODEJS_APP_FOOD_URL') || 'http://localhost:1509';
 
     this.apiAdminClient = axios.create({
       baseURL: apiAdminUrl,
@@ -147,28 +147,27 @@ export class ProxyService {
   }
 
   getApiAdminUrl(): string {
-    return this.configService.get<string>('API_ADMIN_URL') || 'http://localhost:3002';
+    return this.configService.get<string>('CONFIG_API_NODEJS_ADMIN_URL') || 'http://localhost:1502';
   }
 
   getApiDashboardUrl(): string {
-    return this.configService.get<string>('API_DASHBOARD_URL') || 'http://localhost:4002';
+    return this.configService.get<string>('CONFIG_API_NODEJS_MANAGEMENT_URL') || 'http://localhost:1503';
   }
 
   getApiOAuthUrl(): string {
-    return this.configService.get<string>('API_OAUTH_URL') || 'http://localhost:3005';
+    return this.configService.get<string>('CONFIG_API_NODEJS_OAUTH_URL') || 'http://localhost:1506';
   }
 
   getWebhookServiceUrl(): string {
-    return this.configService.get<string>('WEBHOOK_SERVICE_URL') || 'http://localhost:3006';
+    return this.configService.get<string>('CONFIG_API_NODEJS_WEBHOOK_URL') || 'http://localhost:1508';
   }
 
   getSocketServiceUrl(): string {
-    return this.configService.get<string>('SOCKET_SERVICE_URL') || 'http://localhost:3007';
+    return this.configService.get<string>('CONFIG_API_NODEJS_SOCKET_URL') || 'http://localhost:1507';
   }
 
   getApiAppFoodUrl(): string {
-    const serviceId = this.configService.get<string>('CONFIG_NODEJS_APP_FOOD_SERVICE_ID') || '3010';
-    return `http://localhost:${serviceId}`;
+    return this.configService.get<string>('CONFIG_API_NODEJS_APP_FOOD_URL') || 'http://localhost:1509';
   }
 
   /**
