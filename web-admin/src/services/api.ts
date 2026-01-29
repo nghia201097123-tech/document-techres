@@ -1,10 +1,12 @@
 import axios, { AxiosInstance } from "axios";
 
-// Helper function to get required environment variable
-function getRequiredEnv(name: string): string {
+// Helper function to get environment variable with validation on access
+function getEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+    console.error(`Missing environment variable: ${name}`);
+    // Return empty string to allow app to load, API calls will fail with clear error
+    return "";
   }
   return value;
 }
@@ -12,19 +14,30 @@ function getRequiredEnv(name: string): string {
 // APISIX Gateway Configuration
 // Gateway sẽ điều hướng request dựa trên header x-svc-id (port của microservice)
 // CONFIG_* variables are exposed to browser via next.config.ts env property
-const GATEWAY_URL = getRequiredEnv("CONFIG_API_GATEWAY_URL");
+export const GATEWAY_URL = getEnv("CONFIG_API_GATEWAY_URL");
 
 // Service IDs (dùng làm x-svc-id header khi gọi qua gateway)
 export const SERVICE_IDS = {
-  API_ADMIN: getRequiredEnv("CONFIG_NODEJS_ADMIN_SERVICE_ID"),
-  API_DASHBOARD: getRequiredEnv("CONFIG_NODEJS_MANAGEMENT_SERVICE_ID"),
-  API_UPLOAD: getRequiredEnv("CONFIG_NODEJS_MEDIA_SERVICE_ID"),
-  API_OAUTH: getRequiredEnv("CONFIG_NODEJS_OAUTH_SERVICE_ID"),
-  API_APP_FOOD: getRequiredEnv("CONFIG_NODEJS_APP_FOOD_SERVICE_ID"),
+  API_ADMIN: getEnv("CONFIG_NODEJS_ADMIN_SERVICE_ID"),
+  API_DASHBOARD: getEnv("CONFIG_NODEJS_MANAGEMENT_SERVICE_ID"),
+  API_UPLOAD: getEnv("CONFIG_NODEJS_MEDIA_SERVICE_ID"),
+  API_OAUTH: getEnv("CONFIG_NODEJS_OAUTH_SERVICE_ID"),
+  API_APP_FOOD: getEnv("CONFIG_NODEJS_APP_FOOD_SERVICE_ID"),
 };
 
-console.log("[API] Gateway URL:", GATEWAY_URL);
-console.log("[API] Service IDs:", SERVICE_IDS);
+if (GATEWAY_URL) {
+  console.log("[Admin API] Gateway URL:", GATEWAY_URL);
+  console.log("[Admin API] Service IDs:", SERVICE_IDS);
+} else {
+  console.error("[Admin API] WARNING: Environment variables not configured!");
+  console.error("[Admin API] Make sure these are set in .env:");
+  console.error("  - CONFIG_API_GATEWAY_URL");
+  console.error("  - CONFIG_NODEJS_ADMIN_SERVICE_ID");
+  console.error("  - CONFIG_NODEJS_MANAGEMENT_SERVICE_ID");
+  console.error("  - CONFIG_NODEJS_MEDIA_SERVICE_ID");
+  console.error("  - CONFIG_NODEJS_OAUTH_SERVICE_ID");
+  console.error("  - CONFIG_NODEJS_APP_FOOD_SERVICE_ID");
+}
 
 // In-memory token storage as fallback when localStorage isn't persisted yet
 let inMemoryToken: string | null = null;
@@ -48,6 +61,11 @@ export const createServiceApi = (serviceId: string): AxiosInstance => {
   // Add auth interceptor
   instance.interceptors.request.use(
     (config) => {
+      // Validate that env is configured before making requests
+      if (!GATEWAY_URL) {
+        return Promise.reject(new Error("API not configured: CONFIG_API_GATEWAY_URL is missing"));
+      }
+
       if (typeof window !== "undefined") {
         let token: string | null = null;
 
