@@ -1,36 +1,16 @@
 import axios, { AxiosInstance } from "axios";
+// Import generated client-side config (generated from .env by scripts/generate-client-env.js)
+import { GATEWAY_URL, SERVICE_IDS } from "@/config/client-env";
 
-// Helper function to get environment variable with validation on access
-function getEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    console.error(`Missing environment variable: ${name}`);
-    // Return empty string to allow app to load, API calls will fail with clear error
-    return "";
-  }
-  return value;
-}
-
-// APISIX Gateway Configuration
-// Gateway sẽ điều hướng request dựa trên header x-svc-id (port của microservice)
-// NEXT_PUBLIC_* variables are mapped from CONFIG_* in next.config.ts
-export const GATEWAY_URL = getEnv("NEXT_PUBLIC_API_GATEWAY_URL");
-
-// Service IDs (dùng làm x-svc-id header khi gọi qua gateway)
-export const SERVICE_IDS = {
-  API_ADMIN: getEnv("NEXT_PUBLIC_ADMIN_SERVICE_ID"),
-  API_DASHBOARD: getEnv("NEXT_PUBLIC_MANAGEMENT_SERVICE_ID"),
-  API_UPLOAD: getEnv("NEXT_PUBLIC_MEDIA_SERVICE_ID"),
-  API_OAUTH: getEnv("NEXT_PUBLIC_OAUTH_SERVICE_ID"),
-  API_APP_FOOD: getEnv("NEXT_PUBLIC_APP_FOOD_SERVICE_ID"),
-};
+// Re-export for other modules
+export { GATEWAY_URL, SERVICE_IDS };
 
 if (GATEWAY_URL) {
   console.log("[Admin API] Gateway URL:", GATEWAY_URL);
   console.log("[Admin API] Service IDs:", SERVICE_IDS);
 } else {
   console.error("[Admin API] WARNING: Environment variables not configured!");
-  console.error("[Admin API] Make sure CONFIG_* variables are set in .env");
+  console.error("[Admin API] Make sure CONFIG_* variables are set in .env and restart dev server");
 }
 
 // In-memory token storage as fallback when localStorage isn't persisted yet

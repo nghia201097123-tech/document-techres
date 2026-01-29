@@ -5,7 +5,7 @@
  * Reads SERVICE_PORT from .env and passes it to Next.js
  */
 
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -23,6 +23,17 @@ if (fs.existsSync(envPath)) {
       }
     }
   });
+}
+
+// Generate client-side environment config
+// This creates src/config/client-env.ts from CONFIG_* variables
+const generateEnvScript = path.join(__dirname, 'generate-client-env.js');
+if (fs.existsSync(generateEnvScript)) {
+  try {
+    execSync(`node "${generateEnvScript}"`, { stdio: 'inherit' });
+  } catch (err) {
+    console.error('Failed to generate client env config:', err.message);
+  }
 }
 
 // Get command (dev or start)
