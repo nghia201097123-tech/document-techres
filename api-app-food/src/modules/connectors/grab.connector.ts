@@ -80,6 +80,14 @@ function parseCurrency(value: string | null | undefined): number {
 }
 
 /**
+ * Format number to Vietnamese currency string
+ * Converts 5000 to "5.000đ"
+ */
+function formatCurrencyVN(amount: number): string {
+  return amount.toLocaleString('vi-VN') + 'đ';
+}
+
+/**
  * GrabFood Platform Connector
  * Uses Grab Merchant Experience (MEX) API for authentication
  */
@@ -865,13 +873,21 @@ export class GrabConnector extends BasePlatformConnector {
 
   /**
    * Transform order items with modifiers and discounts
+   *
+   * Grab API item structure:
+   * - fare.originalItemPriceDisplay: Giá bán gốc (unit price)
+   * - fare.priceDisplay: Tổng thành tiền (total price = unit price * quantity + options)
+   * - discountInfo[].itemDiscountPriceDisplay: Tiền giảm giá
+   * - modifierGroups[].modifiers[].priceDisplay: Giá option
    */
   private transformOrderItems(items: any[]): RawFoodOrderItem[] {
     return items.map((item) => {
       const quantity = item.quantity || 1;
+
+      // Unit price from originalItemPriceDisplay (giá bán gốc)
+      const unitPrice = parseCurrency(item.fare?.originalItemPriceDisplay);
+      // Total price from priceDisplay (tổng thành tiền)
       const totalPrice = parseCurrency(item.fare?.priceDisplay);
-      // Unit price = total price / quantity (theo yêu cầu)
-      const unitPrice = quantity > 1 ? Math.round(totalPrice / quantity) : totalPrice;
 
       // Parse discounts
       const discounts: RawItemDiscount[] = (item.discountInfo || []).map((d: any) => ({
@@ -879,6 +895,9 @@ export class GrabConnector extends BasePlatformConnector {
         discountFunding: d.discountFunding,
         discountAmount: parseCurrency(d.itemDiscountPriceDisplay),
       }));
+
+      // Calculate total discount for this item
+      const discountAmount = discounts.reduce((sum, d) => sum + d.discountAmount, 0);
 
       // Parse modifier groups
       const modifierGroups: RawModifierGroup[] = (item.modifierGroups || []).map((group: any) => ({
@@ -891,9 +910,14 @@ export class GrabConnector extends BasePlatformConnector {
         })),
       }));
 
-      // Build options string from modifiers
+      // Build options string with prices (e.g., "Trứng ốp la (+5.000đ), Pate thêm (+7.000đ)")
       const optionsString = modifierGroups
-        .flatMap((g) => g.modifiers.map((m) => m.modifierName))
+        .flatMap((g) => g.modifiers.map((m) => {
+          if (m.price > 0) {
+            return `${m.modifierName} (+${formatCurrencyVN(m.price)})`;
+          }
+          return m.modifierName;
+        }))
         .join(', ');
 
       return {
@@ -905,6 +929,7 @@ export class GrabConnector extends BasePlatformConnector {
         options: optionsString,
         externalProductId: item.itemID,
         discounts,
+        discountAmount,
         modifierGroups,
       };
     });
