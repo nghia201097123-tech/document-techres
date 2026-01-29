@@ -486,6 +486,9 @@ export default function StaffPage() {
   const handleOpenCreate = () => {
     setSelectedStaff(null);
     setDialogMode("create");
+    // Load required data for form
+    dispatch(fetchDepartments());
+    dispatch(fetchBrands());
   };
 
   // Open view dialog
@@ -504,6 +507,12 @@ export default function StaffPage() {
     // Remove badges when editing
     setNewStaffIds((prev) => { const next = new Set(prev); next.delete(staff.id); return next; });
     setUpdatedStaffIds((prev) => { const next = new Set(prev); next.delete(staff.id); return next; });
+    // Load required data for form
+    dispatch(fetchDepartments());
+    dispatch(fetchBrands());
+    if (staff.brandId) {
+      dispatch(fetchBranchesByBrand(staff.brandId));
+    }
   };
 
   // Handle staff created/updated from StaffFormDialog
