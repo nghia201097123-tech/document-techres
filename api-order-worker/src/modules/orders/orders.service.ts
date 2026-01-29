@@ -332,6 +332,22 @@ export class OrdersService {
           existing.customerNote = rawOrder.customerNote;
         }
 
+        // Update items with full details from detail API
+        // Only update if new items have more details (note, modifiers, prices)
+        if (rawOrder.items && rawOrder.items.length > 0) {
+          const hasItemDetails = rawOrder.items.some(
+            (item: any) => item.note || item.options || item.modifierGroups?.length > 0,
+          );
+          if (hasItemDetails) {
+            existing.items = rawOrder.items;
+            // Re-save order items to food_order_items table
+            await this.saveOrderItems(existing.id, rawOrder.items);
+            this.logger.debug(
+              `[saveOrders] Updated items for order ${existing.orderCode}: ${rawOrder.items.length} items`,
+            );
+          }
+        }
+
         existing.lastSyncAt = new Date();
         await this.orderRepo.save(existing);
         savedOrders.push(existing);

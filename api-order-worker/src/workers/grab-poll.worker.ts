@@ -99,9 +99,12 @@ export default async function pollGrabOrders(account: AccountData) {
         try {
           const detail = await fetchOrderDetail(account.accessToken, order.externalOrderId);
           // Merge detail into order, detail takes priority
-          return { ...order, ...detail };
-        } catch (e) {
+          const enriched = { ...order, ...detail };
+          console.log(`[GrabWorker] Enriched order ${order.externalOrderId}: ${detail.items?.length || 0} items, modifiers: ${detail.items?.some((i: any) => i.modifierGroups?.length > 0)}`);
+          return enriched;
+        } catch (e: any) {
           // Fallback to basic info if detail fails
+          console.warn(`[GrabWorker] Detail fetch failed for ${order.externalOrderId}: ${e.message}`);
           return order;
         }
       }),
