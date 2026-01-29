@@ -5,8 +5,19 @@ const nextConfig: NextConfig = {
   // This creates a minimal deployment package with all dependencies
   output: "standalone",
 
-  // instrumentation.ts is supported by default in Next.js 15+
-  // No additional config needed for runtime ENV logging
+  // Exclude heavy packages from server-side bundling to improve dev performance
+  serverExternalPackages: ["exceljs", "file-saver"],
+
+  // Experimental settings for better performance
+  experimental: {
+    // Optimize package imports to reduce bundle analysis time
+    optimizePackageImports: ["lucide-react", "@radix-ui/react-icons"],
+  },
+
+  // Turbopack config (Next.js 15 default bundler)
+  turbopack: {
+    // Empty config to acknowledge Turbopack usage
+  },
 };
 
 export default nextConfig;
