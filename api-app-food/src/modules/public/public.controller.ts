@@ -588,7 +588,8 @@ export class PublicController {
     @Param('branchId') branchId: string,
     @Query('pageType') pageType: string = 'Preparing',
   ) {
-    this.logger.warn(`[pollOrdersLegacy] DEPRECATED endpoint called for branch ${branchId}`);
+    try {
+      this.logger.warn(`[pollOrdersLegacy] DEPRECATED endpoint called for branch ${branchId}`);
 
     // Get all connected accounts for this branch
     const accounts = await this.accountRepo.find({
