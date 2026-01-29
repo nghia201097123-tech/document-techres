@@ -13,16 +13,16 @@ function getEnv(name: string): string {
 
 // APISIX Gateway Configuration
 // Gateway sẽ điều hướng request dựa trên header x-svc-id (port của microservice)
-// CONFIG_* variables are exposed to browser via next.config.ts env property
-export const GATEWAY_URL = getEnv("CONFIG_API_GATEWAY_URL");
+// NEXT_PUBLIC_* variables are mapped from CONFIG_* in next.config.ts
+export const GATEWAY_URL = getEnv("NEXT_PUBLIC_API_GATEWAY_URL");
 
 // Service IDs (dùng làm x-svc-id header khi gọi qua gateway)
 export const SERVICE_IDS = {
-  API_ADMIN: getEnv("CONFIG_NODEJS_ADMIN_SERVICE_ID"),
-  API_DASHBOARD: getEnv("CONFIG_NODEJS_MANAGEMENT_SERVICE_ID"),
-  API_UPLOAD: getEnv("CONFIG_NODEJS_MEDIA_SERVICE_ID"),
-  API_OAUTH: getEnv("CONFIG_NODEJS_OAUTH_SERVICE_ID"),
-  API_APP_FOOD: getEnv("CONFIG_NODEJS_APP_FOOD_SERVICE_ID"),
+  API_ADMIN: getEnv("NEXT_PUBLIC_ADMIN_SERVICE_ID"),
+  API_DASHBOARD: getEnv("NEXT_PUBLIC_MANAGEMENT_SERVICE_ID"),
+  API_UPLOAD: getEnv("NEXT_PUBLIC_MEDIA_SERVICE_ID"),
+  API_OAUTH: getEnv("NEXT_PUBLIC_OAUTH_SERVICE_ID"),
+  API_APP_FOOD: getEnv("NEXT_PUBLIC_APP_FOOD_SERVICE_ID"),
 };
 
 if (GATEWAY_URL) {
@@ -30,13 +30,7 @@ if (GATEWAY_URL) {
   console.log("[Admin API] Service IDs:", SERVICE_IDS);
 } else {
   console.error("[Admin API] WARNING: Environment variables not configured!");
-  console.error("[Admin API] Make sure these are set in .env:");
-  console.error("  - CONFIG_API_GATEWAY_URL");
-  console.error("  - CONFIG_NODEJS_ADMIN_SERVICE_ID");
-  console.error("  - CONFIG_NODEJS_MANAGEMENT_SERVICE_ID");
-  console.error("  - CONFIG_NODEJS_MEDIA_SERVICE_ID");
-  console.error("  - CONFIG_NODEJS_OAUTH_SERVICE_ID");
-  console.error("  - CONFIG_NODEJS_APP_FOOD_SERVICE_ID");
+  console.error("[Admin API] Make sure CONFIG_* variables are set in .env");
 }
 
 // In-memory token storage as fallback when localStorage isn't persisted yet
