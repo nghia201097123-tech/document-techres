@@ -11,16 +11,16 @@ function getRequiredEnv(name: string): string {
 
 // APISIX Gateway Configuration
 // Gateway sẽ điều hướng request dựa trên header x-svc-id (port của microservice)
-// Using NEXT_PUBLIC_* prefix to expose to browser (required by Next.js)
-const GATEWAY_URL = getRequiredEnv("NEXT_PUBLIC_API_GATEWAY_URL");
+// CONFIG_* variables are exposed to browser via next.config.ts env property
+const GATEWAY_URL = getRequiredEnv("CONFIG_API_GATEWAY_URL");
 
 // Service IDs (dùng làm x-svc-id header khi gọi qua gateway)
 export const SERVICE_IDS = {
-  API_ADMIN: getRequiredEnv("NEXT_PUBLIC_SVC_ID_ADMIN"),
-  API_DASHBOARD: getRequiredEnv("NEXT_PUBLIC_SVC_ID_DASHBOARD"),
-  API_UPLOAD: getRequiredEnv("NEXT_PUBLIC_SVC_ID_UPLOAD"),
-  API_OAUTH: getRequiredEnv("NEXT_PUBLIC_SVC_ID_OAUTH"),
-  API_APP_FOOD: getRequiredEnv("NEXT_PUBLIC_SVC_ID_APP_FOOD"),
+  API_ADMIN: getRequiredEnv("CONFIG_NODEJS_ADMIN_SERVICE_ID"),
+  API_DASHBOARD: getRequiredEnv("CONFIG_NODEJS_MANAGEMENT_SERVICE_ID"),
+  API_UPLOAD: getRequiredEnv("CONFIG_NODEJS_MEDIA_SERVICE_ID"),
+  API_OAUTH: getRequiredEnv("CONFIG_NODEJS_OAUTH_SERVICE_ID"),
+  API_APP_FOOD: getRequiredEnv("CONFIG_NODEJS_APP_FOOD_SERVICE_ID"),
 };
 
 console.log("[API] Gateway URL:", GATEWAY_URL);
