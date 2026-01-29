@@ -99,10 +99,8 @@ export class RedisSubscriberService implements OnModuleInit, OnModuleDestroy {
         this.logger.log(`   Accounts Processed: ${result.accounts.length}`);
         this.logger.log('───────────────────────────────────────────────────────────');
 
-        // Publish result back to api-app-food
-        if (result.newOrderIds.length > 0) {
-          await this.publishNewOrders(branchId, result);
-        }
+        // NOTE: Không cần publish ở đây vì orders.service.ts đã publish full order data
+        // khi saveOrders() xong (channel: new-orders:branch:${branchId})
 
       } catch (error: any) {
         this.logger.error('═══════════════════════════════════════════════════════════');
@@ -114,21 +112,4 @@ export class RedisSubscriberService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  /**
-   * Publish new orders to api-app-food via Redis
-   */
-  private async publishNewOrders(branchId: string, result: any): Promise<void> {
-    const channel = `new-orders:branch:${branchId}`;
-
-    const message = JSON.stringify({
-      branchId,
-      orders: result.newOrderIds,
-      count: result.newOrderIds.length,
-      timestamp: Date.now(),
-    });
-
-    await this.publisher.publish(channel, message);
-
-    this.logger.log(`📤 Published ${result.newOrderIds.length} new orders to channel: ${channel}`);
-  }
 }

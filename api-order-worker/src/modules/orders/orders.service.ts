@@ -632,7 +632,7 @@ export class OrdersService {
 
     const ordersDto = orders.map((o) => this.transformOrderToDto(o));
 
-    const channel = `branch:${branchId}:new-orders`;
+    const channel = `new-orders:branch:${branchId}`;
     await this.redis.publish(
       channel,
       JSON.stringify({
