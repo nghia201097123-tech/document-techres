@@ -34,11 +34,11 @@ android {
             buildConfigField("String", "SVC_ID_MASTER_DATA", "\"1504\"")
             buildConfigField("String", "SVC_ID_UPLOAD", "\"1505\"")
             buildConfigField("String", "SVC_ID_SOCKET", "\"1507\"")
+            buildConfigField("String", "SVC_ID_APP_FOOD", "\"1509\"")
             // Legacy URLs (for backwards compatibility)
             buildConfigField("String", "API_BASE_URL", "\"https://beta.api.gateway.overate-vntech.com/\"")
             buildConfigField("String", "API_POS_BASE_URL", "\"https://beta.api.gateway.overate-vntech.com/\"")
             buildConfigField("String", "API_GATEWAY_URL", "\"https://beta.api.gateway.overate-vntech.com/\"")
-            buildConfigField("String", "API_FOOD_BASE_URL", "\"http://192.168.1.125:3010/\"")
             // Socket-service (port 1507)
             buildConfigField("String", "SOCKET_URL", "\"https://beta-socket.techres.vn\"")
         }
@@ -52,11 +52,11 @@ android {
             buildConfigField("String", "SVC_ID_MASTER_DATA", "\"1504\"")
             buildConfigField("String", "SVC_ID_UPLOAD", "\"1505\"")
             buildConfigField("String", "SVC_ID_SOCKET", "\"1507\"")
+            buildConfigField("String", "SVC_ID_APP_FOOD", "\"1509\"")
             // Legacy URLs
             buildConfigField("String", "API_BASE_URL", "\"https://api.techres.vn/\"")
             buildConfigField("String", "API_POS_BASE_URL", "\"https://api.techres.vn/\"")
             buildConfigField("String", "API_GATEWAY_URL", "\"https://api.techres.vn/\"")
-            buildConfigField("String", "API_FOOD_BASE_URL", "\"https://food.techres.vn/\"")
             // Socket-service production URL
             buildConfigField("String", "SOCKET_URL", "\"https://socket.techres.vn\"")
             proguardFiles(

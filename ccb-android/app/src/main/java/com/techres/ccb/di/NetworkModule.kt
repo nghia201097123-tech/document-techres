@@ -47,7 +47,7 @@ annotation class MasterDataRetrofit // api-master-data: 1504
 
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
-annotation class FoodRetrofit       // api-app-food (direct, không qua gateway)
+annotation class FoodRetrofit       // api-app-food: 1509
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -250,24 +250,17 @@ object NetworkModule {
         return retrofit.create(MasterDataApi::class.java)
     }
 
-    // ==================== Food Platform Retrofit (api-app-food - direct, không qua gateway) ====================
+    // ==================== Food Platform Retrofit (api-app-food: 1509) ====================
 
     @Provides
     @Singleton
     @FoodRetrofit
     fun provideFoodRetrofit(): Retrofit {
-        val foodApiUrl = try {
-            val field = BuildConfig::class.java.getField("API_FOOD_BASE_URL")
-            val url = field.get(null) as? String
-            if (url.isNullOrEmpty()) GATEWAY_URL else url
-        } catch (e: Exception) {
-            Log.w(TAG, "API_FOOD_BASE_URL not found, using Gateway URL as fallback")
-            GATEWAY_URL
-        }
-        Log.d(TAG, "Creating Food Retrofit | URL: $foodApiUrl")
+        val serviceId = BuildConfig.SVC_ID_APP_FOOD
+        Log.d(TAG, "Creating Food Retrofit | Gateway: $GATEWAY_URL | x-svc-id: $serviceId")
         return Retrofit.Builder()
-            .baseUrl(foodApiUrl)
-            .client(createBasicOkHttpClient())
+            .baseUrl(GATEWAY_URL)
+            .client(createGatewayOkHttpClient(serviceId))
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
