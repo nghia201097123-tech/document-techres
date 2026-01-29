@@ -730,14 +730,16 @@ export class GrabConnector extends BasePlatformConnector {
       items,
 
       // Pricing
-      subtotal: parseCurrency(fare.reducedPriceDisplay),
+      // subTotalDisplay: tiền món ăn (59.000)
+      // passengerTotalDisplay: tổng tiền khách trả (60.000)
+      subtotal: parseCurrency(fare.subTotalDisplay) || parseCurrency(fare.revampedSubtotalDisplay),
       deliveryFee: parseCurrency(fare.deliveryFeeDisplay),
       smallOrderFee: parseCurrency(fare.smallOrderFeeDisplay),
       itemDiscountAmount: parseCurrency(fare.totalDiscountAmountDisplay),
       promotionAmount: parseCurrency(fare.promotionDisplay),
       platformFee: 0,
       discount: parseCurrency(fare.totalDiscountAmountDisplay) + parseCurrency(fare.promotionDisplay),
-      totalAmount: parseCurrency(fare.reducedPriceDisplay),
+      totalAmount: parseCurrency(fare.passengerTotalDisplay) || parseCurrency(fare.reducedPriceDisplay),
 
       isPaid: true,
       paymentMethod: 'GrabPay',
@@ -793,14 +795,16 @@ export class GrabConnector extends BasePlatformConnector {
       items: allItems,
 
       // Pricing
-      subtotal: parseCurrency(fare.reducedPriceDisplay),
+      // subTotalDisplay: tiền món ăn (59.000)
+      // passengerTotalDisplay: tổng tiền khách trả (60.000)
+      subtotal: parseCurrency(fare.subTotalDisplay) || parseCurrency(fare.revampedSubtotalDisplay),
       deliveryFee: parseCurrency(fare.deliveryFeeDisplay),
       smallOrderFee: parseCurrency(fare.smallOrderFeeDisplay),
       itemDiscountAmount: parseCurrency(fare.totalDiscountAmountDisplay),
       promotionAmount: parseCurrency(fare.promotionDisplay),
       platformFee: 0,
       discount: parseCurrency(fare.totalDiscountAmountDisplay) + parseCurrency(fare.promotionDisplay),
-      totalAmount: parseCurrency(fare.reducedPriceDisplay),
+      totalAmount: parseCurrency(fare.passengerTotalDisplay) || parseCurrency(fare.reducedPriceDisplay),
 
       isPaid: true,
       paymentMethod: 'GrabPay',

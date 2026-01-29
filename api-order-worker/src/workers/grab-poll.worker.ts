@@ -92,20 +92,18 @@ export default async function pollGrabOrders(account: AccountData) {
     // 2. Transform orders to TechRes format
     const transformedOrders = grabOrders.map((order) => transformGrabOrder(order));
 
-    // 3. Enrich with detail API if needed (parallel)
+    // 3. Enrich ALL orders with detail API (parallel)
+    // We need full item details (notes, modifiers, prices) from detail API
     const enrichedOrders = await Promise.all(
       transformedOrders.map(async (order) => {
-        // Only fetch detail if missing phone numbers
-        if (!order.customerPhone || (!order.driverPhone && order.driverName)) {
-          try {
-            const detail = await fetchOrderDetail(account.accessToken, order.externalOrderId);
-            return { ...order, ...detail };
-          } catch (e) {
-            // Fallback to basic info if detail fails
-            return order;
-          }
+        try {
+          const detail = await fetchOrderDetail(account.accessToken, order.externalOrderId);
+          // Merge detail into order, detail takes priority
+          return { ...order, ...detail };
+        } catch (e) {
+          // Fallback to basic info if detail fails
+          return order;
         }
-        return order;
       }),
     );
 
@@ -189,6 +187,7 @@ function transformGrabOrder(grabOrder: GrabPaginationOrder) {
 
 /**
  * Fetch order detail for enrichment
+ * Extracts full item details including notes, modifiers, prices, and fee info
  */
 async function fetchOrderDetail(token: string, orderId: string) {
   const response = await axios.get(`${GRAB_API_URL}/orders/${orderId}`, {
@@ -200,17 +199,83 @@ async function fetchOrderDetail(token: string, orderId: string) {
   });
 
   const detail = response.data.order;
+  const fare = detail?.fare || {};
+  const eater = detail?.eater || {};
+  const driver = detail?.driver || {};
+
+  // Parse items with full details (note, options, modifiers, prices)
+  const items = (detail?.itemInfo?.items || []).map((item: any, index: number) => {
+    const unitPrice = parseCurrency(item.fare?.originalItemPriceDisplay);
+    const totalPrice = parseCurrency(item.fare?.priceDisplay);
+
+    // Parse modifiers
+    const modifierGroups = (item.modifierGroups || []).map((group: any) => ({
+      groupId: group.groupID,
+      groupName: group.groupName,
+      modifiers: (group.modifiers || []).map((mod: any) => ({
+        modifierId: mod.modifierID,
+        modifierName: mod.modifierName,
+        price: parseCurrency(mod.priceDisplay),
+      })),
+    }));
+
+    // Build options string with prices
+    const optionsString = modifierGroups
+      .flatMap((g: any) => g.modifiers.map((m: any) => {
+        if (m.price > 0) {
+          return `${m.modifierName} (+${formatCurrencyVN(m.price)})`;
+        }
+        return m.modifierName;
+      }))
+      .join(', ');
+
+    // Calculate item discount
+    const discountAmount = (item.discountInfo || []).reduce(
+      (sum: number, d: any) => sum + parseCurrency(d.itemDiscountPriceDisplay),
+      0,
+    );
+
+    return {
+      productName: item.name,
+      quantity: item.quantity || 1,
+      unitPrice,
+      totalPrice,
+      discountAmount,
+      note: item.comment || '',
+      options: optionsString,
+      externalProductId: item.itemID,
+      modifierGroups,
+    };
+  });
 
   return {
-    customerPhone: formatPhone(detail?.eater?.phone),
-    customerAddress: detail?.eater?.address || '',
-    customerNote: detail?.eater?.comment || '',
-    driverPhone: formatPhone(detail?.driver?.phone),
-    subtotal: parseCurrency(detail?.price?.subtotal),
-    deliveryFee: parseCurrency(detail?.price?.deliveryFee),
-    discount: parseCurrency(detail?.price?.merchantDiscount),
-    isPaid: detail?.payment?.status === 'PAID',
-    paymentMethod: detail?.payment?.method || 'GrabPay',
+    // Customer info
+    customerPhone: formatPhone(eater.mobileNumber),
+    customerAddress: eater.address || '',
+    customerNote: eater.comment || '',
+    // Driver info
+    driverPhone: formatPhone(driver.mobileNumber),
+    driverAvatar: driver.avatar || null,
+    driverLicensePlate: driver.licensePlate || null,
+    // Items with full details
+    items,
+    // Pricing
+    subtotal: parseCurrency(fare.subTotalDisplay),
+    deliveryFee: parseCurrency(fare.deliveryFeeDisplay),
+    smallOrderFee: parseCurrency(fare.smallOrderFeeDisplay),
+    itemDiscountAmount: parseCurrency(fare.totalDiscountAmountDisplay),
+    promotionAmount: parseCurrency(fare.promotionDisplay),
+    discount: parseCurrency(fare.totalDiscountAmountDisplay) + parseCurrency(fare.promotionDisplay),
+    totalAmount: parseCurrency(fare.passengerTotalDisplay) || parseCurrency(fare.reducedPriceDisplay),
+    // Payment
+    isPaid: detail?.paymentMethod !== 'COD',
+    paymentMethod: detail?.paymentMethod || 'GrabPay',
+    // Scheduled order
+    isScheduledOrder: detail?.scheduledOrderInfo?.isScheduledOrder || false,
+    scheduledDeliveryTime: detail?.scheduledOrderInfo?.expectedDeliveryTime || null,
+    // Combined order
+    isCombinedOrder: !!detail?.orderBookings && detail.orderBookings.length > 0,
+    parentOrderId: null,
   };
 }
 
@@ -234,4 +299,12 @@ function parseCurrency(value?: string | number): number {
   if (!value) return 0;
   if (typeof value === 'number') return value;
   return parseInt(String(value).replace(/\D/g, ''), 10) || 0;
+}
+
+/**
+ * Format number to Vietnamese currency string
+ * 5000 -> "5.000đ"
+ */
+function formatCurrencyVN(amount: number): string {
+  return amount.toLocaleString('vi-VN') + 'đ';
 }
