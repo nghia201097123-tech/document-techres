@@ -34,9 +34,18 @@ export class FoodOrderItem {
   @Column({ name: 'total_price', type: 'bigint' })
   totalPrice: number;
 
+  @Column({ name: 'discount_amount', type: 'bigint', default: 0 })
+  discountAmount: number;
+
   @Column({ type: 'text', nullable: true })
   note: string;
 
   @Column({ type: 'text', nullable: true })
   options: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  modifiers: any[];
+
+  @Column({ name: 'sort_order', type: 'int', default: 0 })
+  sortOrder: number;
 }

@@ -372,12 +372,23 @@ export class OrdersService {
           platformFee: rawOrder.platformFee,
           discount: rawOrder.discount,
           totalAmount: rawOrder.totalAmount,
+          // Additional fee fields
+          smallOrderFee: rawOrder.smallOrderFee || 0,
+          itemDiscountAmount: rawOrder.itemDiscountAmount || 0,
+          promotionAmount: rawOrder.promotionAmount || 0,
           isPaid: rawOrder.isPaid,
           paymentMethod: rawOrder.paymentMethod || '',
           driverName: rawOrder.driverName || null,
           driverPhone: rawOrder.driverPhone || null,
           driverAvatar: rawOrder.driverAvatar || null,
+          driverLicensePlate: rawOrder.driverLicensePlate || null,
           estimatedDeliveryTime: rawOrder.estimatedDeliveryTime || null,
+          // Scheduled order
+          isScheduledOrder: rawOrder.isScheduledOrder || false,
+          scheduledDeliveryTime: rawOrder.scheduledDeliveryTime || null,
+          // Combined order
+          isCombinedOrder: rawOrder.isCombinedOrder || false,
+          parentOrderId: rawOrder.parentOrderId || null,
           platformCreatedAt: rawOrder.createdAt,
         });
 
@@ -402,14 +413,15 @@ export class OrdersService {
 
   /**
    * Save order items to food_order_items table
+   * Saves full item data including discounts and modifiers
    */
   private async saveOrderItems(orderId: string, items: any[]): Promise<void> {
     try {
       // Delete existing items for this order (in case of re-sync)
       await this.orderItemRepo.delete({ orderId });
 
-      // Create new items
-      const orderItems = items.map((item) =>
+      // Create new items with full data
+      const orderItems = items.map((item, index) =>
         this.orderItemRepo.create({
           orderId,
           externalProductId: item.externalProductId || item.id || null,
@@ -417,8 +429,11 @@ export class OrdersService {
           quantity: item.quantity || 1,
           unitPrice: item.unitPrice || item.price || 0,
           totalPrice: item.totalPrice || (item.quantity || 1) * (item.unitPrice || item.price || 0),
-          note: item.note || item.specialInstruction || null,
-          options: item.options ? JSON.stringify(item.options) : null,
+          discountAmount: item.discountAmount || 0,
+          note: item.note || item.specialInstruction || item.comment || null,
+          options: typeof item.options === 'string' ? item.options : null,
+          modifiers: this.transformModifiers(item.modifierGroups),
+          sortOrder: index,
         }),
       );
 
@@ -427,6 +442,25 @@ export class OrdersService {
     } catch (error: any) {
       this.logger.error(`[saveOrderItems] Failed to save items for order ${orderId}: ${error.message}`);
     }
+  }
+
+  /**
+   * Transform modifierGroups to ModifierInfo[] for storage
+   */
+  private transformModifiers(modifierGroups: any[] | undefined): any[] | null {
+    if (!modifierGroups || modifierGroups.length === 0) return null;
+
+    const modifiers: any[] = [];
+    for (const group of modifierGroups) {
+      for (const mod of group.modifiers || []) {
+        modifiers.push({
+          groupName: group.groupName,
+          modifierName: mod.modifierName,
+          price: mod.price || 0,
+        });
+      }
+    }
+    return modifiers.length > 0 ? modifiers : null;
   }
 
   /**

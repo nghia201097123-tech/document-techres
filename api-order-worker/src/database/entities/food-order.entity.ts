@@ -120,6 +120,16 @@ export class FoodOrder {
   @Column({ name: 'total_amount', type: 'bigint' })
   totalAmount: number;
 
+  // Additional Grab fee fields
+  @Column({ name: 'small_order_fee', type: 'bigint', default: 0 })
+  smallOrderFee: number;
+
+  @Column({ name: 'item_discount_amount', type: 'bigint', default: 0 })
+  itemDiscountAmount: number;
+
+  @Column({ name: 'promotion_amount', type: 'bigint', default: 0 })
+  promotionAmount: number;
+
   // Payment
   @Column({ name: 'is_paid', type: 'boolean', default: true })
   isPaid: boolean;
@@ -142,6 +152,20 @@ export class FoodOrder {
 
   @Column({ name: 'estimated_delivery_time', type: 'varchar', length: 255, nullable: true })
   estimatedDeliveryTime: string;
+
+  // Scheduled order (đơn đặt trước)
+  @Column({ name: 'is_scheduled_order', type: 'boolean', default: false })
+  isScheduledOrder: boolean;
+
+  @Column({ name: 'scheduled_delivery_time', type: 'varchar', length: 255, nullable: true })
+  scheduledDeliveryTime: string;
+
+  // Combined order (đơn ghép)
+  @Column({ name: 'is_combined_order', type: 'boolean', default: false })
+  isCombinedOrder: boolean;
+
+  @Column({ name: 'parent_order_id', type: 'varchar', length: 100, nullable: true })
+  parentOrderId: string;
 
   // Timestamps
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })

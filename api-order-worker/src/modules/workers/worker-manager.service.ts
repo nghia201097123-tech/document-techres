@@ -46,9 +46,19 @@ export interface RawFoodOrder {
   platformFee: number;
   discount: number;
   totalAmount: number;
+  // Additional Grab fee fields
+  smallOrderFee?: number;
+  itemDiscountAmount?: number;
+  promotionAmount?: number;
   isPaid: boolean;
   paymentMethod?: string;
   estimatedDeliveryTime?: string;
+  // Scheduled order (đơn đặt trước)
+  isScheduledOrder?: boolean;
+  scheduledDeliveryTime?: string;
+  // Combined order (đơn ghép)
+  isCombinedOrder?: boolean;
+  parentOrderId?: string;
   createdAt?: Date;
   rawData?: any;
 }
