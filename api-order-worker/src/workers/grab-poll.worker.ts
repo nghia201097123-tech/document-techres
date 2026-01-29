@@ -66,6 +66,7 @@ interface GrabPaginationOrder {
 
 /**
  * Main worker function - called by Piscina
+ * Xử lý ĐỒNG BỘ (sequential) để đảm bảo data nhất quán
  */
 export default async function pollGrabOrders(account: AccountData) {
   const startTime = Date.now();
@@ -95,38 +96,59 @@ export default async function pollGrabOrders(account: AccountData) {
     const grabOrders: GrabPaginationOrder[] = data.orders || [];
     console.log(`[GrabWorker] 📦 Pagination returned ${grabOrders.length} orders`);
 
-    // 2. Transform orders to TechRes format
-    const transformedOrders = grabOrders.map((order) => transformGrabOrder(order));
-    console.log(`[GrabWorker] 🔄 Transformed ${transformedOrders.length} orders`);
+    // 2. Xử lý TỪNG order một cách ĐỒNG BỘ (sequential)
+    // Đảm bảo mỗi order đều có đầy đủ detail trước khi tiếp tục
+    console.log(`[GrabWorker] 📞 Fetching detail SEQUENTIALLY for ${grabOrders.length} orders...`);
+    const enrichedOrders: any[] = [];
+    let skippedCount = 0;
 
-    // 3. Enrich ALL orders with detail API (parallel)
-    // We need full item details (notes, modifiers, prices) from detail API
-    console.log(`[GrabWorker] 📞 Fetching detail for ${transformedOrders.length} orders...`);
-    const enrichedOrders = await Promise.all(
-      transformedOrders.map(async (order) => {
-        try {
-          console.log(`[GrabWorker] 📞 Fetching detail for order ${order.externalOrderId}...`);
-          const detail = await fetchOrderDetail(account.accessToken, order.externalOrderId);
-          // Merge detail into order, detail takes priority
-          const enriched = { ...order, ...detail };
-          console.log(`[GrabWorker] ✅ Enriched order ${order.externalOrderId}: ${detail.items?.length || 0} items`);
+    for (const grabOrder of grabOrders) {
+      const orderId = grabOrder.orderID;
+      const orderCode = grabOrder.displayID || `#GR${orderId.slice(-6)}`;
 
-          // Log first item details for debugging
-          if (detail.items && detail.items.length > 0) {
-            const firstItem = detail.items[0];
-            console.log(`[GrabWorker]   First item: "${firstItem.productName}", price: ${firstItem.unitPrice}, options: "${firstItem.options || 'none'}"`);
+      console.log(`[GrabWorker] ───────────────────────────────────────`);
+      console.log(`[GrabWorker] 📋 Processing order ${orderCode} (${orderId})`);
+
+      // Gọi detail API với retry
+      const detail = await fetchOrderDetailWithRetry(account.accessToken, orderId, 3);
+
+      if (detail) {
+        // Có detail đầy đủ - tạo order hoàn chỉnh
+        const order = transformGrabOrderWithDetail(grabOrder, detail);
+
+        // Validate: đảm bảo items có giá
+        const hasValidItems = order.items.some((item: any) => item.unitPrice > 0 || item.totalPrice > 0);
+
+        if (hasValidItems) {
+          enrichedOrders.push(order);
+          console.log(`[GrabWorker] ✅ Order ${orderCode}: ${order.items.length} items với đầy đủ thông tin`);
+
+          // Log first item
+          if (order.items.length > 0) {
+            const firstItem = order.items[0];
+            console.log(
+              `[GrabWorker]    Item 1: "${firstItem.productName}", ` +
+                `giá: ${firstItem.unitPrice}đ, note: "${firstItem.note || ''}", ` +
+                `options: "${firstItem.options || 'không có'}"`,
+            );
           }
-
-          return enriched;
-        } catch (e: any) {
-          // Fallback to basic info if detail fails
-          console.error(`[GrabWorker] ❌ Detail fetch failed for ${order.externalOrderId}: ${e.message}`);
-          return order;
+        } else {
+          // Items không có giá - có thể detail API trả về thiếu
+          console.warn(`[GrabWorker] ⚠️ Order ${orderCode}: Items không có giá, SKIP`);
+          skippedCount++;
         }
-      }),
-    );
+      } else {
+        // Detail API fail sau retry - skip order này
+        console.error(`[GrabWorker] ❌ Order ${orderCode}: Không lấy được detail, SKIP`);
+        skippedCount++;
+      }
 
-    console.log(`[GrabWorker] 🏁 Enrichment complete. Returning ${enrichedOrders.length} orders`);
+      // Delay nhỏ giữa các request để tránh rate limit
+      await sleep(100);
+    }
+
+    console.log(`[GrabWorker] ───────────────────────────────────────`);
+    console.log(`[GrabWorker] 🏁 DONE: ${enrichedOrders.length} orders thành công, ${skippedCount} skipped`);
     console.log('═══════════════════════════════════════════════════════════');
 
     return {
@@ -134,6 +156,7 @@ export default async function pollGrabOrders(account: AccountData) {
       accountId: account.id,
       platform: 'grab',
       orders: enrichedOrders,
+      skippedOrders: skippedCount,
       orderStats: data.orderStats
         ? {
             newCount: data.orderStats.numberInNew || 0,
@@ -146,6 +169,7 @@ export default async function pollGrabOrders(account: AccountData) {
       duration: Date.now() - startTime,
     };
   } catch (error: any) {
+    console.error(`[GrabWorker] ❌ FATAL ERROR: ${error.message}`);
     return {
       success: false,
       accountId: account.id,
@@ -159,52 +183,94 @@ export default async function pollGrabOrders(account: AccountData) {
 }
 
 /**
- * Transform Grab order to TechRes format
+ * Fetch order detail với retry logic
+ * @param token Access token
+ * @param orderId Order ID
+ * @param maxRetries Số lần retry tối đa
+ * @returns Detail object hoặc null nếu fail
  */
-function transformGrabOrder(grabOrder: GrabPaginationOrder) {
-  const orderValue = parseCurrency(grabOrder.orderValue);
+async function fetchOrderDetailWithRetry(
+  token: string,
+  orderId: string,
+  maxRetries: number = 3,
+): Promise<any | null> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[GrabWorker]    Attempt ${attempt}/${maxRetries}: Fetching detail...`);
+      const detail = await fetchOrderDetail(token, orderId);
+      return detail;
+    } catch (error: any) {
+      console.error(`[GrabWorker]    Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
 
+      if (attempt < maxRetries) {
+        // Exponential backoff: 500ms, 1000ms, 2000ms
+        const delay = 500 * Math.pow(2, attempt - 1);
+        console.log(`[GrabWorker]    Waiting ${delay}ms before retry...`);
+        await sleep(delay);
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Transform Grab order với detail đầy đủ
+ */
+function transformGrabOrderWithDetail(grabOrder: GrabPaginationOrder, detail: any) {
   return {
     externalOrderId: grabOrder.orderID,
     orderCode: grabOrder.displayID || `#GR${grabOrder.orderID.slice(-6)}`,
     platform: 'grab',
     status: GRAB_STATUS_MAP[grabOrder.state] || 'NEW',
 
-    // Customer info
-    customerName: grabOrder.eater?.name || 'Khách hàng',
-    customerPhone: formatPhone(grabOrder.eater?.phone),
-    customerAddress: '',
-    customerNote: '',
+    // Customer info từ detail
+    customerName: detail.customerName || grabOrder.eater?.name || 'Khách hàng',
+    customerPhone: detail.customerPhone || formatPhone(grabOrder.eater?.phone),
+    customerAddress: detail.customerAddress || '',
+    customerNote: detail.customerNote || '',
 
-    // Driver info
-    driverName: grabOrder.driver?.name || null,
-    driverPhone: formatPhone(grabOrder.driver?.phone),
-    driverAvatar: grabOrder.driver?.avatar || null,
-    driverLicensePlate: grabOrder.driver?.licensePlate || null,
+    // Driver info từ detail
+    driverName: detail.driverName || grabOrder.driver?.name || null,
+    driverPhone: detail.driverPhone || formatPhone(grabOrder.driver?.phone),
+    driverAvatar: detail.driverAvatar || grabOrder.driver?.avatar || null,
+    driverLicensePlate: detail.driverLicensePlate || grabOrder.driver?.licensePlate || null,
 
-    // Items
-    items: (grabOrder.itemInfo?.items || []).map((item) => ({
-      productName: item.name,
-      quantity: item.quantity,
-      unitPrice: parseCurrency(item.price),
-      totalPrice: parseCurrency(item.price),
-    })),
+    // Items từ detail (có đầy đủ giá, note, modifiers)
+    items: detail.items || [],
 
-    // Pricing
-    subtotal: orderValue,
-    deliveryFee: 0,
-    platformFee: 0,
-    discount: 0,
-    totalAmount: orderValue,
+    // Pricing từ detail
+    subtotal: detail.subtotal || 0,
+    deliveryFee: detail.deliveryFee || 0,
+    platformFee: detail.platformFee || 0,
+    smallOrderFee: detail.smallOrderFee || 0,
+    itemDiscountAmount: detail.itemDiscountAmount || 0,
+    promotionAmount: detail.promotionAmount || 0,
+    discount: detail.discount || 0,
+    totalAmount: detail.totalAmount || 0,
 
     // Payment
-    isPaid: true,
-    paymentMethod: 'GrabPay',
+    isPaid: detail.isPaid ?? true,
+    paymentMethod: detail.paymentMethod || 'GrabPay',
 
-    // Extra
-    estimatedDeliveryTime: null,
+    // Scheduled order
+    isScheduledOrder: detail.isScheduledOrder || false,
+    scheduledDeliveryTime: detail.scheduledDeliveryTime || null,
+
+    // Combined order
+    isCombinedOrder: detail.isCombinedOrder || false,
+    parentOrderId: detail.parentOrderId || null,
+
+    // Timestamps
     createdAt: grabOrder.times?.createdAt ? new Date(grabOrder.times.createdAt) : new Date(),
   };
+}
+
+/**
+ * Sleep helper
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -289,6 +355,7 @@ async function fetchOrderDetail(token: string, orderId: string) {
 
   return {
     // Customer info
+    customerName: eater.name || '',
     customerPhone: formatPhone(eater.mobileNumber),
     customerAddress: eater.address || '',
     customerNote: eater.comment || '',
