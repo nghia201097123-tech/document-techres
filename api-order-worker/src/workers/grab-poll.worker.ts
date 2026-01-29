@@ -70,8 +70,13 @@ interface GrabPaginationOrder {
 export default async function pollGrabOrders(account: AccountData) {
   const startTime = Date.now();
 
+  console.log('═══════════════════════════════════════════════════════════');
+  console.log(`[GrabWorker] 🚀 START polling for account ${account.id}`);
+  console.log(`[GrabWorker] Branch: ${account.branchId}, Platform: ${account.platform}`);
+
   try {
     // 1. Fetch orders from pagination API
+    console.log(`[GrabWorker] 📡 Calling pagination API...`);
     const response = await axios.get(`${GRAB_API_URL}/orders-pagination`, {
       params: {
         autoAcceptGroup: 3,
@@ -88,27 +93,41 @@ export default async function pollGrabOrders(account: AccountData) {
 
     const data = response.data;
     const grabOrders: GrabPaginationOrder[] = data.orders || [];
+    console.log(`[GrabWorker] 📦 Pagination returned ${grabOrders.length} orders`);
 
     // 2. Transform orders to TechRes format
     const transformedOrders = grabOrders.map((order) => transformGrabOrder(order));
+    console.log(`[GrabWorker] 🔄 Transformed ${transformedOrders.length} orders`);
 
     // 3. Enrich ALL orders with detail API (parallel)
     // We need full item details (notes, modifiers, prices) from detail API
+    console.log(`[GrabWorker] 📞 Fetching detail for ${transformedOrders.length} orders...`);
     const enrichedOrders = await Promise.all(
       transformedOrders.map(async (order) => {
         try {
+          console.log(`[GrabWorker] 📞 Fetching detail for order ${order.externalOrderId}...`);
           const detail = await fetchOrderDetail(account.accessToken, order.externalOrderId);
           // Merge detail into order, detail takes priority
           const enriched = { ...order, ...detail };
-          console.log(`[GrabWorker] Enriched order ${order.externalOrderId}: ${detail.items?.length || 0} items, modifiers: ${detail.items?.some((i: any) => i.modifierGroups?.length > 0)}`);
+          console.log(`[GrabWorker] ✅ Enriched order ${order.externalOrderId}: ${detail.items?.length || 0} items`);
+
+          // Log first item details for debugging
+          if (detail.items && detail.items.length > 0) {
+            const firstItem = detail.items[0];
+            console.log(`[GrabWorker]   First item: "${firstItem.productName}", price: ${firstItem.unitPrice}, options: "${firstItem.options || 'none'}"`);
+          }
+
           return enriched;
         } catch (e: any) {
           // Fallback to basic info if detail fails
-          console.warn(`[GrabWorker] Detail fetch failed for ${order.externalOrderId}: ${e.message}`);
+          console.error(`[GrabWorker] ❌ Detail fetch failed for ${order.externalOrderId}: ${e.message}`);
           return order;
         }
       }),
     );
+
+    console.log(`[GrabWorker] 🏁 Enrichment complete. Returning ${enrichedOrders.length} orders`);
+    console.log('═══════════════════════════════════════════════════════════');
 
     return {
       success: true,

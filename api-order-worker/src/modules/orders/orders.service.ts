@@ -116,7 +116,9 @@ export class OrdersService {
       }));
 
       // 4. Poll tất cả accounts song song bằng Piscina workers
+      this.logger.log(`[triggerPoll] 📡 Calling workers for ${accountData.length} accounts...`);
       const results = await this.workerManager.pollMultipleAccounts(accountData);
+      this.logger.log(`[triggerPoll] 📦 Workers returned ${results.length} results`);
 
       // 5. Process kết quả
       const newOrderIds: string[] = [];
@@ -124,8 +126,26 @@ export class OrdersService {
 
       for (const result of results) {
         const account = accounts.find((a) => a.id === result.accountId);
+        this.logger.log(
+          `[triggerPoll] Processing result for ${result.platform}: success=${result.success}, orders=${result.orders?.length || 0}`,
+        );
 
         if (result.success) {
+          // Log first order's items for debugging
+          if (result.orders && result.orders.length > 0) {
+            const firstOrder = result.orders[0];
+            this.logger.log(
+              `[triggerPoll]   First order: ${firstOrder.orderCode}, items: ${firstOrder.items?.length || 0}`,
+            );
+            if (firstOrder.items && firstOrder.items.length > 0) {
+              const firstItem = firstOrder.items[0];
+              this.logger.log(
+                `[triggerPoll]   First item: "${firstItem.productName}", price: ${firstItem.unitPrice}, ` +
+                  `options: "${firstItem.options || 'none'}", modifierGroups: ${firstItem.modifierGroups?.length || 0}`,
+              );
+            }
+          }
+
           // Save orders and get new ones
           const saved = await this.saveOrders(result.orders, branchId, account?.tenantId || '');
           newOrderIds.push(...saved.newOrderIds);
@@ -262,10 +282,26 @@ export class OrdersService {
     branchId: string,
     tenantId: string,
   ): Promise<{ savedOrders: FoodOrder[]; newOrderIds: string[] }> {
+    this.logger.log('═══════════════════════════════════════════════════════════');
+    this.logger.log(`[saveOrders] 💾 START saving ${orders.length} orders for branch ${branchId}`);
+
     const savedOrders: FoodOrder[] = [];
     const newOrderIds: string[] = [];
 
     for (const rawOrder of orders) {
+      this.logger.log(`[saveOrders] 📋 Processing order: ${rawOrder.orderCode || rawOrder.externalOrderId}`);
+      this.logger.log(`[saveOrders]   Items count: ${rawOrder.items?.length || 0}`);
+
+      // Log first item details
+      if (rawOrder.items && rawOrder.items.length > 0) {
+        const firstItem = rawOrder.items[0];
+        this.logger.log(
+          `[saveOrders]   First item: "${firstItem.productName || firstItem.name}", ` +
+            `price: ${firstItem.unitPrice || 0}, note: "${firstItem.note || ''}", ` +
+            `options: "${firstItem.options || ''}", modifierGroups: ${firstItem.modifierGroups?.length || 0}`,
+        );
+      }
+
       const existing = await this.orderRepo.findOne({
         where: {
           externalOrderId: rawOrder.externalOrderId,
@@ -275,6 +311,7 @@ export class OrdersService {
 
       // Map platform status to MerchantOrderStatus
       const newMerchantStatus = this.mapToMerchantStatus(rawOrder.status);
+      this.logger.log(`[saveOrders]   Existing: ${existing ? 'YES' : 'NO'}, Status: ${newMerchantStatus}`);
 
       if (existing) {
         // Update existing order
@@ -335,6 +372,15 @@ export class OrdersService {
         // Update items with full details from detail API
         // Update if items have: prices, options, modifiers, or notes
         if (rawOrder.items && rawOrder.items.length > 0) {
+          // Check each condition
+          const firstItem = rawOrder.items[0];
+          this.logger.log(
+            `[saveOrders]   Checking hasItemDetails for ${existing.orderCode}:` +
+              ` unitPrice=${firstItem?.unitPrice}, totalPrice=${firstItem?.totalPrice},` +
+              ` note="${firstItem?.note}", options="${firstItem?.options}",` +
+              ` modifierGroups=${firstItem?.modifierGroups?.length || 0}`,
+          );
+
           const hasItemDetails = rawOrder.items.some(
             (item: any) =>
               item.unitPrice > 0 ||
@@ -343,19 +389,26 @@ export class OrdersService {
               item.options ||
               item.modifierGroups?.length > 0,
           );
+
+          this.logger.log(`[saveOrders]   hasItemDetails: ${hasItemDetails}`);
+
           if (hasItemDetails) {
             existing.items = rawOrder.items;
             // Re-save order items to food_order_items table
+            this.logger.log(`[saveOrders] 💾 Saving ${rawOrder.items.length} items for existing order ${existing.orderCode}...`);
             await this.saveOrderItems(existing.id, rawOrder.items);
-            this.logger.log(
-              `[saveOrders] Updated items for order ${existing.orderCode}: ${rawOrder.items.length} items with details`,
-            );
+            this.logger.log(`[saveOrders] ✅ Updated items for order ${existing.orderCode}`);
+          } else {
+            this.logger.log(`[saveOrders] ⚠️ hasItemDetails=false, NOT updating items for ${existing.orderCode}`);
           }
+        } else {
+          this.logger.log(`[saveOrders] ⚠️ No items in rawOrder for ${existing.orderCode}`);
         }
 
         existing.lastSyncAt = new Date();
         await this.orderRepo.save(existing);
         savedOrders.push(existing);
+        this.logger.log(`[saveOrders] ✅ Updated existing order ${existing.orderCode}`);
       } else {
         // Create new order
         // TechRes status: luôn bắt đầu với NEW (chờ CCB xác nhận)
@@ -416,18 +469,26 @@ export class OrdersService {
         const saved = await this.orderRepo.save(newOrder);
         savedOrders.push(saved);
         newOrderIds.push(saved.id);
+        this.logger.log(`[saveOrders] ✅ Created new order in DB: ${saved.orderCode}, ID: ${saved.id}`);
 
         // Save order items to food_order_items table
         if (rawOrder.items && rawOrder.items.length > 0) {
+          this.logger.log(`[saveOrders] 💾 Saving ${rawOrder.items.length} items for new order ${saved.orderCode}...`);
           await this.saveOrderItems(saved.id, rawOrder.items);
+          this.logger.log(`[saveOrders] ✅ Saved items for new order ${saved.orderCode}`);
+        } else {
+          this.logger.log(`[saveOrders] ⚠️ No items to save for new order ${saved.orderCode}`);
         }
 
         this.logger.log(
-          `[saveOrders] Created new order: ${saved.orderCode} ` +
+          `[saveOrders] 🎉 NEW ORDER COMPLETE: ${saved.orderCode} ` +
             `(TechRes: ${initialTechResStatus}, Merchant: ${newMerchantStatus}, Items: ${rawOrder.items?.length || 0})`,
         );
       }
     }
+
+    this.logger.log(`[saveOrders] 🏁 DONE saving orders. Total: ${savedOrders.length}, New: ${newOrderIds.length}`);
+    this.logger.log('═══════════════════════════════════════════════════════════');
 
     return { savedOrders, newOrderIds };
   }
