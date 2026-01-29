@@ -9,6 +9,7 @@ export enum BackendService {
   MASTER_DATA = 'master-data',
   WEBHOOK = 'webhook',
   SOCKET = 'socket',
+  APP_FOOD = 'app-food',
 }
 
 @Injectable()
@@ -19,6 +20,7 @@ export class ProxyService {
   private readonly apiMasterDataClient: AxiosInstance;
   private readonly webhookServiceClient: AxiosInstance;
   private readonly socketServiceClient: AxiosInstance;
+  private readonly apiAppFoodClient: AxiosInstance;
 
   constructor(private readonly configService: ConfigService) {
     const apiAdminUrl = this.configService.get<string>('API_ADMIN_URL') || 'http://localhost:3002';
@@ -27,6 +29,7 @@ export class ProxyService {
     const apiMasterDataUrl = this.configService.get<string>('API_MASTER_DATA_URL') || 'http://localhost:3004';
     const webhookServiceUrl = this.configService.get<string>('WEBHOOK_SERVICE_URL') || 'http://localhost:3006';
     const socketServiceUrl = this.configService.get<string>('SOCKET_SERVICE_URL') || 'http://localhost:3007';
+    const apiAppFoodUrl = this.configService.get<string>('API_APP_FOOD_URL') || 'http://localhost:3010';
 
     this.apiAdminClient = axios.create({
       baseURL: apiAdminUrl,
@@ -63,6 +66,13 @@ export class ProxyService {
       baseURL: socketServiceUrl,
       timeout: 30000, // 30 seconds for socket events
     });
+
+    this.apiAppFoodClient = axios.create({
+      baseURL: apiAppFoodUrl,
+      timeout: 60000, // 1 minute for food platform operations
+      maxBodyLength: 10 * 1024 * 1024, // 10MB
+      maxContentLength: 10 * 1024 * 1024, // 10MB
+    });
   }
 
   private getClient(service: BackendService): AxiosInstance {
@@ -77,6 +87,8 @@ export class ProxyService {
         return this.webhookServiceClient;
       case BackendService.SOCKET:
         return this.socketServiceClient;
+      case BackendService.APP_FOOD:
+        return this.apiAppFoodClient;
       default:
         return this.apiAdminClient;
     }
@@ -142,7 +154,37 @@ export class ProxyService {
     return this.configService.get<string>('SOCKET_SERVICE_URL') || 'http://localhost:3007';
   }
 
+  getApiAppFoodUrl(): string {
+    return this.configService.get<string>('API_APP_FOOD_URL') || 'http://localhost:3010';
+  }
+
   determineService(path: string): { service: BackendService; adjustedPath: string } {
+    // Routes for Food Platform API (api-app-food)
+    // /api/food/* -> api-app-food /api/*
+    // /api/public/* -> api-app-food /api/public/*
+    if (path.startsWith('/api/food/') || path.startsWith('/food/')) {
+      const foodPath = path.replace(/^\/api\/food/, '/api').replace(/^\/food/, '/api');
+      return { service: BackendService.APP_FOOD, adjustedPath: foodPath };
+    }
+
+    // Public food platform routes (poll-orders, confirm-order, etc.)
+    // /api/public/poll-orders/* -> api-app-food /api/public/poll-orders/*
+    // /api/public/confirm-order/* -> api-app-food /api/public/confirm-order/*
+    // /api/public/cancel-order/* -> api-app-food /api/public/cancel-order/*
+    // /api/public/complete-order/* -> api-app-food /api/public/complete-order/*
+    // /api/public/sync/food-platform/* -> api-app-food /api/public/sync/food-platform/*
+    if (
+      path.startsWith('/api/public/poll-orders') ||
+      path.startsWith('/api/public/confirm-order') ||
+      path.startsWith('/api/public/cancel-order') ||
+      path.startsWith('/api/public/complete-order') ||
+      path.startsWith('/api/public/sync/food-platform') ||
+      path.startsWith('/api/public/reconnect') ||
+      path.startsWith('/api/public/disconnected-accounts')
+    ) {
+      return { service: BackendService.APP_FOOD, adjustedPath: path };
+    }
+
     // Routes for Socket.IO events -> socket-service
     // /api/socket/* -> socket-service /*
     if (path.startsWith('/api/socket/') || path.startsWith('/socket/')) {
