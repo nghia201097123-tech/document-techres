@@ -333,17 +333,22 @@ export class OrdersService {
         }
 
         // Update items with full details from detail API
-        // Only update if new items have more details (note, modifiers, prices)
+        // Update if items have: prices, options, modifiers, or notes
         if (rawOrder.items && rawOrder.items.length > 0) {
           const hasItemDetails = rawOrder.items.some(
-            (item: any) => item.note || item.options || item.modifierGroups?.length > 0,
+            (item: any) =>
+              item.unitPrice > 0 ||
+              item.totalPrice > 0 ||
+              item.note ||
+              item.options ||
+              item.modifierGroups?.length > 0,
           );
           if (hasItemDetails) {
             existing.items = rawOrder.items;
             // Re-save order items to food_order_items table
             await this.saveOrderItems(existing.id, rawOrder.items);
-            this.logger.debug(
-              `[saveOrders] Updated items for order ${existing.orderCode}: ${rawOrder.items.length} items`,
+            this.logger.log(
+              `[saveOrders] Updated items for order ${existing.orderCode}: ${rawOrder.items.length} items with details`,
             );
           }
         }
@@ -437,26 +442,35 @@ export class OrdersService {
       await this.orderItemRepo.delete({ orderId });
 
       // Create new items with full data
-      const orderItems = items.map((item, index) =>
-        this.orderItemRepo.create({
+      const orderItems = items.map((item, index) => {
+        const modifiers = this.transformModifiers(item.modifierGroups);
+
+        // Log item details for debugging
+        this.logger.log(
+          `[saveOrderItems] Item ${index + 1}: ${item.productName || item.name || 'Unknown'}, ` +
+            `price: ${item.unitPrice || 0}, note: "${item.note || ''}", ` +
+            `options: "${item.options || ''}", modifiers: ${modifiers?.length || 0}`,
+        );
+
+        return this.orderItemRepo.create({
           orderId,
           externalProductId: item.externalProductId || item.id || null,
-          productName: item.name || item.productName || 'Unknown',
+          productName: item.productName || item.name || 'Unknown',
           quantity: item.quantity || 1,
           unitPrice: item.unitPrice || item.price || 0,
           totalPrice: item.totalPrice || (item.quantity || 1) * (item.unitPrice || item.price || 0),
           discountAmount: item.discountAmount || 0,
           note: item.note || item.specialInstruction || item.comment || null,
           options: typeof item.options === 'string' ? item.options : null,
-          modifiers: this.transformModifiers(item.modifierGroups),
+          modifiers,
           sortOrder: index,
-        }),
-      );
+        });
+      });
 
       await this.orderItemRepo.save(orderItems);
-      this.logger.debug(`[saveOrderItems] Saved ${orderItems.length} items for order ${orderId}`);
+      this.logger.log(`[saveOrderItems] ✅ Saved ${orderItems.length} items for order ${orderId}`);
     } catch (error: any) {
-      this.logger.error(`[saveOrderItems] Failed to save items for order ${orderId}: ${error.message}`);
+      this.logger.error(`[saveOrderItems] ❌ Failed to save items for order ${orderId}: ${error.message}`);
     }
   }
 

@@ -238,6 +238,13 @@ async function fetchOrderDetail(token: string, orderId: string) {
       0,
     );
 
+    // Log item details for debugging
+    console.log(
+      `[GrabWorker] Detail Item ${index + 1}: "${item.name}", ` +
+        `price: ${unitPrice}/${totalPrice}, note: "${item.comment || ''}", ` +
+        `options: "${optionsString}", modifierGroups: ${modifierGroups.length}`,
+    );
+
     return {
       productName: item.name,
       quantity: item.quantity || 1,
