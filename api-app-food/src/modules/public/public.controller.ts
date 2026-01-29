@@ -476,7 +476,7 @@ export class PublicController {
       // 3. Return orders
       const pollResult = await this.ordersService.pollOrders({
         branchId,
-        lastPollAt,
+        lastPollAt: lastPollAt ? parseInt(lastPollAt, 10) : undefined,
       });
 
       // Transform response for CCB compatibility
@@ -932,7 +932,7 @@ export class PublicController {
             totalAmount: detailOrder.totalAmount || rawOrder.totalAmount,
             // Scheduled order
             isScheduledOrder: detailOrder.isScheduledOrder || false,
-            scheduledDeliveryTime: detailOrder.scheduledDeliveryTime || null,
+            scheduledDeliveryTime: detailOrder.scheduledDeliveryTime || undefined,
             // Combined order
             isCombinedOrder: detailOrder.isCombinedOrder || false,
           };
