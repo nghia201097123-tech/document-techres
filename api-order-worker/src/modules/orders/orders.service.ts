@@ -73,6 +73,17 @@ export class OrdersService {
     totalOrders: number;
     accounts: any[];
   }> {
+    // ======================================================
+    // DEBUG: Log nhận signal từ api-app-food
+    // ======================================================
+    console.log('');
+    console.log('🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔');
+    console.log(`🔔 [triggerPoll] RECEIVED SIGNAL from api-app-food`);
+    console.log(`🔔 Branch: ${branchId}`);
+    console.log(`🔔 Timestamp: ${new Date().toISOString()}`);
+    console.log('🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔🔔');
+    console.log('');
+
     this.logger.log(`[triggerPoll] Starting poll for branch ${branchId}`);
 
     // 1. Lấy tất cả accounts của branch
@@ -290,20 +301,39 @@ export class OrdersService {
 
         // STEP 1: Gọi detail API để lấy đầy đủ items trước
         let detailItems: any[] = [];
+        let detailSource = 'unknown';
+
         if (account) {
-          this.logger.log(`[processOrdersWithDetails]   📡 Fetching detail from API...`);
+          console.log(`📡 [processOrdersWithDetails] Calling detail API for ${rawOrder.orderCode}...`);
+          console.log(`   External Order ID: ${rawOrder.externalOrderId}`);
+          console.log(`   Access Token: ${account.accessToken?.substring(0, 50)}...`);
+
           const detailResponse = await this.callGrabDetailApi(rawOrder.externalOrderId, account.accessToken);
+
           if (detailResponse) {
+            console.log(`✅ [processOrdersWithDetails] Detail API SUCCESS for ${rawOrder.orderCode}`);
             detailItems = this.parseDetailItems(detailResponse);
-            this.logger.log(`[processOrdersWithDetails]   ✅ Got ${detailItems.length} items from detail API`);
+            detailSource = 'detail_api';
+
+            // Log first item price để verify
+            if (detailItems.length > 0) {
+              console.log(`   First item: "${detailItems[0].productName}"`);
+              console.log(`   First item unitPrice: ${detailItems[0].unitPrice}`);
+              console.log(`   First item totalPrice: ${detailItems[0].totalPrice}`);
+            }
           } else {
-            this.logger.warn(`[processOrdersWithDetails]   ⚠️ No detail data, using basic items from pagination`);
+            console.log(`⚠️ [processOrdersWithDetails] Detail API FAILED for ${rawOrder.orderCode}`);
+            console.log(`   Falling back to pagination items (NO PRICE!)`);
             detailItems = rawOrder.items || [];
+            detailSource = 'pagination_fallback';
           }
         } else {
-          this.logger.warn(`[processOrdersWithDetails]   ⚠️ No account, using basic items from pagination`);
+          console.log(`⚠️ [processOrdersWithDetails] No account for ${rawOrder.orderCode}`);
           detailItems = rawOrder.items || [];
+          detailSource = 'no_account';
         }
+
+        console.log(`📦 [processOrdersWithDetails] Items source: ${detailSource}, count: ${detailItems.length}`);
 
         // STEP 2: Lưu order + items trong 1 transaction
         const result = await this.saveOrderWithItemsTransaction(
