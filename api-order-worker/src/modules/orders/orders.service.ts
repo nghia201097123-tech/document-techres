@@ -319,10 +319,13 @@ export class OrdersService {
         // Validate items have prices
         const hasValidPrices = detailItems.some((item: any) => item.unitPrice > 0 || item.totalPrice > 0);
         if (!hasValidPrices && detailItems.length > 0) {
-          this.logger.warn(`[processOrdersWithDetails] ⚠️ Items have no prices for ${rawOrder.orderCode} - SKIP`);
-          this.logger.warn(`   This should not happen if detail API returned correct data`);
-          skippedCount++;
-          continue; // Skip order if items have no prices
+          this.logger.warn(`[processOrdersWithDetails] ⚠️ Items have no prices for ${rawOrder.orderCode}`);
+          this.logger.warn(`   Detail API returned ${detailItems.length} items but all have price = 0`);
+          this.logger.warn(`   This usually means Detail API response structure is different than expected`);
+          this.logger.warn(`   Detail response preview: ${JSON.stringify(detailResponse).substring(0, 500)}`);
+          // KHÔNG skip - vẫn lưu để không mất order, nhưng log warning
+          // User có thể check logs để debug
+          this.logger.warn(`   ⚠️ SAVING ORDER ANYWAY with 0 prices - check Detail API response structure!`);
         }
 
         // Log first item price để verify
@@ -533,6 +536,9 @@ export class OrdersService {
 
   /**
    * Save items trong transaction
+   *
+   * QUAN TRỌNG: Items phải được lấy từ Detail API (có giá) chứ không phải từ Pagination API
+   * Pagination API KHÔNG có giá items!
    */
   private async saveItemsInTransaction(
     queryRunner: any,
@@ -546,14 +552,25 @@ export class OrdersService {
     const orderItems = items.map((item, index) => {
       const modifiers = this.transformModifiers(item.modifierGroups);
 
+      // Parse prices với fallback - QUAN TRỌNG: dùng Number() để handle undefined/null đúng cách
+      // Không dùng || 0 vì 0 là falsy value trong JS
+      const quantity = Number(item.quantity) || 1;
+      const unitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : (typeof item.price === 'number' ? item.price : 0);
+      const totalPrice = typeof item.totalPrice === 'number' ? item.totalPrice : (quantity * unitPrice);
+
+      // Log warning nếu giá = 0 (có thể là bug)
+      if (unitPrice === 0 && totalPrice === 0) {
+        this.logger.warn(`[saveItemsInTransaction] ⚠️ Item "${item.productName || item.name}" has 0 price! Check Detail API response.`);
+      }
+
       return queryRunner.manager.create(FoodOrderItem, {
         orderId,
-        externalProductId: item.externalProductId || item.id || null,
+        externalProductId: item.externalProductId || item.id || item.itemID || null,
         productName: item.productName || item.name || 'Unknown',
-        quantity: item.quantity || 1,
-        unitPrice: item.unitPrice || item.price || 0,
-        totalPrice: item.totalPrice || (item.quantity || 1) * (item.unitPrice || item.price || 0),
-        discountAmount: item.discountAmount || 0,
+        quantity,
+        unitPrice,
+        totalPrice,
+        discountAmount: typeof item.discountAmount === 'number' ? item.discountAmount : 0,
         note: item.note || item.specialInstruction || item.comment || null,
         options: typeof item.options === 'string' ? item.options : null,
         modifiers,
@@ -562,6 +579,8 @@ export class OrdersService {
     });
 
     await queryRunner.manager.save(FoodOrderItem, orderItems);
+
+    this.logger.log(`[saveItemsInTransaction] ✅ Saved ${orderItems.length} items for order ${orderId}`);
   }
 
   /**
@@ -620,12 +639,15 @@ export class OrdersService {
   /**
    * Parse items từ Grab detail API response
    *
-   * Grab API item structure:
+   * Grab API item structure (Detail API):
    * - fare.originalItemPriceDisplay: Giá bán gốc (unit price) - VD: "59.000"
    * - fare.priceDisplay: Tổng thành tiền (total price = unit price * quantity + options) - VD: "64.000"
    * - comment: Ghi chú của khách
    * - modifierGroups[].modifiers[].priceDisplay: Giá option - VD: "5.000"
    * - discountInfo[].itemDiscountPriceDisplay: Tiền giảm giá
+   *
+   * LƯU Ý: Pagination API KHÔNG có giá items (chỉ có itemID, name, quantity, weight)
+   * Phải dùng Detail API để lấy giá chính xác!
    */
   private parseDetailItems(detailData: any): any[] {
     // Grab order detail structure: detailData.order.itemInfo.items
@@ -634,13 +656,46 @@ export class OrdersService {
 
     this.logger.log(`[parseDetailItems] Parsing ${rawItems.length} items from detail API`);
 
+    // Debug: Log full structure nếu không có items
+    if (rawItems.length === 0) {
+      this.logger.warn(`[parseDetailItems] ⚠️ No items found in detail response!`);
+      this.logger.warn(`[parseDetailItems] Response structure: ${JSON.stringify({
+        hasOrder: !!detailData.order,
+        hasItemInfo: !!orderData.itemInfo,
+        hasItems: !!orderData.items,
+        keys: Object.keys(orderData || {}),
+      })}`);
+    }
+
     return rawItems.map((item: any, index: number) => {
       const quantity = item.quantity || 1;
 
       // Unit price từ fare.originalItemPriceDisplay (giá bán gốc)
-      const unitPrice = this.parseCurrency(item.fare?.originalItemPriceDisplay);
+      // Fallback paths cho các trường hợp structure khác nhau
+      const unitPrice = this.parseCurrency(
+        item.fare?.originalItemPriceDisplay ||
+        item.fare?.originalPrice ||
+        item.originalItemPriceDisplay ||
+        item.originalPrice ||
+        item.unitPrice ||
+        item.price,
+      );
+
       // Total price từ fare.priceDisplay (tổng thành tiền bao gồm options)
-      const totalPrice = this.parseCurrency(item.fare?.priceDisplay);
+      // Fallback paths cho các trường hợp structure khác nhau
+      const totalPrice = this.parseCurrency(
+        item.fare?.priceDisplay ||
+        item.fare?.totalPrice ||
+        item.priceDisplay ||
+        item.totalPrice,
+      ) || (unitPrice * quantity); // Fallback: tính từ unitPrice nếu không có totalPrice
+
+      // Debug: Log chi tiết nếu giá = 0
+      if (unitPrice === 0 && totalPrice === 0) {
+        this.logger.warn(`[parseDetailItems] ⚠️ Item "${item.name}" has 0 price!`);
+        this.logger.warn(`[parseDetailItems] Item fare structure: ${JSON.stringify(item.fare || 'undefined')}`);
+        this.logger.warn(`[parseDetailItems] Item keys: ${Object.keys(item || {}).join(', ')}`);
+      }
 
       // Parse discounts
       const discounts = (item.discountInfo || []).map((d: any) => ({
@@ -657,7 +712,7 @@ export class OrdersService {
         modifiers: (group.modifiers || []).map((mod: any) => ({
           modifierId: mod.modifierID,
           modifierName: mod.modifierName,
-          price: this.parseCurrency(mod.priceDisplay),
+          price: this.parseCurrency(mod.priceDisplay || mod.price),
         })),
       }));
 

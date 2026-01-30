@@ -38,6 +38,11 @@ interface AccountData {
   tenantId: string;
 }
 
+/**
+ * Interface cho Grab Pagination Order
+ * LƯU Ý: Pagination API KHÔNG có giá items (chỉ có itemID, name, quantity, weight)
+ * Giá items phải được lấy từ Detail API sau đó!
+ */
 interface GrabPaginationOrder {
   orderID: string;
   displayID?: string;
@@ -55,10 +60,13 @@ interface GrabPaginationOrder {
     licensePlate?: string;
   };
   itemInfo?: {
+    count?: number;
     items?: Array<{
+      itemID?: string;
       name: string;
       quantity: number;
-      price?: string;
+      weight?: number | null;
+      // LƯU Ý: KHÔNG có trường price trong pagination response!
     }>;
   };
   orderValue?: string;
@@ -143,6 +151,11 @@ export default async function pollGrabOrders(account: AccountData) {
 /**
  * Transform Grab pagination order to basic TechRes format
  * Chỉ có thông tin cơ bản từ pagination API
+ *
+ * QUAN TRỌNG: Pagination API KHÔNG trả về giá items!
+ * - items chỉ có: itemID, name, quantity, weight
+ * - KHÔNG có: price, fare, modifiers, discounts
+ * - Giá items phải được lấy từ Detail API sau đó bởi orders.service.ts
  */
 function transformPaginationOrder(grabOrder: GrabPaginationOrder) {
   const orderValue = parseCurrency(grabOrder.orderValue);
@@ -165,15 +178,17 @@ function transformPaginationOrder(grabOrder: GrabPaginationOrder) {
     driverAvatar: grabOrder.driver?.avatar || null,
     driverLicensePlate: grabOrder.driver?.licensePlate || null,
 
-    // Items (basic - chỉ có tên và số lượng từ pagination)
+    // Items (basic - CHỈ có tên và số lượng từ pagination, KHÔNG CÓ GIÁ!)
+    // Giá sẽ được lấy từ Detail API bởi orders.service.ts
     items: (grabOrder.itemInfo?.items || []).map((item) => ({
+      itemID: item.itemID,
       productName: item.name,
       quantity: item.quantity,
-      unitPrice: parseCurrency(item.price),
-      totalPrice: parseCurrency(item.price) * (item.quantity || 1),
+      // KHÔNG set unitPrice/totalPrice ở đây vì pagination API không có!
+      // orders.service.ts sẽ gọi Detail API để lấy giá
     })),
 
-    // Pricing (basic)
+    // Pricing (basic - chỉ có tổng giá trị đơn hàng)
     subtotal: orderValue,
     deliveryFee: 0,
     platformFee: 0,
@@ -187,7 +202,7 @@ function transformPaginationOrder(grabOrder: GrabPaginationOrder) {
     // Timestamps
     createdAt: grabOrder.times?.createdAt ? new Date(grabOrder.times.createdAt) : new Date(),
 
-    // Flag để biết chưa có detail
+    // Flag để biết chưa có detail - orders.service.ts sẽ gọi Detail API
     hasDetailInfo: false,
   };
 }
