@@ -314,6 +314,13 @@ export class OrdersService {
           this.logger.log(`[processOrdersWithDetails]   📡 Fetching detail from API...`);
           const detailResponse = await this.callGrabDetailApi(rawOrder.externalOrderId, account.accessToken);
           if (detailResponse) {
+            // DEBUG: Log full response from Grab API
+            console.log('');
+            console.log('📋📋📋 [GRAB DETAIL API RESPONSE] 📋📋📋');
+            console.log(JSON.stringify(detailResponse, null, 2));
+            console.log('📋📋📋 [END GRAB DETAIL API RESPONSE] 📋📋📋');
+            console.log('');
+
             detailItems = this.parseDetailItems(detailResponse);
             this.logger.log(`[processOrdersWithDetails]   ✅ Got ${detailItems.length} items from detail API`);
           } else {
