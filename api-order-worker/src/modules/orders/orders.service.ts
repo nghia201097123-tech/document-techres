@@ -73,15 +73,7 @@ export class OrdersService {
     totalOrders: number;
     accounts: any[];
   }> {
-    // ======================================================
-    // DEBUG: Verify new code is running
-    // ======================================================
-    console.log('');
-    console.log('🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥');
-    console.log('🔥 [triggerPoll] NEW CODE VERSION - 2024-01-29 v2');
-    console.log('🔥 Branch:', branchId);
-    console.log('🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥');
-    console.log('');
+    this.logger.log(`[triggerPoll] Starting poll for branch ${branchId}`);
 
     // 1. Lấy tất cả accounts của branch
     const accounts = await this.accountRepo.find({
@@ -145,17 +137,7 @@ export class OrdersService {
         );
 
         if (result.success) {
-          // Log orders from pagination
-          console.log(`📦 [triggerPoll] Received ${result.orders?.length || 0} orders from ${result.platform}`);
-
-          // ============================================
-          // NEW FLOW: Fetch detail trước, lưu order + items cùng lúc
-          // ============================================
-          console.log('');
-          console.log('📝📝📝 Processing orders with detail API... 📝📝📝');
-          console.log(`   Orders to process: ${result.orders?.length || 0}`);
-          console.log(`   Account: ${account?.id} (${account?.platform})`);
-
+          // Process orders: fetch detail API + save order & items atomically
           const saved = await this.processOrdersWithDetails(
             result.orders,
             branchId,
@@ -163,8 +145,6 @@ export class OrdersService {
             account,
           );
           newOrderIds.push(...saved.newOrderIds);
-
-          console.log(`✅ DONE: Processed ${saved.savedOrders.length} orders, ${saved.newOrderIds.length} new`);
 
           // Update account metadata
           await this.accountRepo.update(result.accountId, {
@@ -314,13 +294,6 @@ export class OrdersService {
           this.logger.log(`[processOrdersWithDetails]   📡 Fetching detail from API...`);
           const detailResponse = await this.callGrabDetailApi(rawOrder.externalOrderId, account.accessToken);
           if (detailResponse) {
-            // DEBUG: Log full response from Grab API
-            console.log('');
-            console.log('📋📋📋 [GRAB DETAIL API RESPONSE] 📋📋📋');
-            console.log(JSON.stringify(detailResponse, null, 2));
-            console.log('📋📋📋 [END GRAB DETAIL API RESPONSE] 📋📋📋');
-            console.log('');
-
             detailItems = this.parseDetailItems(detailResponse);
             this.logger.log(`[processOrdersWithDetails]   ✅ Got ${detailItems.length} items from detail API`);
           } else {
@@ -537,26 +510,11 @@ export class OrdersService {
     // Delete existing items first
     await queryRunner.manager.delete(FoodOrderItem, { orderId });
 
-    // DEBUG: Log items received
-    console.log('');
-    console.log('💾💾💾 [saveItemsInTransaction] DEBUG - Items to save:');
-    items.forEach((item, index) => {
-      console.log(`   Item ${index + 1}:`);
-      console.log(`      productName: "${item.productName}"`);
-      console.log(`      quantity: ${item.quantity}`);
-      console.log(`      unitPrice: ${item.unitPrice} (type: ${typeof item.unitPrice})`);
-      console.log(`      totalPrice: ${item.totalPrice} (type: ${typeof item.totalPrice})`);
-      console.log(`      note: "${item.note}"`);
-      console.log(`      options: "${item.options}"`);
-    });
-    console.log('💾💾💾');
-    console.log('');
-
     // Create new items
     const orderItems = items.map((item, index) => {
       const modifiers = this.transformModifiers(item.modifierGroups);
 
-      const entityData = {
+      return queryRunner.manager.create(FoodOrderItem, {
         orderId,
         externalProductId: item.externalProductId || item.id || null,
         productName: item.productName || item.name || 'Unknown',
@@ -568,12 +526,7 @@ export class OrdersService {
         options: typeof item.options === 'string' ? item.options : null,
         modifiers,
         sortOrder: index,
-      };
-
-      // DEBUG: Log entity data before create
-      console.log(`   [saveItemsInTransaction] Creating entity ${index + 1}:`, JSON.stringify(entityData, null, 2));
-
-      return queryRunner.manager.create(FoodOrderItem, entityData);
+      });
     });
 
     await queryRunner.manager.save(FoodOrderItem, orderItems);
@@ -883,33 +836,9 @@ export class OrdersService {
    * - discountInfo[].itemDiscountPriceDisplay: Tiền giảm giá
    */
   private parseDetailItems(detailData: any): any[] {
-    // DEBUG: Log full response structure để phân tích
-    console.log('');
-    console.log('🔍🔍🔍 [parseDetailItems] DEBUG - Full response structure:');
-    console.log('   detailData keys:', Object.keys(detailData || {}));
-    console.log('   detailData.order keys:', Object.keys(detailData?.order || {}));
-    console.log('   detailData.order.itemInfo keys:', Object.keys(detailData?.order?.itemInfo || {}));
-
-    // Grab order detail có thể có structure khác nhau
-    // Thường là: detailData.order.items hoặc detailData.itemInfo.items
+    // Grab order detail structure: detailData.order.itemInfo.items
     const orderData = detailData.order || detailData;
     const rawItems = orderData.itemInfo?.items || orderData.items || [];
-
-    console.log('   orderData keys:', Object.keys(orderData || {}));
-    console.log('   rawItems length:', rawItems.length);
-
-    // Log first item structure for debugging
-    if (rawItems.length > 0) {
-      const firstItem = rawItems[0];
-      console.log('   First item keys:', Object.keys(firstItem || {}));
-      console.log('   First item.fare:', JSON.stringify(firstItem?.fare, null, 2));
-      console.log('   First item.price:', firstItem?.price);
-      console.log('   First item.unitPrice:', firstItem?.unitPrice);
-      console.log('   First item.originalPrice:', firstItem?.originalPrice);
-      console.log('   First item.displayPrice:', firstItem?.displayPrice);
-    }
-    console.log('🔍🔍🔍');
-    console.log('');
 
     this.logger.log(`[parseDetailItems] Parsing ${rawItems.length} items from detail API`);
 
