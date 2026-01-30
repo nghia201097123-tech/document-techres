@@ -537,11 +537,26 @@ export class OrdersService {
     // Delete existing items first
     await queryRunner.manager.delete(FoodOrderItem, { orderId });
 
+    // DEBUG: Log items received
+    console.log('');
+    console.log('💾💾💾 [saveItemsInTransaction] DEBUG - Items to save:');
+    items.forEach((item, index) => {
+      console.log(`   Item ${index + 1}:`);
+      console.log(`      productName: "${item.productName}"`);
+      console.log(`      quantity: ${item.quantity}`);
+      console.log(`      unitPrice: ${item.unitPrice} (type: ${typeof item.unitPrice})`);
+      console.log(`      totalPrice: ${item.totalPrice} (type: ${typeof item.totalPrice})`);
+      console.log(`      note: "${item.note}"`);
+      console.log(`      options: "${item.options}"`);
+    });
+    console.log('💾💾💾');
+    console.log('');
+
     // Create new items
     const orderItems = items.map((item, index) => {
       const modifiers = this.transformModifiers(item.modifierGroups);
 
-      return queryRunner.manager.create(FoodOrderItem, {
+      const entityData = {
         orderId,
         externalProductId: item.externalProductId || item.id || null,
         productName: item.productName || item.name || 'Unknown',
@@ -553,7 +568,12 @@ export class OrdersService {
         options: typeof item.options === 'string' ? item.options : null,
         modifiers,
         sortOrder: index,
-      });
+      };
+
+      // DEBUG: Log entity data before create
+      console.log(`   [saveItemsInTransaction] Creating entity ${index + 1}:`, JSON.stringify(entityData, null, 2));
+
+      return queryRunner.manager.create(FoodOrderItem, entityData);
     });
 
     await queryRunner.manager.save(FoodOrderItem, orderItems);
