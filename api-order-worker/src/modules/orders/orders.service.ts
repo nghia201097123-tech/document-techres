@@ -856,10 +856,33 @@ export class OrdersService {
    * - discountInfo[].itemDiscountPriceDisplay: Tiền giảm giá
    */
   private parseDetailItems(detailData: any): any[] {
+    // DEBUG: Log full response structure để phân tích
+    console.log('');
+    console.log('🔍🔍🔍 [parseDetailItems] DEBUG - Full response structure:');
+    console.log('   detailData keys:', Object.keys(detailData || {}));
+    console.log('   detailData.order keys:', Object.keys(detailData?.order || {}));
+    console.log('   detailData.order.itemInfo keys:', Object.keys(detailData?.order?.itemInfo || {}));
+
     // Grab order detail có thể có structure khác nhau
     // Thường là: detailData.order.items hoặc detailData.itemInfo.items
     const orderData = detailData.order || detailData;
     const rawItems = orderData.itemInfo?.items || orderData.items || [];
+
+    console.log('   orderData keys:', Object.keys(orderData || {}));
+    console.log('   rawItems length:', rawItems.length);
+
+    // Log first item structure for debugging
+    if (rawItems.length > 0) {
+      const firstItem = rawItems[0];
+      console.log('   First item keys:', Object.keys(firstItem || {}));
+      console.log('   First item.fare:', JSON.stringify(firstItem?.fare, null, 2));
+      console.log('   First item.price:', firstItem?.price);
+      console.log('   First item.unitPrice:', firstItem?.unitPrice);
+      console.log('   First item.originalPrice:', firstItem?.originalPrice);
+      console.log('   First item.displayPrice:', firstItem?.displayPrice);
+    }
+    console.log('🔍🔍🔍');
+    console.log('');
 
     this.logger.log(`[parseDetailItems] Parsing ${rawItems.length} items from detail API`);
 
