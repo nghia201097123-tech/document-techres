@@ -294,6 +294,7 @@ export class OrdersService {
 
     const savedOrders: FoodOrder[] = [];
     const newOrderIds: string[] = [];
+    let skippedCount = 0;
 
     for (const rawOrder of orders) {
       try {
@@ -303,37 +304,46 @@ export class OrdersService {
         let detailItems: any[] = [];
         let detailSource = 'unknown';
 
-        if (account) {
-          console.log(`📡 [processOrdersWithDetails] Calling detail API for ${rawOrder.orderCode}...`);
-          console.log(`   External Order ID: ${rawOrder.externalOrderId}`);
-          console.log(`   Access Token: ${account.accessToken?.substring(0, 50)}...`);
-
-          const detailResponse = await this.callGrabDetailApi(rawOrder.externalOrderId, account.accessToken);
-
-          if (detailResponse) {
-            console.log(`✅ [processOrdersWithDetails] Detail API SUCCESS for ${rawOrder.orderCode}`);
-            detailItems = this.parseDetailItems(detailResponse);
-            detailSource = 'detail_api';
-
-            // Log first item price để verify
-            if (detailItems.length > 0) {
-              console.log(`   First item: "${detailItems[0].productName}"`);
-              console.log(`   First item unitPrice: ${detailItems[0].unitPrice}`);
-              console.log(`   First item totalPrice: ${detailItems[0].totalPrice}`);
-            }
-          } else {
-            console.log(`⚠️ [processOrdersWithDetails] Detail API FAILED for ${rawOrder.orderCode}`);
-            console.log(`   Falling back to pagination items (NO PRICE!)`);
-            detailItems = rawOrder.items || [];
-            detailSource = 'pagination_fallback';
-          }
-        } else {
-          console.log(`⚠️ [processOrdersWithDetails] No account for ${rawOrder.orderCode}`);
-          detailItems = rawOrder.items || [];
-          detailSource = 'no_account';
+        if (!account) {
+          this.logger.warn(`[processOrdersWithDetails] ⚠️ No account for ${rawOrder.orderCode} - SKIP`);
+          skippedCount++;
+          continue; // Skip order without account
         }
 
-        console.log(`📦 [processOrdersWithDetails] Items source: ${detailSource}, count: ${detailItems.length}`);
+        this.logger.log(`📡 [processOrdersWithDetails] Calling detail API for ${rawOrder.orderCode}...`);
+        this.logger.log(`   External Order ID: ${rawOrder.externalOrderId}`);
+
+        // Call detail API with retry
+        const detailResponse = await this.callGrabDetailApi(rawOrder.externalOrderId, account.accessToken);
+
+        if (!detailResponse) {
+          this.logger.warn(`[processOrdersWithDetails] ⚠️ Detail API FAILED for ${rawOrder.orderCode} - SKIP`);
+          this.logger.warn(`   Order will be processed in next poll when detail API succeeds`);
+          skippedCount++;
+          continue; // Skip order without detail - DO NOT fallback to pagination (no prices!)
+        }
+
+        this.logger.log(`✅ [processOrdersWithDetails] Detail API SUCCESS for ${rawOrder.orderCode}`);
+        detailItems = this.parseDetailItems(detailResponse);
+        detailSource = 'detail_api';
+
+        // Validate items have prices
+        const hasValidPrices = detailItems.some((item: any) => item.unitPrice > 0 || item.totalPrice > 0);
+        if (!hasValidPrices && detailItems.length > 0) {
+          this.logger.warn(`[processOrdersWithDetails] ⚠️ Items have no prices for ${rawOrder.orderCode} - SKIP`);
+          this.logger.warn(`   This should not happen if detail API returned correct data`);
+          skippedCount++;
+          continue; // Skip order if items have no prices
+        }
+
+        // Log first item price để verify
+        if (detailItems.length > 0) {
+          this.logger.log(`   First item: "${detailItems[0].productName}"`);
+          this.logger.log(`   First item unitPrice: ${detailItems[0].unitPrice}đ`);
+          this.logger.log(`   First item totalPrice: ${detailItems[0].totalPrice}đ`);
+        }
+
+        this.logger.log(`📦 [processOrdersWithDetails] Items source: ${detailSource}, count: ${detailItems.length}`);
 
         // STEP 2: Lưu order + items trong 1 transaction
         const result = await this.saveOrderWithItemsTransaction(
@@ -355,7 +365,10 @@ export class OrdersService {
       }
     }
 
-    this.logger.log(`[processOrdersWithDetails] 🏁 DONE. Total: ${savedOrders.length}, New: ${newOrderIds.length}`);
+    this.logger.log(`[processOrdersWithDetails] 🏁 DONE. Saved: ${savedOrders.length}, New: ${newOrderIds.length}, Skipped: ${skippedCount}`);
+    if (skippedCount > 0) {
+      this.logger.warn(`[processOrdersWithDetails] ⚠️ ${skippedCount} orders skipped due to detail API failure - will retry in next poll`);
+    }
     this.logger.log('═══════════════════════════════════════════════════════════');
 
     return { savedOrders, newOrderIds };
@@ -825,6 +838,8 @@ export class OrdersService {
   private async callGrabDetailApi(orderId: string, accessToken: string, maxRetries = 3): Promise<any> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
+        this.logger.log(`[callGrabDetailApi] Attempt ${attempt}/${maxRetries} for order ${orderId}`);
+
         const response = await axios.get(`${GRAB_API_URL}/orders/${orderId}`, {
           headers: {
             Authorization: accessToken,
@@ -835,11 +850,26 @@ export class OrdersService {
           timeout: 30000,
         });
 
+        this.logger.log(`[callGrabDetailApi] ✅ Success for order ${orderId}, status: ${response.status}`);
         return response.data;
       } catch (error: any) {
+        const status = error.response?.status;
+        const errorData = error.response?.data;
+
         this.logger.warn(
-          `[callGrabDetailApi] Attempt ${attempt}/${maxRetries} failed for order ${orderId}: ${error.message}`,
+          `[callGrabDetailApi] Attempt ${attempt}/${maxRetries} failed for order ${orderId}`,
         );
+        this.logger.warn(`   Status: ${status || 'N/A'}`);
+        this.logger.warn(`   Message: ${error.message}`);
+        if (errorData) {
+          this.logger.warn(`   Response: ${JSON.stringify(errorData).substring(0, 200)}`);
+        }
+
+        // Check for specific error types
+        if (status === 401) {
+          this.logger.error(`[callGrabDetailApi] ❌ Token expired/invalid for order ${orderId}`);
+          return null; // Don't retry on auth errors
+        }
 
         if (attempt < maxRetries) {
           // Exponential backoff: 1s, 2s, 4s
